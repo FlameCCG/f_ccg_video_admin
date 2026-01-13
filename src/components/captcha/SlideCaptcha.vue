@@ -34,6 +34,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   /** 验证成功 */
   success: [result: CaptchaResult]
+  /** 确认验证（用户释放滑块） */
+  confirm: [result: CaptchaResult]
   /** 验证失败 */
   fail: []
   /** 刷新验证码 */
@@ -58,11 +60,20 @@ const isDragging = ref(false)
 /** 滑块当前 X 位置 */
 const sliderX = ref(0)
 
+/** 图片缩放比例 */
+const scale = ref(1)
+
 /** 拖动起始 X 位置 */
 const startX = ref(0)
 
 /** 验证状态: idle | success | fail */
 const verifyStatus = ref<'idle' | 'success' | 'fail'>('idle')
+
+/** 是否显示结果覆盖层 */
+const showResult = ref(false)
+
+/** 是否抖动 */
+const isShaking = ref(false)
 
 /** 容器宽度 */
 const containerWidth = ref(280)
@@ -102,6 +113,20 @@ async function fetchCaptcha(): Promise<void> {
 function handleRefresh(): void {
   emit('refresh')
   void fetchCaptcha()
+}
+
+/**
+ * 图片加载完成，计算缩放比例
+ */
+function onImageLoad(e: Event): void {
+  const img = e.target as HTMLImageElement
+  if (img && captchaData.value) {
+    // 假设后端返回的图片原始宽度为 320 (通常是标准宽度，或者根据实际情况调整)
+    // 如果后端没返回原始尺寸，这里可能需要约定或者从 masterImage 获取原始尺寸（如果 masterImage 是原图）
+    // 这里我们假设容器宽度即为显示宽度，原始宽度需要根据实际图片 naturalWidth 计算
+    // 但因为我们是 fit width，所以 scale = currentWidth / naturalWidth
+    scale.value = img.width / img.naturalWidth
+  }
 }
 
 /**
@@ -161,17 +186,15 @@ function verifySlider(): void {
   if (!captchaData.value) return
 
   // 计算实际 X 坐标（相对于图片的位置）
-  // 这里简化处理，实际项目中可能需要根据后端返回的数据进行计算
+  // 使用 scale 反向计算原始坐标
   const result: CaptchaResult = {
     token: captchaData.value.token,
-    x: Math.round(sliderX.value),
+    x: Math.round(sliderX.value / scale.value),
     y: captchaData.value.thumbY,
   }
 
-  // 这里我们假设验证成功（实际验证由后端在登录时完成）
-  // 前端只负责收集滑块位置数据
-  verifyStatus.value = 'success'
-  emit('success', result)
+  // 触发确认事件，由父组件调用后端验证
+  emit('confirm', result)
 }
 
 /**
@@ -221,13 +244,38 @@ watch(
 defineExpose({
   reset,
   refresh: handleRefresh,
+  success: () => {
+    verifyStatus.value = 'success'
+    showResult.value = true
+    emit('success', {
+      token: captchaData.value?.token || '',
+      x: 0,
+      y: 0,
+    })
+  },
+  fail: () => {
+    verifyStatus.value = 'fail'
+    showResult.value = true
+    isShaking.value = true
+    // 0.5s 后移除抖动
+    setTimeout(() => {
+      isShaking.value = false
+    }, 500)
+
+    // 1.5s 后自动重置，允许重试
+    setTimeout(() => {
+      verifyStatus.value = 'idle'
+      showResult.value = false
+      sliderX.value = 0
+    }, 1500)
+  },
 })
 </script>
 
 <template>
   <div v-if="visible" ref="containerRef" class="slide-captcha">
     <!-- 验证码图片区域 -->
-    <div class="slide-captcha__image-wrapper">
+    <div class="slide-captcha__image-wrapper" :class="{ 'slide-captcha--shake': isShaking }">
       <n-spin :show="loading">
         <div class="slide-captcha__image-container">
           <!-- 主图片 -->
@@ -237,6 +285,7 @@ defineExpose({
             class="slide-captcha__master-image"
             alt="captcha"
             draggable="false"
+            @load="onImageLoad"
           />
 
           <!-- 滑块图片 -->
@@ -246,7 +295,9 @@ defineExpose({
             class="slide-captcha__tile-image"
             :style="{
               left: `${sliderX}px`,
-              top: `${captchaData.thumbY}px`,
+              top: `${(captchaData.thumbY || 0) * scale}px`,
+              transform: `scale(${scale})`,
+              transformOrigin: 'left top',
             }"
             alt="slider"
             draggable="false"
@@ -255,6 +306,34 @@ defineExpose({
           <!-- 加载占位 -->
           <div v-if="!captchaData && !loading" class="slide-captcha__placeholder">
             {{ t('auth.captcha.loading') }}
+          </div>
+          <!-- 结果覆盖层 -->
+          <div
+            v-if="showResult"
+            class="slide-captcha__result"
+            :class="{
+              'slide-captcha__result--success': verifyStatus === 'success',
+              'slide-captcha__result--fail': verifyStatus === 'fail',
+            }"
+          >
+            <div class="slide-captcha__result-icon">
+              <n-icon size="40">
+                <svg v-if="verifyStatus === 'success'" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                </svg>
+                <svg v-else viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                  />
+                </svg>
+              </n-icon>
+            </div>
+            <div class="slide-captcha__result-text">
+              {{
+                verifyStatus === 'success' ? t('auth.captcha.success') : t('auth.captcha.failed')
+              }}
+            </div>
           </div>
         </div>
       </n-spin>
@@ -333,7 +412,6 @@ defineExpose({
   &__image-container {
     position: relative;
     width: 100%;
-    height: 160px;
     overflow: hidden;
     background-color: var(--color-surface-alt);
     border-radius: var(--radius-md);
@@ -341,14 +419,12 @@ defineExpose({
 
   &__master-image {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: auto;
+    display: block;
   }
 
   &__tile-image {
     position: absolute;
-    height: 40px;
-    width: 40px;
     object-fit: contain;
     pointer-events: none;
     filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3));
@@ -472,6 +548,62 @@ defineExpose({
   &__slider-icon {
     font-size: 18px;
     font-weight: bold;
+  }
+
+  &__result {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.9);
+    z-index: 10;
+    opacity: 0;
+    animation: fade-in 0.2s forwards;
+
+    &--success {
+      color: var(--color-success);
+    }
+
+    &--fail {
+      color: var(--color-danger);
+    }
+  }
+
+  &__result-text {
+    margin-top: var(--spacing-2);
+    font-weight: bold;
+    font-size: var(--text-lg);
+  }
+
+  &--shake {
+    animation: shake 0.5s;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-5px);
+  }
+
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
   }
 }
 </style>
