@@ -3,6 +3,9 @@
  */
 export default {
   title: 'User Management',
+  banRecords: {
+    title: 'Ban Records',
+  },
   list: {
     title: 'User List',
     avatar: 'Avatar',

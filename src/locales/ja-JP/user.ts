@@ -3,6 +3,9 @@
  */
 export default {
   title: 'ユーザー管理',
+  banRecords: {
+    title: 'BAN履歴',
+  },
   list: {
     title: 'ユーザー一覧',
     avatar: 'アバター',

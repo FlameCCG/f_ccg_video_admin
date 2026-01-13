@@ -3,6 +3,12 @@
  */
 export default {
   title: 'Video Management',
+  partitions: {
+    title: 'Partitions',
+  },
+  reports: {
+    title: 'Reports',
+  },
   list: {
     title: 'Video List',
     cover: 'Cover',

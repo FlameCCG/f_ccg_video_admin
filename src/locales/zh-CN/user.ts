@@ -3,6 +3,9 @@
  */
 export default {
   title: '用户管理',
+  banRecords: {
+    title: '封禁记录',
+  },
   list: {
     title: '用户列表',
     avatar: '头像',

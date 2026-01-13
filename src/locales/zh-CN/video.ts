@@ -3,6 +3,12 @@
  */
 export default {
   title: '视频管理',
+  partitions: {
+    title: '分区管理',
+  },
+  reports: {
+    title: '举报管理',
+  },
   list: {
     title: '视频列表',
     cover: '封面',

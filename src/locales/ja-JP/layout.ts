@@ -27,7 +27,7 @@ export default {
     title: 'テーマ設定',
     pearl: 'パール',
     obsidian: 'オブシディアン',
-    aurum: 'オーラム',
+    cyberpunk: 'サイバーパンク',
     sakura: 'サクラ',
     light: 'ライト',
     dark: 'ダーク',

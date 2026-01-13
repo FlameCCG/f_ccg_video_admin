@@ -3,6 +3,15 @@
  */
 export default {
   title: 'Access Control',
+  roles: {
+    title: 'Roles',
+  },
+  menus: {
+    title: 'Menus',
+  },
+  permissions: {
+    title: 'Permissions',
+  },
   role: {
     title: 'Role Management',
     name: 'Role Name',

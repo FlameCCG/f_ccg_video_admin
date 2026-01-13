@@ -3,6 +3,15 @@
  */
 export default {
   title: 'アクセス制御',
+  roles: {
+    title: 'ロール管理',
+  },
+  menus: {
+    title: 'メニュー管理',
+  },
+  permissions: {
+    title: '権限管理',
+  },
   role: {
     title: 'ロール管理',
     name: 'ロール名',

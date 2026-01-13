@@ -3,6 +3,12 @@
  */
 export default {
   title: '動画管理',
+  partitions: {
+    title: 'カテゴリ管理',
+  },
+  reports: {
+    title: '通報管理',
+  },
   list: {
     title: '動画一覧',
     cover: 'サムネイル',

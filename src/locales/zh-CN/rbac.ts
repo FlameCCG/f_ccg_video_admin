@@ -3,6 +3,15 @@
  */
 export default {
   title: '权限管理',
+  roles: {
+    title: '角色管理',
+  },
+  menus: {
+    title: '菜单管理',
+  },
+  permissions: {
+    title: '权限管理',
+  },
   role: {
     title: '角色管理',
     name: '角色名称',
