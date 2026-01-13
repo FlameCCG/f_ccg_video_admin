@@ -1,6 +1,8 @@
 // Design Tokens - Motion
 // 动效系统
 
+@use 'sass:map';
+
 // 持续时间
 $duration: (
   'instant': 0ms,
@@ -28,38 +30,38 @@ $easing: (
 $motion-semantic: (
   // 微交互
   'hover': (
-      'duration': map-get($duration, 'fast'),
-      'easing': map-get($easing, 'ease-out'),
+      'duration': map.get($duration, 'fast'),
+      'easing': map.get($easing, 'ease-out'),
     ),
   'active': (
-    'duration': map-get($duration, 'instant'),
-    'easing': map-get($easing, 'linear'),
+    'duration': map.get($duration, 'instant'),
+    'easing': map.get($easing, 'linear'),
   ),
   'focus': (
-    'duration': map-get($duration, 'fast'),
-    'easing': map-get($easing, 'ease-out'),
+    'duration': map.get($duration, 'fast'),
+    'easing': map.get($easing, 'ease-out'),
   ),
   // 展开/收起
   'expand': (
-      'duration': map-get($duration, 'normal'),
-      'easing': map-get($easing, 'ease-out'),
+      'duration': map.get($duration, 'normal'),
+      'easing': map.get($easing, 'ease-out'),
     ),
   'collapse': (
-    'duration': map-get($duration, 'fast'),
-    'easing': map-get($easing, 'ease-in'),
+    'duration': map.get($duration, 'fast'),
+    'easing': map.get($easing, 'ease-in'),
   ),
   // 进入/离开
   'enter': (
-      'duration': map-get($duration, 'normal'),
-      'easing': map-get($easing, 'ease-out'),
+      'duration': map.get($duration, 'normal'),
+      'easing': map.get($easing, 'ease-out'),
     ),
   'leave': (
-    'duration': map-get($duration, 'fast'),
-    'easing': map-get($easing, 'ease-in'),
+    'duration': map.get($duration, 'fast'),
+    'easing': map.get($easing, 'ease-in'),
   ),
   // 页面过渡
   'page': (
-      'duration': map-get($duration, 'slow'),
-      'easing': map-get($easing, 'smooth'),
+      'duration': map.get($duration, 'slow'),
+      'easing': map.get($easing, 'smooth'),
     )
 );

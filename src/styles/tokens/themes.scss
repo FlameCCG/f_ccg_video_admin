@@ -1,6 +1,7 @@
 // Design Tokens - Theme CSS Variables Generator
 // 从 Sass 变量生成运行时 CSS Variables
 
+@use 'sass:map';
 @use 'colors' as *;
 @use 'spacing' as *;
 @use 'typography' as *;
@@ -14,7 +15,7 @@
 
 // 默认主题 (Pearl) - :root
 :root {
-  $pearl-colors: map-get($themes, 'pearl');
+  $pearl-colors: map.get($themes, 'pearl');
 
   @each $color-name, $color-value in $pearl-colors {
     --color-#{$color-name}: #{$color-value};
@@ -34,8 +35,8 @@
     }
 
     // 根据主题类型选择阴影
-    $meta: map-get($theme-meta, $theme-name);
-    $is-dark: map-get($meta, 'is-dark');
+    $meta: map.get($theme-meta, $theme-name);
+    $is-dark: map.get($meta, 'is-dark');
 
     @if $is-dark {
       @each $shadow-name, $shadow-value in $shadows-dark {
@@ -137,3 +138,31 @@
     --duration-slowest: 0ms;
   }
 }
+
+// 主题元数据
+$theme-meta: (
+  'pearl': (
+    'is-dark': false,
+    'label': 'Pearl',
+    'label-zh': '珍珠白',
+    'label-ja': 'パール',
+  ),
+  'obsidian': (
+    'is-dark': true,
+    'label': 'Obsidian',
+    'label-zh': '黑曜石',
+    'label-ja': 'オブシディアン',
+  ),
+  'cyberpunk': (
+    'is-dark': true,
+    'label': 'Cyberpunk',
+    'label-zh': '赛博朋克',
+    'label-ja': 'サイバーパンク',
+  ),
+  'sakura': (
+    'is-dark': false,
+    'label': 'Sakura',
+    'label-zh': '樱',
+    'label-ja': 'サクラ',
+  ),
+);

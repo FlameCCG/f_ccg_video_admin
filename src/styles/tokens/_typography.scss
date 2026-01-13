@@ -1,6 +1,8 @@
 // Design Tokens - Typography
 // 字体系统
 
+@use 'sass:map';
+
 // 字体族
 $font-family-sans: (
   'Inter',
@@ -73,51 +75,51 @@ $letter-spacing: (
 // 语义化字体样式
 $typography-styles: (
   'h1': (
-    'size': map-get($font-size, '4xl'),
-    'weight': map-get($font-weight, 'bold'),
-    'line-height': map-get($line-height, 'tight'),
-    'letter-spacing': map-get($letter-spacing, 'tight'),
+    'size': map.get($font-size, '4xl'),
+    'weight': map.get($font-weight, 'bold'),
+    'line-height': map.get($line-height, 'tight'),
+    'letter-spacing': map.get($letter-spacing, 'tight'),
   ),
   'h2': (
-    'size': map-get($font-size, '3xl'),
-    'weight': map-get($font-weight, 'semibold'),
-    'line-height': map-get($line-height, 'tight'),
-    'letter-spacing': map-get($letter-spacing, 'tight'),
+    'size': map.get($font-size, '3xl'),
+    'weight': map.get($font-weight, 'semibold'),
+    'line-height': map.get($line-height, 'tight'),
+    'letter-spacing': map.get($letter-spacing, 'tight'),
   ),
   'h3': (
-    'size': map-get($font-size, '2xl'),
-    'weight': map-get($font-weight, 'semibold'),
-    'line-height': map-get($line-height, 'snug'),
-    'letter-spacing': map-get($letter-spacing, 'normal'),
+    'size': map.get($font-size, '2xl'),
+    'weight': map.get($font-weight, 'semibold'),
+    'line-height': map.get($line-height, 'snug'),
+    'letter-spacing': map.get($letter-spacing, 'normal'),
   ),
   'h4': (
-    'size': map-get($font-size, 'xl'),
-    'weight': map-get($font-weight, 'semibold'),
-    'line-height': map-get($line-height, 'snug'),
-    'letter-spacing': map-get($letter-spacing, 'normal'),
+    'size': map.get($font-size, 'xl'),
+    'weight': map.get($font-weight, 'semibold'),
+    'line-height': map.get($line-height, 'snug'),
+    'letter-spacing': map.get($letter-spacing, 'normal'),
   ),
   'body': (
-    'size': map-get($font-size, 'base'),
-    'weight': map-get($font-weight, 'normal'),
-    'line-height': map-get($line-height, 'normal'),
-    'letter-spacing': map-get($letter-spacing, 'normal'),
+    'size': map.get($font-size, 'base'),
+    'weight': map.get($font-weight, 'normal'),
+    'line-height': map.get($line-height, 'normal'),
+    'letter-spacing': map.get($letter-spacing, 'normal'),
   ),
   'body-sm': (
-    'size': map-get($font-size, 'sm'),
-    'weight': map-get($font-weight, 'normal'),
-    'line-height': map-get($line-height, 'normal'),
-    'letter-spacing': map-get($letter-spacing, 'normal'),
+    'size': map.get($font-size, 'sm'),
+    'weight': map.get($font-weight, 'normal'),
+    'line-height': map.get($line-height, 'normal'),
+    'letter-spacing': map.get($letter-spacing, 'normal'),
   ),
   'caption': (
-    'size': map-get($font-size, 'xs'),
-    'weight': map-get($font-weight, 'normal'),
-    'line-height': map-get($line-height, 'normal'),
-    'letter-spacing': map-get($letter-spacing, 'wide'),
+    'size': map.get($font-size, 'xs'),
+    'weight': map.get($font-weight, 'normal'),
+    'line-height': map.get($line-height, 'normal'),
+    'letter-spacing': map.get($letter-spacing, 'wide'),
   ),
   'label': (
-    'size': map-get($font-size, 'sm'),
-    'weight': map-get($font-weight, 'medium'),
-    'line-height': map-get($line-height, 'normal'),
-    'letter-spacing': map-get($letter-spacing, 'normal'),
+    'size': map.get($font-size, 'sm'),
+    'weight': map.get($font-weight, 'medium'),
+    'line-height': map.get($line-height, 'normal'),
+    'letter-spacing': map.get($letter-spacing, 'normal'),
   ),
 );

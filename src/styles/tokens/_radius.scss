@@ -1,6 +1,8 @@
 // Design Tokens - Border Radius
 // 圆角系统
 
+@use 'sass:map';
+
 $radius: (
   'none': 0,
   'xs': 2px,
@@ -15,21 +17,21 @@ $radius: (
 
 // 语义化圆角
 $radius-semantic: (
-  'button': map-get($radius, 'lg'),
+  'button': map.get($radius, 'lg'),
   // 按钮 8px
-  'input': map-get($radius, 'lg'),
+  'input': map.get($radius, 'lg'),
   // 输入框 8px
-  'card': map-get($radius, 'xl'),
+  'card': map.get($radius, 'xl'),
   // 卡片 12px
-  'modal': map-get($radius, '2xl'),
+  'modal': map.get($radius, '2xl'),
   // 模态框 16px
-  'dropdown': map-get($radius, 'lg'),
+  'dropdown': map.get($radius, 'lg'),
   // 下拉菜单 8px
-  'tag': map-get($radius, 'md'),
+  'tag': map.get($radius, 'md'),
   // 标签 6px
-  'avatar': map-get($radius, 'full'),
+  'avatar': map.get($radius, 'full'),
   // 头像 圆形
-  'badge': map-get($radius, 'full'),
+  'badge': map.get($radius, 'full'),
   // 徽章 圆形
-  'tooltip': map-get($radius, 'md'), // 提示 6px
+  'tooltip': map.get($radius, 'md'), // 提示 6px
 );

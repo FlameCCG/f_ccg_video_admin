@@ -11,7 +11,8 @@
 // ============================================
 // 2. Tailwind CSS with Theme Integration
 // ============================================
-@import 'tailwindcss';
+/* stylelint-disable-next-line import-notation */
+@import url('tailwindcss');
 
 // Tailwind v4 Theme Configuration
 // 使用 CSS Variables 扩展 Tailwind 颜色

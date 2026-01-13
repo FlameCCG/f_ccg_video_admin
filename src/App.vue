@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui'
 import { useNaiveTheme, useLocale } from '@/composables'
-import { useTheme } from '@/composables'
+import { useAppStore } from '@/stores/app'
 
-// 初始化主题
-const { initTheme } = useTheme()
-initTheme()
+// 初始化应用
+const appStore = useAppStore()
+appStore.initApp()
 
 // Naive UI 主题配置
 const { naiveTheme, naiveThemeOverrides } = useNaiveTheme()

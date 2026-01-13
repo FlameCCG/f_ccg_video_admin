@@ -1,6 +1,8 @@
 // Design Tokens - Spacing
 // 间距系统基于 4px 基准单位
 
+@use 'sass:map';
+
 $spacing-base: 4px;
 
 $spacing: (
@@ -32,19 +34,19 @@ $spacing: (
 
 // 语义化间距
 $spacing-semantic: (
-  'page-x': map-get($spacing, '6'),
+  'page-x': map.get($spacing, '6'),
   // 页面水平内边距 24px
-  'page-y': map-get($spacing, '6'),
+  'page-y': map.get($spacing, '6'),
   // 页面垂直内边距 24px
-  'section': map-get($spacing, '6'),
+  'section': map.get($spacing, '6'),
   // 区块间距 24px
-  'card': map-get($spacing, '4'),
+  'card': map.get($spacing, '4'),
   // 卡片内边距 16px
-  'card-gap': map-get($spacing, '4'),
+  'card-gap': map.get($spacing, '4'),
   // 卡片间距 16px
-  'form-gap': map-get($spacing, '4'),
+  'form-gap': map.get($spacing, '4'),
   // 表单项间距 16px
-  'inline-gap': map-get($spacing, '2'),
+  'inline-gap': map.get($spacing, '2'),
   // 行内元素间距 8px
-  'icon-gap': map-get($spacing, '2'), // 图标与文字间距 8px
+  'icon-gap': map.get($spacing, '2'), // 图标与文字间距 8px
 );
