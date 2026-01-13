@@ -1,0 +1,65 @@
+// Design Tokens - Motion
+// 动效系统
+
+// 持续时间
+$duration: (
+  'instant': 0ms,
+  'fast': 100ms,
+  'normal': 200ms,
+  'slow': 300ms,
+  'slower': 400ms,
+  'slowest': 500ms,
+);
+
+// 缓动函数
+$easing: (
+  'linear': linear,
+  'ease': ease,
+  'ease-in': cubic-bezier(0.4, 0, 1, 1),
+  'ease-out': cubic-bezier(0, 0, 0.2, 1),
+  'ease-in-out': cubic-bezier(0.4, 0, 0.2, 1),
+  // 弹性效果
+  'bounce': cubic-bezier(0.68, -0.55, 0.265, 1.55),
+  // 平滑效果
+  'smooth': cubic-bezier(0.25, 0.1, 0.25, 1),
+);
+
+// 语义化动效
+$motion-semantic: (
+  // 微交互
+  'hover': (
+      'duration': map-get($duration, 'fast'),
+      'easing': map-get($easing, 'ease-out'),
+    ),
+  'active': (
+    'duration': map-get($duration, 'instant'),
+    'easing': map-get($easing, 'linear'),
+  ),
+  'focus': (
+    'duration': map-get($duration, 'fast'),
+    'easing': map-get($easing, 'ease-out'),
+  ),
+  // 展开/收起
+  'expand': (
+      'duration': map-get($duration, 'normal'),
+      'easing': map-get($easing, 'ease-out'),
+    ),
+  'collapse': (
+    'duration': map-get($duration, 'fast'),
+    'easing': map-get($easing, 'ease-in'),
+  ),
+  // 进入/离开
+  'enter': (
+      'duration': map-get($duration, 'normal'),
+      'easing': map-get($easing, 'ease-out'),
+    ),
+  'leave': (
+    'duration': map-get($duration, 'fast'),
+    'easing': map-get($easing, 'ease-in'),
+  ),
+  // 页面过渡
+  'page': (
+      'duration': map-get($duration, 'slow'),
+      'easing': map-get($easing, 'smooth'),
+    )
+);

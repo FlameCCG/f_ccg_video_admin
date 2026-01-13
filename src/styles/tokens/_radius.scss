@@ -1,0 +1,35 @@
+// Design Tokens - Border Radius
+// 圆角系统
+
+$radius: (
+  'none': 0,
+  'xs': 2px,
+  'sm': 4px,
+  'md': 6px,
+  'lg': 8px,
+  'xl': 12px,
+  '2xl': 16px,
+  '3xl': 24px,
+  'full': 9999px,
+);
+
+// 语义化圆角
+$radius-semantic: (
+  'button': map-get($radius, 'lg'),
+  // 按钮 8px
+  'input': map-get($radius, 'lg'),
+  // 输入框 8px
+  'card': map-get($radius, 'xl'),
+  // 卡片 12px
+  'modal': map-get($radius, '2xl'),
+  // 模态框 16px
+  'dropdown': map-get($radius, 'lg'),
+  // 下拉菜单 8px
+  'tag': map-get($radius, 'md'),
+  // 标签 6px
+  'avatar': map-get($radius, 'full'),
+  // 头像 圆形
+  'badge': map-get($radius, 'full'),
+  // 徽章 圆形
+  'tooltip': map-get($radius, 'md'), // 提示 6px
+);

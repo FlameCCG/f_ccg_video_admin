@@ -1,0 +1,50 @@
+// Design Tokens - Spacing
+// 间距系统基于 4px 基准单位
+
+$spacing-base: 4px;
+
+$spacing: (
+  '0': 0,
+  '1': $spacing-base,
+  // 4px
+  '2': $spacing-base * 2,
+  // 8px
+  '3': $spacing-base * 3,
+  // 12px
+  '4': $spacing-base * 4,
+  // 16px
+  '5': $spacing-base * 5,
+  // 20px
+  '6': $spacing-base * 6,
+  // 24px
+  '8': $spacing-base * 8,
+  // 32px
+  '10': $spacing-base * 10,
+  // 40px
+  '12': $spacing-base * 12,
+  // 48px
+  '16': $spacing-base * 16,
+  // 64px
+  '20': $spacing-base * 20,
+  // 80px
+  '24': $spacing-base * 24, // 96px
+);
+
+// 语义化间距
+$spacing-semantic: (
+  'page-x': map-get($spacing, '6'),
+  // 页面水平内边距 24px
+  'page-y': map-get($spacing, '6'),
+  // 页面垂直内边距 24px
+  'section': map-get($spacing, '6'),
+  // 区块间距 24px
+  'card': map-get($spacing, '4'),
+  // 卡片内边距 16px
+  'card-gap': map-get($spacing, '4'),
+  // 卡片间距 16px
+  'form-gap': map-get($spacing, '4'),
+  // 表单项间距 16px
+  'inline-gap': map-get($spacing, '2'),
+  // 行内元素间距 8px
+  'icon-gap': map-get($spacing, '2'), // 图标与文字间距 8px
+);

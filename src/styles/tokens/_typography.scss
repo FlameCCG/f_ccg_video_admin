@@ -1,0 +1,123 @@
+// Design Tokens - Typography
+// 字体系统
+
+// 字体族
+$font-family-sans: (
+  'Inter',
+  'SF Pro Display',
+  '-apple-system',
+  'BlinkMacSystemFont',
+  'Segoe UI',
+  'Roboto',
+  'Helvetica Neue',
+  'Arial',
+  'Noto Sans',
+  'PingFang SC',
+  'Hiragino Sans GB',
+  'Microsoft YaHei',
+  'sans-serif'
+);
+
+$font-family-mono: (
+  'JetBrains Mono',
+  'SF Mono',
+  'Fira Code',
+  'Consolas',
+  'Monaco',
+  'Andale Mono',
+  'Ubuntu Mono',
+  'monospace'
+);
+
+// 字体大小
+$font-size: (
+  'xs': 12px,
+  'sm': 13px,
+  'base': 14px,
+  'md': 15px,
+  'lg': 16px,
+  'xl': 18px,
+  '2xl': 20px,
+  '3xl': 24px,
+  '4xl': 30px,
+  '5xl': 36px,
+);
+
+// 行高
+$line-height: (
+  'none': 1,
+  'tight': 1.25,
+  'snug': 1.375,
+  'normal': 1.5,
+  'relaxed': 1.625,
+  'loose': 2,
+);
+
+// 字重
+$font-weight: (
+  'normal': 400,
+  'medium': 500,
+  'semibold': 600,
+  'bold': 700,
+);
+
+// 字间距
+$letter-spacing: (
+  'tighter': -0.05em,
+  'tight': -0.025em,
+  'normal': 0,
+  'wide': 0.025em,
+  'wider': 0.05em,
+);
+
+// 语义化字体样式
+$typography-styles: (
+  'h1': (
+    'size': map-get($font-size, '4xl'),
+    'weight': map-get($font-weight, 'bold'),
+    'line-height': map-get($line-height, 'tight'),
+    'letter-spacing': map-get($letter-spacing, 'tight'),
+  ),
+  'h2': (
+    'size': map-get($font-size, '3xl'),
+    'weight': map-get($font-weight, 'semibold'),
+    'line-height': map-get($line-height, 'tight'),
+    'letter-spacing': map-get($letter-spacing, 'tight'),
+  ),
+  'h3': (
+    'size': map-get($font-size, '2xl'),
+    'weight': map-get($font-weight, 'semibold'),
+    'line-height': map-get($line-height, 'snug'),
+    'letter-spacing': map-get($letter-spacing, 'normal'),
+  ),
+  'h4': (
+    'size': map-get($font-size, 'xl'),
+    'weight': map-get($font-weight, 'semibold'),
+    'line-height': map-get($line-height, 'snug'),
+    'letter-spacing': map-get($letter-spacing, 'normal'),
+  ),
+  'body': (
+    'size': map-get($font-size, 'base'),
+    'weight': map-get($font-weight, 'normal'),
+    'line-height': map-get($line-height, 'normal'),
+    'letter-spacing': map-get($letter-spacing, 'normal'),
+  ),
+  'body-sm': (
+    'size': map-get($font-size, 'sm'),
+    'weight': map-get($font-weight, 'normal'),
+    'line-height': map-get($line-height, 'normal'),
+    'letter-spacing': map-get($letter-spacing, 'normal'),
+  ),
+  'caption': (
+    'size': map-get($font-size, 'xs'),
+    'weight': map-get($font-weight, 'normal'),
+    'line-height': map-get($line-height, 'normal'),
+    'letter-spacing': map-get($letter-spacing, 'wide'),
+  ),
+  'label': (
+    'size': map-get($font-size, 'sm'),
+    'weight': map-get($font-weight, 'medium'),
+    'line-height': map-get($line-height, 'normal'),
+    'letter-spacing': map-get($letter-spacing, 'normal'),
+  ),
+);

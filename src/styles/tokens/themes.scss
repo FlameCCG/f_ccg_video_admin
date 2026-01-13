@@ -1,0 +1,139 @@
+// Design Tokens - Theme CSS Variables Generator
+// 从 Sass 变量生成运行时 CSS Variables
+
+@use 'colors' as *;
+@use 'spacing' as *;
+@use 'typography' as *;
+@use 'shadows' as *;
+@use 'radius' as *;
+@use 'motion' as *;
+
+// ============================================
+// 颜色变量生成
+// ============================================
+
+// 默认主题 (Pearl) - :root
+:root {
+  $pearl-colors: map-get($themes, 'pearl');
+
+  @each $color-name, $color-value in $pearl-colors {
+    --color-#{$color-name}: #{$color-value};
+  }
+
+  // 阴影变量 (浅色主题)
+  @each $shadow-name, $shadow-value in $shadows-light {
+    --shadow-#{$shadow-name}: #{$shadow-value};
+  }
+}
+
+// 各主题变量生成
+@each $theme-name, $theme-colors in $themes {
+  [data-theme='#{$theme-name}'] {
+    @each $color-name, $color-value in $theme-colors {
+      --color-#{$color-name}: #{$color-value};
+    }
+
+    // 根据主题类型选择阴影
+    $meta: map-get($theme-meta, $theme-name);
+    $is-dark: map-get($meta, 'is-dark');
+
+    @if $is-dark {
+      @each $shadow-name, $shadow-value in $shadows-dark {
+        --shadow-#{$shadow-name}: #{$shadow-value};
+      }
+    } @else {
+      @each $shadow-name, $shadow-value in $shadows-light {
+        --shadow-#{$shadow-name}: #{$shadow-value};
+      }
+    }
+  }
+}
+
+// ============================================
+// 间距变量
+// ============================================
+
+:root {
+  @each $space-name, $space-value in $spacing {
+    --spacing-#{$space-name}: #{$space-value};
+  }
+
+  @each $space-name, $space-value in $spacing-semantic {
+    --spacing-#{$space-name}: #{$space-value};
+  }
+}
+
+// ============================================
+// 字体变量
+// ============================================
+
+:root {
+  // 字体族
+  --font-sans: #{inspect($font-family-sans)};
+  --font-mono: #{inspect($font-family-mono)};
+
+  // 字体大小
+  @each $size-name, $size-value in $font-size {
+    --text-#{$size-name}: #{$size-value};
+  }
+
+  // 行高
+  @each $lh-name, $lh-value in $line-height {
+    --leading-#{$lh-name}: #{$lh-value};
+  }
+
+  // 字重
+  @each $weight-name, $weight-value in $font-weight {
+    --font-#{$weight-name}: #{$weight-value};
+  }
+
+  // 字间距
+  @each $ls-name, $ls-value in $letter-spacing {
+    --tracking-#{$ls-name}: #{$ls-value};
+  }
+}
+
+// ============================================
+// 圆角变量
+// ============================================
+
+:root {
+  @each $radius-name, $radius-value in $radius {
+    --radius-#{$radius-name}: #{$radius-value};
+  }
+
+  @each $radius-name, $radius-value in $radius-semantic {
+    --radius-#{$radius-name}: #{$radius-value};
+  }
+}
+
+// ============================================
+// 动效变量
+// ============================================
+
+:root {
+  // 持续时间
+  @each $duration-name, $duration-value in $duration {
+    --duration-#{$duration-name}: #{$duration-value};
+  }
+
+  // 缓动函数
+  @each $easing-name, $easing-value in $easing {
+    --easing-#{$easing-name}: #{$easing-value};
+  }
+}
+
+// ============================================
+// Reduced Motion 支持
+// ============================================
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 0ms;
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+    --duration-slower: 0ms;
+    --duration-slowest: 0ms;
+  }
+}
