@@ -4,3 +4,4 @@
 export * from './useTheme'
 export * from './useNaiveTheme'
 export * from './useLocale'
+export * from './usePermission'

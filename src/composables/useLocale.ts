@@ -17,6 +17,7 @@ import {
 } from 'naive-ui'
 import type { LocaleType } from '@/locales'
 import { localeConfigs, DEFAULT_LOCALE, LOCALE_STORAGE_KEY, setI18nLanguage, i18n } from '@/locales'
+import { usePermissionStore } from '@/stores/permission'
 
 /**
  * Naive UI locale 映射
@@ -112,6 +113,10 @@ export function useLocale() {
 
     // 更新 HTML lang 属性
     document.documentElement.setAttribute('lang', locale)
+
+    // 同步更新 permission store 的语言（用于路由标题）
+    const permissionStore = usePermissionStore()
+    permissionStore.setLocale(locale)
   }
 
   /**

@@ -28,6 +28,14 @@ export interface Menu {
   titleJa: string
   /** 菜单图标 */
   icon: string
+  /** 路由路径 */
+  path?: string
+  /** 路由名称 */
+  name?: string
+  /** 前端组件路径/标识 */
+  component?: string
+  /** 是否缓存 */
+  keepAlive?: boolean
   /** 父菜单 ID */
   parentId: number
   /** 排序顺序 */
@@ -160,6 +168,14 @@ export interface CreateMenuParams {
   titleJa?: string
   /** 菜单图标（可选） */
   icon?: string
+  /** 路由路径（可选） */
+  path?: string
+  /** 路由名称（可选） */
+  name?: string
+  /** 前端组件路径/标识（可选） */
+  component?: string
+  /** 是否缓存（可选） */
+  keepAlive?: boolean
   /** 父菜单 ID（可选） */
   parentId?: number
   /** 排序顺序（可选） */
@@ -180,6 +196,14 @@ export interface UpdateMenuParams {
   titleJa?: string
   /** 菜单图标（可选） */
   icon?: string
+  /** 路由路径（可选） */
+  path?: string
+  /** 路由名称（可选） */
+  name?: string
+  /** 前端组件路径/标识（可选） */
+  component?: string
+  /** 是否缓存（可选） */
+  keepAlive?: boolean
   /** 父菜单 ID（可选） */
   parentId?: number
   /** 排序顺序（可选） */

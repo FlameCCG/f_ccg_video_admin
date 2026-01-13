@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, ref, reactive, computed } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
@@ -8,29 +8,22 @@ import {
   NFormItem,
   NInput,
   NButton,
-  NDropdown,
-  NIcon,
   NModal,
   useMessage,
   type FormInst,
   type FormRules,
 } from 'naive-ui'
 
-import { ColorPaletteOutline } from '@vicons/ionicons5'
-import IconFlagCN from '@/components/icons/flags/IconFlagCN.vue'
-import IconFlagUS from '@/components/icons/flags/IconFlagUS.vue'
-import IconFlagJP from '@/components/icons/flags/IconFlagJP.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useAppStore, type ThemeName } from '@/stores/app'
-import { type LocaleType, setI18nLanguage, i18n } from '@/locales'
 import SlideCaptcha from '@/components/captcha/SlideCaptcha.vue'
+import LanguageDropdown from '@/components/common/LanguageDropdown.vue'
+import ThemeDropdown from '@/components/common/ThemeDropdown.vue'
 
 // ==================== Composables ====================
 const router = useRouter()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const message = useMessage()
 const authStore = useAuthStore()
-const appStore = useAppStore()
 
 // ==================== Refs ====================
 const formRef = ref<FormInst | null>(null)
@@ -62,59 +55,6 @@ const showCaptchaModal = ref(false)
 // ==================== 计算属性 ====================
 const isLoading = computed(() => authStore.isLoggingIn)
 
-function getFlagIcon(locale: string) {
-  switch (locale) {
-    case 'zh-CN':
-      return IconFlagCN
-    case 'en-US':
-      return IconFlagUS
-    case 'ja-JP':
-      return IconFlagJP
-    default:
-      return null
-  }
-}
-
-/** 语言下拉选项 */
-const localeOptions = computed(() =>
-  appStore.localeConfigs.map((config) => ({
-    label: config.label,
-    key: config.locale,
-    icon: () => {
-      const Icon = getFlagIcon(config.locale)
-      return Icon ? h(NIcon, null, { default: () => h(Icon) }) : null
-    },
-  }))
-)
-
-/** 主题下拉选项 */
-const themeOptions = computed(() =>
-  appStore.themeConfigs.map((config) => ({
-    label:
-      appStore.currentLocale === 'zh-CN'
-        ? config.labelZh
-        : appStore.currentLocale === 'ja-JP'
-          ? config.labelJa
-          : config.label,
-    key: config.name,
-  }))
-)
-
-/** 当前语言显示名称 */
-const currentLocaleName = computed(() => {
-  const config = appStore.localeConfigs.find((c) => c.locale === appStore.currentLocale)
-  return config ? config.label : 'Language'
-})
-
-/** 当前主题显示名称 */
-const currentThemeName = computed(() => {
-  const config = appStore.currentThemeConfig
-  if (!config) return 'Theme'
-  if (appStore.currentLocale === 'zh-CN') return config.labelZh
-  if (appStore.currentLocale === 'ja-JP') return config.labelJa
-  return config.label
-})
-
 // ==================== 表单验证规则 ====================
 const rules: FormRules = {
   username: [
@@ -134,16 +74,6 @@ const rules: FormRules = {
 }
 
 // ==================== 方法 ====================
-async function handleLocaleSelect(key: string): Promise<void> {
-  await setI18nLanguage(i18n, key as LocaleType)
-  appStore.setLocale(key as LocaleType)
-  locale.value = key
-}
-
-function handleThemeSelect(key: string): void {
-  appStore.setTheme(key as ThemeName)
-}
-
 function handleCaptchaConfirm(result: { token: string; x: number; y: number }): void {
   captchaData.token = result.token
   captchaData.x = result.x
@@ -242,25 +172,8 @@ function handleEnterSubmit(): void {
     <div class="login-page__form-section">
       <!-- 顶部工具栏 -->
       <div class="login-page__toolbar">
-        <n-dropdown :options="localeOptions" trigger="click" @select="handleLocaleSelect">
-          <n-button quaternary size="small" class="login-page__toolbar-btn">
-            <template #icon>
-              <n-icon>
-                <component :is="getFlagIcon(appStore.currentLocale)" />
-              </n-icon>
-            </template>
-            {{ currentLocaleName }}
-          </n-button>
-        </n-dropdown>
-
-        <n-dropdown :options="themeOptions" trigger="click" @select="handleThemeSelect">
-          <n-button quaternary size="small" class="login-page__toolbar-btn">
-            <template #icon>
-              <n-icon><ColorPaletteOutline /></n-icon>
-            </template>
-            {{ currentThemeName }}
-          </n-button>
-        </n-dropdown>
+        <LanguageDropdown show-label size="small" />
+        <ThemeDropdown show-label size="small" />
       </div>
 
       <!-- 登录表单容器 -->
