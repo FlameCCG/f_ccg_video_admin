@@ -1,13 +1,8 @@
 <script setup lang="ts">
-/**
- * 登录页面 - 世界级设计
- * 左右分栏布局：左侧品牌展示 + 右侧登录表单
- * 滑块验证码弹窗触发，右上角语言/主题切换
- * Requirements: 4.1
- */
-import { ref, reactive, computed } from 'vue'
+import { h, ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+
 import {
   NForm,
   NFormItem,
@@ -20,14 +15,17 @@ import {
   type FormInst,
   type FormRules,
 } from 'naive-ui'
-import { LanguageOutline, ColorPaletteOutline } from '@vicons/ionicons5'
+
+import { ColorPaletteOutline } from '@vicons/ionicons5'
+import IconFlagCN from '@/components/icons/flags/IconFlagCN.vue'
+import IconFlagUS from '@/components/icons/flags/IconFlagUS.vue'
+import IconFlagJP from '@/components/icons/flags/IconFlagJP.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore, type ThemeName } from '@/stores/app'
-import type { LocaleType } from '@/locales'
+import { type LocaleType, setI18nLanguage, i18n } from '@/locales'
 import SlideCaptcha from '@/components/captcha/SlideCaptcha.vue'
 
 // ==================== Composables ====================
-
 const router = useRouter()
 const { t, locale } = useI18n()
 const message = useMessage()
@@ -35,17 +33,18 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 // ==================== Refs ====================
-
 const formRef = ref<FormInst | null>(null)
 
 interface CaptchaExposed {
   reset: () => void
   refresh: () => void
+  fail: () => void
+  success: () => void
 }
+
 const captchaRef = ref<CaptchaExposed | null>(null)
 
 // ==================== 状态 ====================
-
 const formData = reactive({
   username: '',
   password: '',
@@ -61,14 +60,30 @@ const captchaData = reactive({
 const showCaptchaModal = ref(false)
 
 // ==================== 计算属性 ====================
-
 const isLoading = computed(() => authStore.isLoggingIn)
+
+function getFlagIcon(locale: string) {
+  switch (locale) {
+    case 'zh-CN':
+      return IconFlagCN
+    case 'en-US':
+      return IconFlagUS
+    case 'ja-JP':
+      return IconFlagJP
+    default:
+      return null
+  }
+}
 
 /** 语言下拉选项 */
 const localeOptions = computed(() =>
   appStore.localeConfigs.map((config) => ({
     label: config.label,
     key: config.locale,
+    icon: () => {
+      const Icon = getFlagIcon(config.locale)
+      return Icon ? h(NIcon, null, { default: () => h(Icon) }) : null
+    },
   }))
 )
 
@@ -88,7 +103,7 @@ const themeOptions = computed(() =>
 /** 当前语言显示名称 */
 const currentLocaleName = computed(() => {
   const config = appStore.localeConfigs.find((c) => c.locale === appStore.currentLocale)
-  return config?.label ?? 'Language'
+  return config ? config.label : 'Language'
 })
 
 /** 当前主题显示名称 */
@@ -101,7 +116,6 @@ const currentThemeName = computed(() => {
 })
 
 // ==================== 表单验证规则 ====================
-
 const rules: FormRules = {
   username: [
     {
@@ -120,8 +134,8 @@ const rules: FormRules = {
 }
 
 // ==================== 方法 ====================
-
-function handleLocaleSelect(key: string): void {
+async function handleLocaleSelect(key: string): Promise<void> {
+  await setI18nLanguage(i18n, key as LocaleType)
   appStore.setLocale(key as LocaleType)
   locale.value = key
 }
@@ -130,12 +144,11 @@ function handleThemeSelect(key: string): void {
   appStore.setTheme(key as ThemeName)
 }
 
-function handleCaptchaSuccess(result: { token: string; x: number; y: number }): void {
+function handleCaptchaConfirm(result: { token: string; x: number; y: number }): void {
   captchaData.token = result.token
   captchaData.x = result.x
   captchaData.y = result.y
   captchaData.verified = true
-  showCaptchaModal.value = false
   void doLogin()
 }
 
@@ -174,10 +187,18 @@ async function doLogin(): Promise<void> {
     })
 
     message.success(t('auth.tips.loginSuccess'))
-    void router.push({ path: '/dashboard' })
-  } catch {
-    captchaRef.value?.reset()
+    captchaRef.value?.success()
+
+    setTimeout(() => {
+      showCaptchaModal.value = false
+      void router.push({ path: '/dashboard' })
+    }, 1000)
+  } catch (error: unknown) {
+    captchaRef.value?.fail()
     captchaData.verified = false
+    if (error instanceof Error) {
+      message.error(error.message)
+    }
   }
 }
 
@@ -190,42 +211,43 @@ function handleEnterSubmit(): void {
   <div class="login-page">
     <!-- 左侧品牌区域 -->
     <div class="login-page__brand">
+      <!-- 动态背景 -->
+      <div class="login-page__brand-bg">
+        <div class="login-page__orb login-page__orb--1" />
+        <div class="login-page__orb login-page__orb--2" />
+        <div class="login-page__orb login-page__orb--3" />
+      </div>
+
+      <!-- 网格线 -->
+      <div class="login-page__grid" />
+
+      <!-- 品牌内容 -->
       <div class="login-page__brand-content">
-        <!-- 装饰图形 -->
-        <div class="login-page__brand-shapes">
-          <div class="login-page__shape login-page__shape--1" />
-          <div class="login-page__shape login-page__shape--2" />
-          <div class="login-page__shape login-page__shape--3" />
-          <div class="login-page__shape login-page__shape--4" />
+        <div class="login-page__brand-logo">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 16L32 24L18 32V16Z" fill="currentColor" />
+          </svg>
         </div>
+        <h1 class="login-page__brand-title">Video Admin</h1>
+        <p class="login-page__brand-desc">{{ t('auth.login.subtitle') }}</p>
+      </div>
 
-        <!-- 品牌信息 -->
-        <div class="login-page__brand-info">
-          <div class="login-page__brand-logo">
-            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="48" height="48" rx="12" fill="currentColor" fill-opacity="0.1" />
-              <path d="M18 16L32 24L18 32V16Z" fill="currentColor" />
-            </svg>
-          </div>
-          <h1 class="login-page__brand-title">Video Admin</h1>
-          <p class="login-page__brand-desc">{{ t('auth.login.subtitle') }}</p>
-        </div>
-
-        <!-- 底部装饰文字 -->
-        <div class="login-page__brand-footer">
-          <span class="login-page__brand-version">v1.0.0</span>
-        </div>
+      <!-- 版本号 -->
+      <div class="login-page__brand-footer">
+        <span class="login-page__brand-version">v1.0.0</span>
       </div>
     </div>
 
     <!-- 右侧登录区域 -->
     <div class="login-page__form-section">
-      <!-- 顶部工具栏：语言/主题切换 -->
+      <!-- 顶部工具栏 -->
       <div class="login-page__toolbar">
         <n-dropdown :options="localeOptions" trigger="click" @select="handleLocaleSelect">
           <n-button quaternary size="small" class="login-page__toolbar-btn">
             <template #icon>
-              <n-icon><LanguageOutline /></n-icon>
+              <n-icon>
+                <component :is="getFlagIcon(appStore.currentLocale)" />
+              </n-icon>
             </template>
             {{ currentLocaleName }}
           </n-button>
@@ -244,60 +266,65 @@ function handleEnterSubmit(): void {
       <!-- 登录表单容器 -->
       <div class="login-page__form-container">
         <div class="login-page__form-wrapper">
-          <!-- 表单标题 -->
-          <div class="login-page__form-header">
-            <h2 class="login-page__form-title">{{ t('auth.login.title') }}</h2>
-            <p class="login-page__form-subtitle">{{ t('auth.login.subtitle') }}</p>
+          <!-- 边框流光效果 -->
+          <div class="login-page__glow-border">
+            <div class="login-page__glow-line" />
           </div>
 
-          <!-- 表单 -->
-          <n-form
-            ref="formRef"
-            :model="formData"
-            :rules="rules"
-            label-placement="left"
-            label-width="0"
-            require-mark-placement="right-hanging"
-            class="login-page__form"
-          >
-            <n-form-item path="username" class="login-page__form-item">
-              <n-input
-                v-model:value="formData.username"
-                :placeholder="t('auth.login.usernamePlaceholder')"
-                size="large"
-                :disabled="isLoading"
-                class="login-page__input"
-                @keydown.enter="handleEnterSubmit"
-              />
-            </n-form-item>
+          <!-- 表单内容 -->
+          <div class="login-page__form-inner">
+            <div class="login-page__form-header">
+              <h2 class="login-page__form-title">{{ t('auth.login.title') }}</h2>
+              <p class="login-page__form-subtitle">{{ t('auth.login.subtitle') }}</p>
+            </div>
 
-            <n-form-item path="password" class="login-page__form-item">
-              <n-input
-                v-model:value="formData.password"
-                type="password"
-                show-password-on="click"
-                :placeholder="t('auth.login.passwordPlaceholder')"
-                size="large"
-                :disabled="isLoading"
-                class="login-page__input"
-                @keydown.enter="handleEnterSubmit"
-              />
-            </n-form-item>
+            <n-form
+              ref="formRef"
+              :model="formData"
+              :rules="rules"
+              label-placement="left"
+              label-width="0"
+              require-mark-placement="right-hanging"
+              class="login-page__form"
+            >
+              <n-form-item path="username" class="login-page__form-item">
+                <n-input
+                  v-model:value="formData.username"
+                  :placeholder="t('auth.login.usernamePlaceholder')"
+                  size="large"
+                  :disabled="isLoading"
+                  class="login-page__input"
+                  @keydown.enter="handleEnterSubmit"
+                />
+              </n-form-item>
 
-            <!-- 登录按钮 -->
-            <n-form-item class="login-page__form-item login-page__form-item--button">
-              <n-button
-                type="primary"
-                block
-                size="large"
-                :loading="isLoading"
-                class="login-page__submit-btn"
-                @click="handleLoginClick"
-              >
-                {{ isLoading ? t('auth.login.logging') : t('auth.login.loginButton') }}
-              </n-button>
-            </n-form-item>
-          </n-form>
+              <n-form-item path="password" class="login-page__form-item">
+                <n-input
+                  v-model:value="formData.password"
+                  type="password"
+                  show-password-on="click"
+                  :placeholder="t('auth.login.passwordPlaceholder')"
+                  size="large"
+                  :disabled="isLoading"
+                  class="login-page__input"
+                  @keydown.enter="handleEnterSubmit"
+                />
+              </n-form-item>
+
+              <n-form-item class="login-page__form-item login-page__form-item--button">
+                <n-button
+                  type="primary"
+                  block
+                  size="large"
+                  :loading="isLoading"
+                  class="login-page__submit-btn"
+                  @click="handleLoginClick"
+                >
+                  {{ isLoading ? t('auth.login.logging') : t('auth.login.loginButton') }}
+                </n-button>
+              </n-form-item>
+            </n-form>
+          </div>
         </div>
       </div>
     </div>
@@ -313,7 +340,7 @@ function handleEnterSubmit(): void {
       <SlideCaptcha
         ref="captchaRef"
         :visible="showCaptchaModal"
-        @success="handleCaptchaSuccess"
+        @confirm="handleCaptchaConfirm"
         @fail="handleCaptchaFail"
         @refresh="handleCaptchaRefresh"
       />
@@ -322,18 +349,24 @@ function handleEnterSubmit(): void {
 </template>
 
 <style lang="scss" scoped>
+// ============================================
+// 基础布局
+// ============================================
 .login-page {
   display: flex;
   min-height: 100vh;
   background-color: var(--color-bg);
+  transition: background-color 0.3s ease;
 
+  // ============================================
   // 左侧品牌区域
+  // ============================================
   &__brand {
     display: none;
-    flex: 0 0 45%;
+    flex: 0 0 50%;
     position: relative;
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
     overflow: hidden;
+    background: var(--color-primary);
 
     @media (width >= 1024px) {
       display: flex;
@@ -342,123 +375,155 @@ function handleEnterSubmit(): void {
     }
   }
 
-  &__brand-content {
-    position: relative;
-    z-index: 1;
-    padding: var(--spacing-8);
-    text-align: center;
-    color: #fff;
-  }
-
-  &__brand-shapes {
+  &__brand-bg {
     position: absolute;
     inset: 0;
     overflow: hidden;
-    pointer-events: none;
   }
 
-  &__shape {
+  // 动态光球
+  &__orb {
     position: absolute;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
+    filter: blur(80px);
+    opacity: 0.6;
+    animation: orb-float 20s ease-in-out infinite;
 
     &--1 {
-      top: -10%;
-      left: -5%;
-      width: 40%;
-      height: 40%;
+      top: -20%;
+      left: -10%;
+      width: 60%;
+      height: 60%;
+      background: var(--color-primary-hover);
+      animation-delay: 0s;
     }
 
     &--2 {
-      bottom: -15%;
+      bottom: -20%;
       right: -10%;
       width: 50%;
       height: 50%;
+      background: var(--color-info);
+      animation-delay: -7s;
     }
 
     &--3 {
       top: 40%;
-      left: 60%;
-      width: 20%;
-      height: 20%;
-    }
-
-    &--4 {
-      top: 60%;
-      left: 10%;
-      width: 15%;
-      height: 15%;
+      left: 50%;
+      width: 30%;
+      height: 30%;
+      background: var(--color-success);
+      opacity: 0.4;
+      animation-delay: -14s;
     }
   }
 
-  &__brand-info {
+  // 网格背景
+  &__grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 50px 50px;
+    opacity: 0.5;
+  }
+
+  &__brand-content {
     position: relative;
-    z-index: 2;
+    z-index: 10;
+    text-align: center;
+    color: #fff;
+    padding: var(--spacing-8);
   }
 
   &__brand-logo {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 80px;
-    height: 80px;
-    margin-bottom: var(--spacing-6);
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: var(--radius-xl);
-    backdrop-filter: blur(10px);
+    width: 100px;
+    height: 100px;
+    margin-bottom: var(--spacing-8);
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--radius-2xl);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    transition:
+      transform 0.3s ease,
+      box-shadow 0.3s ease;
+
+    &:hover {
+      transform: scale(1.05);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    }
 
     svg {
-      width: 48px;
-      height: 48px;
+      width: 56px;
+      height: 56px;
       color: #fff;
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
     }
   }
 
   &__brand-title {
-    margin: 0 0 var(--spacing-3);
-    font-size: var(--text-4xl);
-    font-weight: var(--font-bold);
+    margin: 0 0 var(--spacing-4);
+    font-size: 3rem;
+    font-weight: 700;
     letter-spacing: -0.02em;
+    color: #fff;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
   }
 
   &__brand-desc {
     margin: 0;
     font-size: var(--text-lg);
-    opacity: 0.9;
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 400;
   }
 
   &__brand-footer {
     position: absolute;
-    bottom: var(--spacing-6);
+    bottom: var(--spacing-8);
     left: 50%;
     transform: translateX(-50%);
+    z-index: 10;
   }
 
   &__brand-version {
     font-size: var(--text-sm);
-    opacity: 0.7;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: var(--font-mono);
   }
 
+  // ============================================
   // 右侧表单区域
+  // ============================================
   &__form-section {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    background: var(--color-bg);
+    position: relative;
   }
 
   &__toolbar {
     display: flex;
     justify-content: flex-end;
-    gap: var(--spacing-2);
-    padding: var(--spacing-4) var(--spacing-6);
+    gap: var(--spacing-3);
+    padding: var(--spacing-6) var(--spacing-8);
+    z-index: 10;
   }
 
   &__toolbar-btn {
-    color: var(--color-text-muted);
+    height: 36px;
+    padding: 0 var(--spacing-3);
+    border-radius: var(--radius-full);
+    transition: all 0.2s ease;
 
     &:hover {
-      color: var(--color-text);
+      background-color: var(--color-surface-hover);
     }
   }
 
@@ -471,20 +536,59 @@ function handleEnterSubmit(): void {
   }
 
   &__form-wrapper {
+    position: relative;
     width: 100%;
-    max-width: 400px;
+    max-width: 420px;
+  }
+
+  // 流光边框容器
+  &__glow-border {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-2xl);
+    padding: 1px;
+    background: var(--color-border);
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: var(--color-surface);
+    }
+  }
+
+  // 流光线条
+  &__glow-line {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    background: var(--color-primary);
+    filter: blur(20px);
+    opacity: 0.6;
+    animation: glow-rotate 4s linear infinite;
+  }
+
+  &__form-inner {
+    position: relative;
+    z-index: 1;
+    padding: var(--spacing-10);
+    background: var(--color-surface);
+    border-radius: var(--radius-2xl);
   }
 
   &__form-header {
     text-align: center;
-    margin-bottom: var(--spacing-8);
+    margin-bottom: var(--spacing-10);
   }
 
   &__form-title {
-    margin: 0 0 var(--spacing-2);
+    margin: 0 0 var(--spacing-3);
     font-size: var(--text-3xl);
-    font-weight: var(--font-semibold);
+    font-weight: 700;
     color: var(--color-text);
+    letter-spacing: -0.02em;
   }
 
   &__form-subtitle {
@@ -498,42 +602,430 @@ function handleEnterSubmit(): void {
   }
 
   &__form-item {
-    margin-bottom: var(--spacing-5);
+    margin-bottom: var(--spacing-6);
 
     &--button {
-      margin-top: var(--spacing-6);
+      margin-top: var(--spacing-8);
       margin-bottom: 0;
     }
   }
 
   &__input {
+    :deep(.n-input) {
+      border-radius: var(--radius-lg);
+      background-color: var(--color-bg);
+      transition: all 0.2s ease;
+
+      &:hover,
+      &:focus-within {
+        border-color: var(--color-primary);
+        background-color: var(--color-surface);
+      }
+    }
+
     :deep(.n-input__input-el) {
-      height: 48px;
+      height: 52px;
+      font-size: var(--text-base);
     }
   }
 
   &__submit-btn {
-    height: 48px;
-    font-size: var(--text-base);
-    font-weight: var(--font-medium);
+    height: 52px;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    border-radius: var(--radius-lg);
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
   }
 }
 
-// 深色主题调整
-[data-theme='obsidian'],
-[data-theme='aurum'] {
+// ============================================
+// 动画
+// ============================================
+@keyframes orb-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  25% {
+    transform: translate(10%, 10%) scale(1.1);
+  }
+
+  50% {
+    transform: translate(-5%, 15%) scale(0.95);
+  }
+
+  75% {
+    transform: translate(5%, -10%) scale(1.05);
+  }
+}
+
+@keyframes glow-rotate {
+  0% {
+    top: -40px;
+    left: -40px;
+  }
+
+  25% {
+    top: -40px;
+    left: calc(100% - 40px);
+  }
+
+  50% {
+    top: calc(100% - 40px);
+    left: calc(100% - 40px);
+  }
+
+  75% {
+    top: calc(100% - 40px);
+    left: -40px;
+  }
+
+  100% {
+    top: -40px;
+    left: -40px;
+  }
+}
+
+// ============================================
+// Pearl 主题 - 珍珠白（高端浅色）
+// ============================================
+[data-theme='pearl'] {
   .login-page {
     &__brand {
-      background: linear-gradient(135deg, var(--color-surface-alt) 0%, var(--color-surface) 100%);
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%);
+    }
+
+    &__orb--1 {
+      background: #818cf8;
+    }
+
+    &__orb--2 {
+      background: #60a5fa;
+    }
+
+    &__orb--3 {
+      background: #34d399;
+    }
+
+    &__glow-line {
+      background: linear-gradient(90deg, #4f46e5, #6366f1);
+    }
+
+    &__form-inner {
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    }
+  }
+}
+
+// ============================================
+// Obsidian 主题 - 黑曜石（深色低对比）
+// ============================================
+[data-theme='obsidian'] {
+  .login-page {
+    &__brand {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%);
+    }
+
+    &__orb--1 {
+      background: #6366f1;
+    }
+
+    &__orb--2 {
+      background: #818cf8;
+    }
+
+    &__orb--3 {
+      background: #a5b4fc;
+    }
+
+    &__grid {
+      background-image:
+        linear-gradient(rgba(129, 140, 248, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(129, 140, 248, 0.08) 1px, transparent 1px);
+    }
+
+    &__glow-line {
+      background: linear-gradient(90deg, #818cf8, #a5b4fc);
+    }
+
+    &__form-inner {
+      background: var(--color-surface);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+  }
+}
+
+// ============================================
+// Sakura 主题 - 樱（日系浅粉）
+// ============================================
+[data-theme='sakura'] {
+  .login-page {
+    &__brand {
+      background: linear-gradient(135deg, #ec4899 0%, #db2777 50%, #be185d 100%);
+    }
+
+    &__orb--1 {
+      background: #f472b6;
+    }
+
+    &__orb--2 {
+      background: #fb7185;
+    }
+
+    &__orb--3 {
+      background: #fda4af;
+    }
+
+    &__glow-line {
+      background: linear-gradient(90deg, #ec4899, #f472b6);
+    }
+
+    &__form-inner {
+      box-shadow: 0 4px 24px rgba(236, 72, 153, 0.08);
+    }
+  }
+}
+
+// ============================================
+// Cyberpunk 主题 - 赛博朋克（霓虹深色）
+// ============================================
+[data-theme='cyberpunk'] {
+  .login-page {
+    &__brand {
+      background: #050510;
+
+      // 透视网格地面
+      &::before {
+        content: '';
+        position: absolute;
+        bottom: -100%;
+        left: -50%;
+        right: -50%;
+        height: 200%;
+        background-image:
+          linear-gradient(rgba(217, 70, 239, 0.4) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(217, 70, 239, 0.4) 1px, transparent 1px);
+        background-size: 60px 60px;
+        transform: perspective(500px) rotateX(60deg);
+        transform-origin: center top;
+        animation: cyber-grid 20s linear infinite;
+        mask-image: linear-gradient(to top, black 0%, transparent 70%);
+      }
+
+      // 扫描线
+      &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 2px,
+          rgba(0, 212, 255, 0.03) 2px,
+          rgba(0, 212, 255, 0.03) 4px
+        );
+        pointer-events: none;
+        z-index: 5;
+      }
+    }
+
+    &__brand-bg {
+      z-index: 2;
+    }
+
+    &__orb {
+      filter: blur(100px);
+      opacity: 0.5;
+
+      &--1 {
+        background: #d946ef;
+      }
+
+      &--2 {
+        background: #00d4ff;
+      }
+
+      &--3 {
+        background: #00ff9d;
+        opacity: 0.3;
+      }
+    }
+
+    &__grid {
+      display: none;
+    }
+
+    &__brand-content {
+      z-index: 10;
     }
 
     &__brand-logo {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(217, 70, 239, 0.15);
+      border-color: rgba(217, 70, 239, 0.5);
+      box-shadow:
+        0 0 30px rgba(217, 70, 239, 0.3),
+        inset 0 0 20px rgba(217, 70, 239, 0.1);
+
+      // 角标装饰
+      &::before,
+      &::after {
+        content: '';
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border: 2px solid #00d4ff;
+      }
+
+      &::before {
+        top: -4px;
+        left: -4px;
+        border-right: none;
+        border-bottom: none;
+      }
+
+      &::after {
+        bottom: -4px;
+        right: -4px;
+        border-left: none;
+        border-top: none;
+      }
+
+      svg {
+        color: #d946ef;
+        filter: drop-shadow(0 0 10px #d946ef);
+      }
     }
 
-    &__shape {
-      background: rgba(255, 255, 255, 0.05);
+    &__brand-title {
+      font-family: Orbitron, Rajdhani, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      font-size: 2.5rem;
+      background: linear-gradient(180deg, #fff 0%, #d946ef 100%);
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: none;
+      filter: drop-shadow(0 0 20px rgba(217, 70, 239, 0.5));
     }
+
+    &__brand-desc {
+      color: rgba(224, 224, 255, 0.7);
+    }
+
+    &__brand-version {
+      color: rgba(0, 212, 255, 0.6);
+    }
+
+    // 表单区域
+    &__form-section {
+      background: #050510;
+
+      &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(42, 42, 90, 0.15) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(42, 42, 90, 0.15) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+      }
+    }
+
+    // 流光边框 - 霓虹效果
+    &__glow-border {
+      background: linear-gradient(135deg, rgba(217, 70, 239, 0.3), rgba(0, 212, 255, 0.3));
+      padding: 2px;
+
+      &::before {
+        background: rgba(19, 19, 43, 0.95);
+      }
+    }
+
+    &__glow-line {
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(90deg, #d946ef, #00d4ff);
+      filter: blur(25px);
+      opacity: 0.8;
+    }
+
+    &__form-inner {
+      background: rgba(19, 19, 43, 0.9);
+      backdrop-filter: blur(20px);
+    }
+
+    &__form-title {
+      font-family: Orbitron, Rajdhani, sans-serif;
+      letter-spacing: 0.05em;
+    }
+
+    &__input {
+      :deep(.n-input) {
+        background-color: rgba(5, 5, 16, 0.6);
+        border-color: rgba(42, 42, 90, 0.8);
+
+        &:hover,
+        &:focus-within {
+          border-color: #d946ef;
+          box-shadow: 0 0 20px rgba(217, 70, 239, 0.15);
+          background-color: rgba(5, 5, 16, 0.9);
+        }
+      }
+    }
+
+    &__submit-btn {
+      background: linear-gradient(90deg, #d946ef, #c026d3);
+      border: 1px solid rgba(240, 171, 252, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-family: Orbitron, Rajdhani, sans-serif;
+
+      &:hover {
+        background: linear-gradient(90deg, #f0abfc, #d946ef);
+        box-shadow: 0 0 30px rgba(217, 70, 239, 0.4);
+      }
+    }
+  }
+}
+
+@keyframes cyber-grid {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 0 60px;
+  }
+}
+
+// ============================================
+// Reduced Motion 支持
+// ============================================
+@media (prefers-reduced-motion: reduce) {
+  .login-page {
+    &__orb {
+      animation: none;
+    }
+
+    &__glow-line {
+      animation: none;
+      opacity: 0;
+    }
+  }
+
+  [data-theme='cyberpunk'] .login-page__brand::before {
+    animation: none;
   }
 }
 </style>
