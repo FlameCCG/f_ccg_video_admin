@@ -18,15 +18,16 @@ export interface LocaleConfig {
   locale: LocaleType
   label: string
   labelNative: string
+  icon: string
 }
 
 /**
  * 支持的语言列表
  */
 export const localeConfigs: LocaleConfig[] = [
-  { locale: 'zh-CN', label: 'Chinese (Simplified)', labelNative: '简体中文' },
-  { locale: 'en-US', label: 'English', labelNative: 'English' },
-  { locale: 'ja-JP', label: 'Japanese', labelNative: '日本語' },
+  { locale: 'zh-CN', label: 'Chinese (Simplified)', labelNative: '简体中文', icon: '🇨🇳' },
+  { locale: 'en-US', label: 'English', labelNative: 'English', icon: '🇺🇸' },
+  { locale: 'ja-JP', label: 'Japanese', labelNative: '日本語', icon: '🇯🇵' },
 ]
 
 /**
