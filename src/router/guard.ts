@@ -48,6 +48,7 @@ async function loadUserPermissions(): Promise<boolean> {
 
 /**
  * 添加动态路由
+ * 后端顶级菜单的 component="Layout"，直接注册为顶级路由
  */
 function addDynamicRoutes(router: Router): void {
   const permissionStore = usePermissionStore()
@@ -55,19 +56,42 @@ function addDynamicRoutes(router: Router): void {
   // 获取生成的路由
   const dynamicRoutes = permissionStore.routes
 
-  // 添加到路由器
+  // 直接添加为顶级路由（后端顶级菜单已经是 Layout）
   for (const route of dynamicRoutes) {
     // 检查路由是否已存在
     if (!router.hasRoute(route.name as string)) {
       router.addRoute(route)
     }
   }
-}
 
-/**
- * 静态路由路径列表（这些路由不需要菜单权限检查）
- */
-const STATIC_ROUTE_PATHS = ['/', '/overview', '/overview/dashboard', '/dashboard']
+  // 添加根路由重定向（如果有动态路由）
+  if (dynamicRoutes.length > 0) {
+    const firstRoute = dynamicRoutes[0]
+    if (firstRoute) {
+      // 移除旧的 Root 路由
+      if (router.hasRoute('Root')) {
+        router.removeRoute('Root')
+      }
+      // 添加根路由重定向到第一个动态路由
+      const redirectPath =
+        (typeof firstRoute.redirect === 'string' ? firstRoute.redirect : null) || firstRoute.path
+      router.addRoute({
+        path: '/',
+        name: 'Root',
+        redirect: redirectPath,
+      })
+    }
+  }
+
+  // 添加 404 兜底路由（必须在最后）
+  if (!router.hasRoute('NotFoundRedirect')) {
+    router.addRoute({
+      path: '/:pathMatch(.*)*',
+      name: 'NotFoundRedirect',
+      redirect: '/404',
+    })
+  }
+}
 
 /**
  * 检查路由权限
@@ -82,8 +106,8 @@ function checkRoutePermission(to: RouteLocationNormalized): boolean {
     return true
   }
 
-  // 静态路由直接放行（如 dashboard）
-  if (STATIC_ROUTE_PATHS.includes(to.path)) {
+  // 根路由直接放行
+  if (to.path === '/') {
     return true
   }
 
@@ -101,7 +125,12 @@ function checkRoutePermission(to: RouteLocationNormalized): boolean {
 
   // 如果是动态添加的路由，检查是否存在
   const flatMenus = permissionStore.flatMenus
-  const hasAccess = flatMenus.some((m) => m.path === to.path)
+  const hasAccess = flatMenus.some((m) => {
+    if (!m.path) return false
+    // 检查完整路径匹配
+    const menuFullPath = m.path.startsWith('/') ? m.path : `/${m.path}`
+    return to.path === menuFullPath || to.path.startsWith(menuFullPath + '/')
+  })
 
   return hasAccess
 }

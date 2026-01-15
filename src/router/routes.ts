@@ -1,6 +1,7 @@
 /**
  * 静态路由配置
- * 包含登录页、错误页等公共路由
+ * 只包含登录页、错误页等公共路由
+ * 业务路由由后端菜单动态生成
  * Requirements: 5.2
  */
 import type { RouteRecordRaw } from 'vue-router'
@@ -24,6 +25,8 @@ declare module 'vue-router' {
     keepAlive?: boolean
     /** 菜单图标 */
     icon?: string
+    /** 排序顺序 */
+    sortOrder?: number
   }
 }
 
@@ -73,65 +76,9 @@ export const staticRoutes: RouteRecordRaw[] = [
 ]
 
 /**
- * 根路由
- * 使用默认布局，子路由由动态路由生成
- */
-export const rootRoute: RouteRecordRaw = {
-  path: '/',
-  name: 'Root',
-  component: () => import('@/layouts/DefaultLayout.vue'),
-  redirect: '/overview/dashboard',
-  meta: {
-    requiresAuth: true,
-  },
-  children: [
-    // 运营总览 - 数据看板
-    {
-      path: 'overview',
-      name: 'Overview',
-      redirect: '/overview/dashboard',
-      meta: {
-        title: '运营总览',
-        titleEn: 'Overview',
-        titleJa: '運営概要',
-        requiresAuth: true,
-      },
-      children: [
-        {
-          path: 'dashboard',
-          name: 'DataDashboard',
-          component: () => import('@/views/overview/dashboard/index.vue'),
-          meta: {
-            title: '数据看板',
-            titleEn: 'Dashboard',
-            titleJa: 'ダッシュボード',
-            requiresAuth: true,
-            icon: 'dashboard',
-          },
-        },
-      ],
-    },
-    // 兼容旧路由 - 重定向到新路由
-    {
-      path: 'dashboard',
-      redirect: '/overview/dashboard',
-    },
-  ],
-}
-
-/**
- * 404 兜底路由
- * 必须放在最后，匹配所有未定义的路由
- */
-export const notFoundRoute: RouteRecordRaw = {
-  path: '/:pathMatch(.*)*',
-  name: 'NotFoundRedirect',
-  redirect: '/404',
-}
-
-/**
  * 获取所有基础路由
+ * 动态路由（业务菜单）由 guard.ts 在登录后添加
  */
 export function getBaseRoutes(): RouteRecordRaw[] {
-  return [...staticRoutes, rootRoute, notFoundRoute]
+  return [...staticRoutes]
 }
