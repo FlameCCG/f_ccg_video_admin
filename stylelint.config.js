@@ -68,6 +68,13 @@ export default {
     'color-hex-length': null,
     // 放宽属性顺序规则
     'order/properties-order': null,
+    // 允许 Vue 的 :deep 伪类选择器
+    'selector-pseudo-class-no-unknown': [
+      true,
+      {
+        ignorePseudoClasses: ['deep', 'global', 'slotted'],
+      },
+    ],
   },
   ignoreFiles: ['dist/**', 'node_modules/**'],
 }
