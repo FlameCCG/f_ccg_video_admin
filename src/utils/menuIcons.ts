@@ -15,13 +15,23 @@ import MenuIconBanner from '@/components/icons/MenuIconBanner.vue'
 import MenuIconNotification from '@/components/icons/MenuIconNotification.vue'
 import MenuIconRbac from '@/components/icons/MenuIconRbac.vue'
 import MenuIconSettings from '@/components/icons/MenuIconSettings.vue'
+import MenuIconRole from '@/components/icons/MenuIconRole.vue'
+import MenuIconMenu from '@/components/icons/MenuIconMenu.vue'
+import MenuIconApi from '@/components/icons/MenuIconApi.vue'
+import MenuIconAudit from '@/components/icons/MenuIconAudit.vue'
+import MenuIconBan from '@/components/icons/MenuIconBan.vue'
+import MenuIconRecycle from '@/components/icons/MenuIconRecycle.vue'
+import MenuIconCategory from '@/components/icons/MenuIconCategory.vue'
+import MenuIconReport from '@/components/icons/MenuIconReport.vue'
+import MenuIconDanmaku from '@/components/icons/MenuIconDanmaku.vue'
+import MenuIconVideoList from '@/components/icons/MenuIconVideoList.vue'
 
 /**
  * 后端 icon 字符串到前端组件的映射表
  * 支持多种格式：el-icon-xxx, icon-xxx, xxx
  */
 const iconComponentMap: Record<string, Component> = {
-  // Dashboard / 数据看板
+  // Dashboard / 仪表盘
   dashboard: MenuIconDashboard,
   'el-icon-dashboard': MenuIconDashboard,
   'el-icon-bar-chart': MenuIconDashboard,
@@ -32,23 +42,50 @@ const iconComponentMap: Record<string, Component> = {
   'el-icon-user': MenuIconUser,
   'el-icon-team': MenuIconUser,
   team: MenuIconUser,
-  'el-icon-stop': MenuIconUser, // 封禁管理也用用户图标
+
+  // Ban / 封禁管理
+  ban: MenuIconBan,
+  'el-icon-stop': MenuIconBan,
+  stop: MenuIconBan,
 
   // Video / 视频管理
   video: MenuIconVideo,
   'el-icon-video': MenuIconVideo,
   'el-icon-video-camera': MenuIconVideo,
   'video-camera': MenuIconVideo,
-  'el-icon-audit': MenuIconVideo, // 稿件审核
-  'el-icon-unordered-list': MenuIconVideo, // 视频列表
-  'el-icon-delete': MenuIconVideo, // 回收站
-  'el-icon-appstore': MenuIconVideo, // 分区配置
+
+  // Video List / 视频列表
+  'video-list': MenuIconVideoList,
+  'el-icon-unordered-list': MenuIconVideoList,
+  'unordered-list': MenuIconVideoList,
+
+  // Audit / 稿件审核
+  audit: MenuIconAudit,
+  'el-icon-audit': MenuIconAudit,
+
+  // Recycle / 回收站
+  recycle: MenuIconRecycle,
+  'el-icon-delete': MenuIconRecycle,
+
+  // Category / 分区配置
+  category: MenuIconCategory,
+  'el-icon-appstore': MenuIconCategory,
+  appstore: MenuIconCategory,
 
   // Comment / 评论管理
   comment: MenuIconComment,
   'el-icon-comment': MenuIconComment,
   'el-icon-message': MenuIconComment,
   message: MenuIconComment,
+
+  // Report / 举报处理
+  report: MenuIconReport,
+  'el-icon-warning': MenuIconReport,
+  warning: MenuIconReport,
+
+  // Danmaku / 弹幕管控
+  danmaku: MenuIconDanmaku,
+  'el-icon-danmaku': MenuIconDanmaku,
 
   // Dynamic / 动态管理
   dynamic: MenuIconDynamic,
@@ -61,7 +98,7 @@ const iconComponentMap: Record<string, Component> = {
   'el-icon-banner': MenuIconBanner,
   'el-icon-picture': MenuIconBanner,
   picture: MenuIconBanner,
-  'el-icon-gift': MenuIconBanner, // 营销推广
+  'el-icon-gift': MenuIconBanner,
 
   // Notification / 通知
   notification: MenuIconNotification,
@@ -73,11 +110,20 @@ const iconComponentMap: Record<string, Component> = {
   rbac: MenuIconRbac,
   'el-icon-rbac': MenuIconRbac,
   'el-icon-setting': MenuIconRbac,
-  'el-icon-idcard': MenuIconRbac,
   'el-icon-cluster': MenuIconRbac,
-  'el-icon-api': MenuIconRbac,
-  setting: MenuIconRbac,
-  idcard: MenuIconRbac,
+
+  // Role / 角色管理
+  role: MenuIconRole,
+  'el-icon-idcard': MenuIconRole,
+  idcard: MenuIconRole,
+
+  // Menu / 菜单管理
+  menu: MenuIconMenu,
+  'el-icon-menu': MenuIconMenu,
+
+  // API / 接口资源
+  api: MenuIconApi,
+  'el-icon-api': MenuIconApi,
 
   // Settings / 系统设置
   settings: MenuIconSettings,
@@ -85,7 +131,6 @@ const iconComponentMap: Record<string, Component> = {
 
   // Community / 社区治理
   'el-icon-safety-certificate': MenuIconComment,
-  'el-icon-warning': MenuIconComment, // 举报处理
 }
 
 /**
@@ -145,7 +190,7 @@ export const suggestedIcons = {
   系统权限: 'rbac',
 
   // 二级菜单 - 运营总览
-  数据看板: 'dashboard',
+  仪表盘: 'dashboard',
 
   // 二级菜单 - 内容管理
   稿件审核: 'video',
