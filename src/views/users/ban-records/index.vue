@@ -1,0 +1,284 @@
+<script setup lang="ts">
+/**
+ * 封禁记录页
+ * Ban Records Page
+ * Requirements: 8.5
+ */
+import { ref, computed, h } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useQuery } from '@tanstack/vue-query'
+import { NCard, NSpace, NButton, NIcon, NGi, NFormItem, NInputNumber } from 'naive-ui'
+import type { DataTableColumns } from 'naive-ui'
+import { getBanRecords } from '@/api/user'
+import type { UserStatus } from '@/api/types'
+import { DataTable } from '@/components/table'
+import { SearchForm, FilterSelect } from '@/components/form'
+import { AppStatusTag } from '@/components/common'
+
+const { t } = useI18n()
+
+/** 搜索参数 */
+const searchParams = ref({
+  userId: null as number | null,
+  status: null as UserStatus | null,
+  page: 1,
+  pageSize: 10,
+})
+
+/** 获取封禁记录列表 */
+const {
+  data: recordData,
+  isLoading,
+  refetch,
+} = useQuery({
+  queryKey: ['banRecords', searchParams],
+  queryFn: () =>
+    getBanRecords({
+      userId: searchParams.value.userId ?? undefined,
+      status: searchParams.value.status ?? undefined,
+      page: searchParams.value.page,
+      pageSize: searchParams.value.pageSize,
+    }),
+  staleTime: 30 * 1000,
+})
+
+/** 封禁记录列表数据 */
+const recordList = computed(() => {
+  const list = recordData.value?.list ?? []
+  return list as unknown as Record<string, unknown>[]
+})
+const total = computed(() => recordData.value?.total ?? 0)
+
+/** 状态选项 */
+const statusOptions = computed(() => [
+  { value: 1, label: t('user.status.normal') },
+  { value: 2, label: t('user.status.banned') },
+  { value: 3, label: t('user.status.permanentBan') },
+])
+
+/** 获取状态标签类型 */
+function getStatusType(status: UserStatus): 'success' | 'warning' | 'error' {
+  const typeMap: Record<UserStatus, 'success' | 'warning' | 'error'> = {
+    1: 'success',
+    2: 'warning',
+    3: 'error',
+  }
+  return typeMap[status]
+}
+
+/** 获取状态文本 */
+function getStatusText(status: UserStatus): string {
+  const textMap: Record<UserStatus, string> = {
+    1: t('user.status.normal'),
+    2: t('user.status.banned'),
+    3: t('user.status.permanentBan'),
+  }
+  return textMap[status]
+}
+
+/** 表格列配置 */
+const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
+  {
+    title: 'ID',
+    key: 'id',
+    width: 80,
+    align: 'center',
+  },
+  {
+    title: t('user.banRecord.userId'),
+    key: 'userId',
+    width: 100,
+    align: 'center',
+  },
+  {
+    title: t('user.banRecord.username'),
+    key: 'username',
+    width: 150,
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: t('user.banRecord.status'),
+    key: 'status',
+    width: 120,
+    render: (row) =>
+      h(AppStatusTag, {
+        type: getStatusType(row.status as UserStatus),
+        text: getStatusText(row.status as UserStatus),
+        dot: true,
+      }),
+  },
+  {
+    title: t('user.banRecord.duration'),
+    key: 'days',
+    width: 100,
+    align: 'center',
+    render: (row) => {
+      if ((row.status as UserStatus) === 3) return t('user.ban.permanent')
+      if ((row.days as number) === 0) return '-'
+      return `${String(row.days)} ${t('user.ban.durationUnit')}`
+    },
+  },
+  {
+    title: t('user.banRecord.reason'),
+    key: 'reason',
+    width: 200,
+    ellipsis: { tooltip: true },
+    render: (row) => (row.reason as string) || '-',
+  },
+  {
+    title: t('user.banRecord.operator'),
+    key: 'operatorUsername',
+    width: 120,
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: t('user.banRecord.banTime'),
+    key: 'startAt',
+    width: 180,
+    render: (row) => formatDateTime(row.startAt as string),
+  },
+  {
+    title: t('user.banRecord.expireTime'),
+    key: 'endAt',
+    width: 180,
+    render: (row) => {
+      if ((row.status as UserStatus) === 3) return t('user.ban.permanent')
+      return formatDateTime(row.endAt as string)
+    },
+  },
+  {
+    title: t('common.table.createdAt'),
+    key: 'createdAt',
+    width: 180,
+    render: (row) => formatDateTime(row.createdAt as string),
+  },
+])
+
+/** 格式化日期时间 */
+function formatDateTime(dateStr: string): string {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+/** 处理搜索 */
+function handleSearch(): void {
+  searchParams.value.page = 1
+  void refetch()
+}
+
+/** 处理重置 */
+function handleReset(): void {
+  searchParams.value = {
+    userId: null,
+    status: null,
+    page: 1,
+    pageSize: 10,
+  }
+  void refetch()
+}
+
+/** 处理页码变化 */
+function handlePageChange(page: number): void {
+  searchParams.value.page = page
+  void refetch()
+}
+
+/** 处理每页数量变化 */
+function handlePageSizeChange(pageSize: number): void {
+  searchParams.value.pageSize = pageSize
+  searchParams.value.page = 1
+  void refetch()
+}
+
+/** 处理刷新 */
+function handleRefresh(): void {
+  void refetch()
+}
+</script>
+
+<template>
+  <div class="page-list">
+    <!-- 搜索表单 -->
+    <n-card :bordered="false" class="page-list__search">
+      <search-form :loading="isLoading" @search="handleSearch" @reset="handleReset">
+        <n-gi span="6 m:3 l:2">
+          <n-form-item :label="t('user.banRecord.userId')" path="userId">
+            <n-input-number
+              v-model:value="searchParams.userId"
+              :placeholder="t('common.form.pleaseInput')"
+              :min="1"
+              clearable
+              style="width: 100%"
+            />
+          </n-form-item>
+        </n-gi>
+        <n-gi span="6 m:3 l:2">
+          <n-form-item :label="t('user.banRecord.status')" path="status">
+            <filter-select
+              :value="searchParams.status"
+              :options="statusOptions"
+              :placeholder="t('user.filter.statusPlaceholder')"
+              :width="'100%'"
+              @change="(val) => (searchParams.status = val as UserStatus | null)"
+            />
+          </n-form-item>
+        </n-gi>
+      </search-form>
+    </n-card>
+
+    <!-- 数据表格 -->
+    <n-card :bordered="false" class="page-list__table">
+      <template #header>
+        <n-space justify="space-between" align="center">
+          <span class="page-list__title">{{ t('user.banRecord.title') }}</span>
+          <n-button size="small" secondary @click="handleRefresh">
+            <template #icon>
+              <n-icon>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+              </n-icon>
+            </template>
+            {{ t('common.refresh') }}
+          </n-button>
+        </n-space>
+      </template>
+
+      <data-table
+        :columns="columns"
+        :data="recordList"
+        :loading="isLoading"
+        :selectable="false"
+        :page="searchParams.page"
+        :page-size="searchParams.pageSize"
+        :total="total"
+        row-key="id"
+        @update:page="handlePageChange"
+        @update:page-size="handlePageSizeChange"
+      />
+    </n-card>
+  </div>
+</template>
+
+<style scoped lang="scss">
+// 使用全局 page-list 样式
+</style>
