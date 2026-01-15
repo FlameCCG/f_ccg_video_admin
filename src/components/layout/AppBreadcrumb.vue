@@ -5,7 +5,7 @@
  * Requirements: 6.3
  */
 import { computed } from 'vue'
-import { useRoute, useRouter, type RouteLocationMatched } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { NBreadcrumb, NBreadcrumbItem } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { usePermissionStore } from '@/stores/permission'
@@ -13,7 +13,7 @@ import type { LocaleType } from '@/locales'
 
 const route = useRoute()
 const router = useRouter()
-const { t, locale } = useI18n()
+const { locale } = useI18n()
 const permissionStore = usePermissionStore()
 
 /** 面包屑项接口 */
@@ -39,49 +39,51 @@ function getMenuTitle(menu: { title: string; titleEn?: string; titleJa?: string 
   }
 }
 
-/** 生成面包屑数据 */
+/** 生成面包屑数据 - 基于后端菜单层级 */
 const breadcrumbs = computed<BreadcrumbItem[]>(() => {
   const items: BreadcrumbItem[] = []
-  const matched = route.matched
+  const currentPath = route.path
 
-  // 始终添加首页
-  items.push({
-    title: t('layout.breadcrumb.home'),
-    path: '/dashboard',
-    clickable: true,
-  })
+  // 从后端菜单数据查找当前路径对应的菜单及其父级
+  const menuPath = permissionStore.getMenuPathByRoutePath(currentPath)
 
-  // 根据路由匹配生成面包屑
-  matched.forEach((record: RouteLocationMatched, index: number) => {
-    const path = record.path
-    const isLast = index === matched.length - 1
+  if (menuPath.length > 0) {
+    // 使用后端菜单层级生成面包屑
+    // 如果只有一个菜单且没有子菜单，只显示该菜单
+    const lastMenu = menuPath[menuPath.length - 1]
+    if (!lastMenu) return items
+    const hasChildren = lastMenu.children && lastMenu.children.length > 0
 
-    // 跳过根路由和登录页
-    if (path === '/' || path === '/login' || path === '/dashboard') {
-      return
-    }
-
-    // 优先从后端菜单数据获取标题
-    const menu = permissionStore.getMenuByPath(path)
-    let title: string
-
-    if (menu) {
-      // 从菜单数据获取多语言标题
-      title = getMenuTitle(menu)
-    } else if (record.meta?.title) {
-      // 回退到路由 meta 中的标题
-      title = record.meta.title
+    if (menuPath.length === 1 && !hasChildren) {
+      // 单层菜单，只显示一级
+      items.push({
+        title: getMenuTitle(lastMenu),
+        path: undefined,
+        clickable: false,
+      })
     } else {
-      // 最后回退到路径
-      title = path
+      // 多层菜单，显示完整路径
+      menuPath.forEach((menu, index) => {
+        const isLast = index === menuPath.length - 1
+        items.push({
+          title: getMenuTitle(menu),
+          path: isLast ? undefined : menu.path,
+          clickable: !isLast && !!menu.path,
+        })
+      })
     }
-
-    items.push({
-      title,
-      path: isLast ? undefined : path,
-      clickable: !isLast,
-    })
-  })
+  } else {
+    // 回退：使用路由 meta 中的标题（只取最后一个有标题的）
+    const matched = route.matched
+    const lastWithTitle = matched.filter((r) => r.meta?.title).pop()
+    if (lastWithTitle?.meta?.title) {
+      items.push({
+        title: lastWithTitle.meta.title,
+        path: undefined,
+        clickable: false,
+      })
+    }
+  }
 
   return items
 })

@@ -1,18 +1,19 @@
 <script setup lang="ts">
 /**
  * 菜单组件
- * 从后端动态获取菜单，递归渲染菜单树，支持图标
+ * 从后端动态获取菜单，递归渲染菜单树，支持 SVG 图标
  * Requirements: 6.1, 6.4
  */
-import { computed, h, type Component } from 'vue'
+import { computed, h, type Component, type VNode } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NMenu, NIcon, type MenuOption } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import type { Menu } from '@/api/types/rbac'
 import type { LocaleType } from '@/locales'
 import { usePermissionStore } from '@/stores/permission'
+import { SvgIcon } from '@/components/common'
 
-// 图标映射（使用内联 SVG）
+// 图标映射（使用内联 SVG）- 作为后备方案
 import MenuIconDashboard from '@/components/icons/MenuIconDashboard.vue'
 import MenuIconUser from '@/components/icons/MenuIconUser.vue'
 import MenuIconVideo from '@/components/icons/MenuIconVideo.vue'
@@ -47,8 +48,8 @@ const { locale } = useI18n()
 const permissionStore = usePermissionStore()
 
 /**
- * 图标组件映射
- * 后端菜单 icon 字段使用以下名称
+ * 图标组件映射（后备方案）
+ * 当后端 icon 字段不是 SVG 字符串时使用
  */
 const iconMap: Record<string, Component> = {
   // 一级菜单
@@ -100,9 +101,19 @@ function getMenuTitle(menu: Menu): string {
   }
 }
 
-/** 渲染图标 */
-function renderIcon(iconName: string) {
-  const IconComponent = iconMap[iconName]
+/** 渲染图标 - 支持 SVG 字符串和组件映射 */
+function renderIcon(iconValue: string): (() => VNode) | undefined {
+  if (!iconValue) return undefined
+
+  // 检查是否是 SVG 字符串
+  const trimmedIcon = iconValue.trim()
+  if (trimmedIcon.startsWith('<svg')) {
+    // SVG 字符串直接用 SvgIcon 渲染，不需要 NIcon 包装
+    return () => h(SvgIcon, { svg: trimmedIcon, size: 18 })
+  }
+
+  // 后备：使用组件映射
+  const IconComponent = iconMap[iconValue]
   if (!IconComponent) return undefined
   return () => h(NIcon, null, { default: () => h(IconComponent) })
 }

@@ -30,9 +30,11 @@ function handleToggle(): void {
       <AppLogo :collapsed="collapsed" />
     </div>
 
-    <!-- 菜单区域 -->
+    <!-- 菜单区域 - 独立滚动容器 -->
     <div class="sidebar-menu">
-      <AppMenu :collapsed="collapsed" />
+      <div class="sidebar-menu__scroll">
+        <AppMenu :collapsed="collapsed" />
+      </div>
     </div>
 
     <!-- 折叠按钮 -->
@@ -103,7 +105,6 @@ function handleToggle(): void {
   position: relative;
   transition: padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  // 底部分隔线 - 渐变效果
   &::after {
     content: '';
     position: absolute;
@@ -135,31 +136,39 @@ function handleToggle(): void {
 
 .sidebar-menu {
   flex: 1;
-  overflow: hidden auto;
-  padding: 12px 8px;
-  transition: padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
 
-  // 自定义滚动条
-  &::-webkit-scrollbar {
-    width: 4px;
+  &__scroll {
+    height: 100%;
+    overflow: hidden auto;
+    padding: 12px 8px;
+    transition: padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+      margin: 8px 0;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      border-radius: 2px;
+
+      &:hover {
+        background: var(--color-text-muted);
+      }
+    }
+
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
   }
 
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 2px;
-    opacity: 0;
-    transition: opacity 200ms;
-  }
-
-  &:hover::-webkit-scrollbar-thumb {
-    opacity: 1;
-  }
-
-  .is-collapsed & {
+  .is-collapsed & &__scroll {
     padding: 12px 4px;
   }
 }
@@ -170,7 +179,6 @@ function handleToggle(): void {
   position: relative;
   transition: padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  // 顶部分隔线 - 渐变效果
   &::before {
     content: '';
     position: absolute;
@@ -185,9 +193,6 @@ function handleToggle(): void {
       var(--color-border-light) 80%,
       transparent 100%
     );
-    transition:
-      left 280ms cubic-bezier(0.4, 0, 0.2, 1),
-      right 280ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .is-collapsed & {
@@ -252,11 +257,6 @@ function handleToggle(): void {
     opacity: 0.08;
     transform: scale(1);
   }
-
-  .collapse-btn:active & {
-    opacity: 0.12;
-    transform: scale(0.98);
-  }
 }
 
 .collapse-icon-wrapper {
@@ -300,7 +300,6 @@ function handleToggle(): void {
   overflow: hidden;
 }
 
-// 文字淡入淡出
 .text-fade-enter-active,
 .text-fade-leave-active {
   transition:
@@ -318,7 +317,6 @@ function handleToggle(): void {
   transform: translateX(8px);
 }
 
-// 底部光晕装饰
 .sidebar-glow {
   position: absolute;
   bottom: 0;
@@ -333,14 +331,12 @@ function handleToggle(): void {
   );
   pointer-events: none;
   opacity: 0.8;
-  transition: opacity 280ms cubic-bezier(0.4, 0, 0.2, 1);
 
   .is-collapsed & {
     opacity: 0.4;
   }
 }
 
-// Reduced motion
 @media (prefers-reduced-motion: reduce) {
   .collapse-btn,
   .collapse-btn-inner,
@@ -351,11 +347,6 @@ function handleToggle(): void {
   .sidebar-menu,
   .sidebar-footer,
   .sidebar-glow {
-    transition: none;
-  }
-
-  .text-fade-enter-active,
-  .text-fade-leave-active {
     transition: none;
   }
 }
