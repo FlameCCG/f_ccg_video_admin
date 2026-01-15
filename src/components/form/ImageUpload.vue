@@ -2,12 +2,14 @@
 /**
  * 图片上传组件
  * 支持单图和多图上传、预览、删除
+ * 自动计算 fileHash 并携带 token
  * Requirements: 8.2, 9.2
  */
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NUpload, NButton, NIcon, useMessage } from 'naive-ui'
-import type { UploadFileInfo, UploadInst } from 'naive-ui'
+import type { UploadFileInfo, UploadInst, UploadCustomRequestOptions } from 'naive-ui'
+import { getAccessToken } from '@/utils/storage'
 
 interface Props {
   /** 已上传的图片列表 */
@@ -44,7 +46,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   value: () => [],
-  action: '/api/upload',
+  action: '/v1/common/video/image/upload',
   max: 1,
   maxSize: 5,
   accept: 'image/*',
@@ -54,7 +56,7 @@ const props = withDefaults(defineProps<Props>(), {
   multiple: false,
   headers: undefined,
   data: undefined,
-  name: 'file',
+  name: 'cover',
   drag: false,
   imageWidth: 100,
   imageHeight: 100,
@@ -95,6 +97,103 @@ const canUpload = computed(() => {
   return fileList.value.length < props.max
 })
 
+/** 计算文件 SHA-256 哈希 */
+async function calculateFileHash(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer()
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** 自定义上传请求（支持 fileHash） */
+async function customRequest(options: UploadCustomRequestOptions): Promise<void> {
+  const { file, onFinish, onError, onProgress } = options
+
+  if (!file.file) {
+    onError()
+    return
+  }
+
+  try {
+    // 计算文件哈希
+    const fileHash = await calculateFileHash(file.file)
+
+    // 构建 FormData
+    const formData = new FormData()
+    formData.append('fileHash', fileHash)
+    formData.append(props.name, file.file)
+
+    // 添加额外数据
+    if (props.data) {
+      Object.entries(props.data).forEach(([key, value]) => {
+        formData.append(key, value)
+      })
+    }
+
+    // 发送请求
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', props.action)
+
+    // 设置请求头
+    const token = getAccessToken()
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    }
+    if (props.headers) {
+      Object.entries(props.headers).forEach(([key, value]) => {
+        xhr.setRequestHeader(key, value)
+      })
+    }
+
+    // 上传进度
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        onProgress({ percent: Math.round((e.loaded / e.total) * 100) })
+      }
+    }
+
+    // 上传完成
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText) as {
+            code: number
+            data: { imageUrl: string }
+            msg: string
+          }
+          if (response.code === 0 && response.data?.imageUrl) {
+            file.url = response.data.imageUrl
+            onFinish()
+            updateValue()
+            emit('success', response.data.imageUrl, file)
+          } else {
+            message.error(response.msg || t('common.fileUpload.uploadFailed'))
+            onError()
+          }
+        } catch {
+          message.error(t('common.fileUpload.uploadFailed'))
+          onError()
+        }
+      } else {
+        message.error(t('common.fileUpload.uploadFailed'))
+        onError()
+      }
+    }
+
+    // 上传错误
+    xhr.onerror = () => {
+      message.error(t('common.fileUpload.uploadFailed'))
+      onError()
+      emit('error', new Error('Upload failed'), file)
+    }
+
+    xhr.send(formData)
+  } catch {
+    message.error(t('common.fileUpload.uploadFailed'))
+    onError()
+  }
+}
+
 /** 上传前校验 */
 function handleBeforeUpload(data: { file: UploadFileInfo }): boolean {
   const { file } = data
@@ -118,43 +217,6 @@ function handleBeforeUpload(data: { file: UploadFileInfo }): boolean {
   }
 
   return true
-}
-
-/** 处理上传完成 */
-function handleFinish(data: { file: UploadFileInfo; event?: ProgressEvent }): UploadFileInfo {
-  const { file, event } = data
-
-  try {
-    // 解析响应
-    const target = event?.target as XMLHttpRequest | undefined
-    if (target?.response) {
-      const response = JSON.parse(target.response) as {
-        code: number
-        data: { url: string }
-        msg: string
-      }
-      if (response.code === 0 && response.data?.url) {
-        file.url = response.data.url
-        updateValue()
-        emit('success', response.data.url, file)
-      } else {
-        file.status = 'error'
-        message.error(response.msg || t('common.fileUpload.uploadFailed'))
-      }
-    }
-  } catch {
-    file.status = 'error'
-    message.error(t('common.fileUpload.uploadFailed'))
-  }
-
-  return file
-}
-
-/** 处理上传错误 */
-function handleError(data: { file: UploadFileInfo; event?: ProgressEvent }): void {
-  const { file } = data
-  message.error(t('common.fileUpload.uploadFailed'))
-  emit('error', new Error('Upload failed'), file)
 }
 
 /** 处理文件移除 */
@@ -194,20 +256,15 @@ defineExpose({
     <n-upload
       ref="uploadRef"
       v-model:file-list="fileList"
-      :action="action"
       :accept="accept"
       :max="max"
       :disabled="disabled"
       :show-file-list="showFileList"
       :list-type="listType"
       :multiple="multiple && max > 1"
-      :headers="headers"
-      :data="data"
-      :name="name"
+      :custom-request="customRequest"
       :default-upload="true"
       @before-upload="handleBeforeUpload"
-      @finish="handleFinish"
-      @error="handleError"
       @remove="handleRemove"
     >
       <!-- 上传按钮 -->
@@ -302,6 +359,22 @@ defineExpose({
     margin-top: var(--spacing-2);
     font-size: var(--text-xs);
     color: var(--color-text-muted);
+  }
+
+  // 覆盖 Naive UI upload 组件的默认边框样式
+  :deep(.n-upload-trigger) {
+    border: none !important;
+  }
+
+  :deep(.n-upload-file-list) {
+    .n-upload-file {
+      border: 1px solid var(--color-border) !important;
+      border-radius: var(--radius-md) !important;
+
+      &:hover {
+        border-color: var(--color-primary) !important;
+      }
+    }
   }
 }
 </style>
