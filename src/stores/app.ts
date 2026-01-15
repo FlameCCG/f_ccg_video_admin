@@ -12,7 +12,7 @@ import { localeConfigs, DEFAULT_LOCALE, LOCALE_STORAGE_KEY } from '@/locales'
 /**
  * 主题名称类型
  */
-export type ThemeName = 'pearl' | 'obsidian' | 'cyberpunk' | 'sakura'
+export type ThemeName = 'pearl' | 'obsidian' | 'aurum' | 'sakura'
 
 /**
  * 主题配置接口
@@ -44,10 +44,10 @@ export const themeConfigs: ThemeConfig[] = [
     isDark: true,
   },
   {
-    name: 'cyberpunk',
-    label: 'Cyberpunk',
-    labelZh: '赛博朋克',
-    labelJa: 'サイバーパンク',
+    name: 'aurum',
+    label: 'Aurum',
+    labelZh: '鎏金',
+    labelJa: 'オーラム',
     isDark: true,
   },
   {
@@ -62,6 +62,7 @@ export const themeConfigs: ThemeConfig[] = [
 // 存储 keys
 const THEME_STORAGE_KEY = 'admin-console-theme'
 const SIDEBAR_COLLAPSED_KEY = 'admin-console-sidebar-collapsed'
+const MENU_SWIPER_INDEX_KEY = 'admin-console-menu-swiper-index'
 
 /**
  * 获取主题配置
@@ -145,7 +146,7 @@ export const useAppStore = defineStore('app', () => {
       setTheme(currentTheme.value === 'obsidian' ? 'pearl' : 'sakura')
     } else {
       // 当前是浅色，切换到深色
-      setTheme(currentTheme.value === 'pearl' ? 'obsidian' : 'cyberpunk')
+      setTheme(currentTheme.value === 'pearl' ? 'obsidian' : 'aurum')
     }
   }
 
@@ -219,6 +220,18 @@ export const useAppStore = defineStore('app', () => {
     setSidebarCollapsed(!sidebarCollapsed.value)
   }
 
+  // ==================== 菜单 Swiper 状态 ====================
+  const storedMenuSwiperIndex = useStorage<number>(MENU_SWIPER_INDEX_KEY, 0)
+  const menuSwiperIndex = ref<number>(storedMenuSwiperIndex.value)
+
+  /**
+   * 设置菜单 Swiper 索引
+   */
+  function setMenuSwiperIndex(index: number): void {
+    menuSwiperIndex.value = index
+    storedMenuSwiperIndex.value = index
+  }
+
   // ==================== 初始化 ====================
   /**
    * 初始化应用状态
@@ -250,6 +263,10 @@ export const useAppStore = defineStore('app', () => {
     sidebarCollapsed: computed(() => sidebarCollapsed.value),
     setSidebarCollapsed,
     toggleSidebar,
+
+    // 菜单 Swiper 相关
+    menuSwiperIndex: computed(() => menuSwiperIndex.value),
+    setMenuSwiperIndex,
 
     // 初始化
     initApp,

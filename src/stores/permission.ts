@@ -27,7 +27,7 @@ const layoutModules: Record<string, () => Promise<{ default: RouteComponent }>> 
 
 /**
  * 解析组件路径，返回懒加载组件函数
- * @param component 后端返回的组件路径，如 "views/overview/dashboard/index" 或 "Layout"
+ * @param component 后端返回的组件路径，如 "views/content/review/index.vue" 或 "Layout"
  */
 function resolveComponent(
   component: string | undefined
@@ -40,8 +40,8 @@ function resolveComponent(
   }
 
   // 2. 处理视图组件路径
-  // 后端格式: "views/overview/dashboard/index"
-  // 需要转换为: "/src/views/overview/dashboard/index.vue"
+  // 后端格式: "views/content/review/index.vue"
+  // 需要转换为: "/src/views/content/review/index.vue"
   let path = component
 
   // 移除开头的 views/ 或 @/views/
@@ -51,8 +51,13 @@ function resolveComponent(
     path = path.substring(8) // 移除 "@/views/"
   }
 
+  // 确保路径以 .vue 结尾
+  if (!path.endsWith('.vue')) {
+    path = `${path}.vue`
+  }
+
   // 构建完整路径
-  const fullPath = `/src/views/${path}.vue`
+  const fullPath = `/src/views/${path}`
 
   // 从 glob 映射中查找
   const module = viewModules[fullPath]
@@ -60,16 +65,16 @@ function resolveComponent(
     return module
   }
 
-  // 尝试添加 /index.vue 后缀
-  const indexPath = `/src/views/${path}/index.vue`
-  const indexModule = viewModules[indexPath]
-  if (indexModule) {
-    return indexModule
+  // 如果没找到，尝试添加 /index.vue（针对不带 .vue 后缀的情况）
+  if (!component.endsWith('.vue')) {
+    const indexPath = `/src/views/${path.replace('.vue', '')}/index.vue`
+    const indexModule = viewModules[indexPath]
+    if (indexModule) {
+      return indexModule
+    }
   }
 
-  console.warn(
-    `[Permission] Component not found: ${component}, tried paths: ${fullPath}, ${indexPath}`
-  )
+  console.warn(`[Permission] Component not found: ${component}, tried path: ${fullPath}`)
   return undefined
 }
 
@@ -92,9 +97,14 @@ function getMenuTitle(menu: Menu, locale: LocaleType): string {
 
 /**
  * 将菜单树转换为路由配置
+ *
+ * 后端数据结构：
+ * - 顶级菜单：component="Layout", path="/xxx", redirect="/xxx/yyy"
+ * - 子菜单：component="views/xxx/index.vue", path="yyy"（相对路径）
+ *
  * @param menu 菜单对象
  * @param locale 当前语言（用于设置路由标题）
- * @param isTopLevel 是否为顶级菜单
+ * @param isTopLevel 是否为顶级菜单（parentId === 0）
  */
 function menuToRoute(menu: Menu, locale: LocaleType, isTopLevel = false): RouteRecordRaw | null {
   // 如果没有 path，则不生成路由
@@ -113,22 +123,20 @@ function menuToRoute(menu: Menu, locale: LocaleType, isTopLevel = false): RouteR
     menuId: menu.id,
     keepAlive: menu.keepAlive ?? false,
     sortOrder: menu.sortOrder,
+    requiresAuth: true,
   }
 
   // 解析组件
-  let component = resolveComponent(menu.component)
-  if (!component && isTopLevel && menu.children && menu.children.length > 0) {
-    // 顶级菜单如果没有指定组件但有子菜单，使用默认布局
-    component = layoutModules['Layout']
-  }
+  // 顶级菜单（parentId === 0）强制使用 Layout，即使后端配置了其他组件
+  const componentPath = isTopLevel && menu.component !== 'Layout' ? 'Layout' : menu.component
+  const component = resolveComponent(componentPath)
 
   // 递归处理子菜单
   let children: RouteRecordRaw[] | undefined
-  let redirect: string | undefined
 
   if (menu.children && menu.children.length > 0) {
     const childRoutes = menu.children
-      .map((child) => menuToRoute(child, locale, false))
+      .map((child) => menuToRoute(child, locale))
       .filter((r): r is RouteRecordRaw => r !== null)
       // 按 sortOrder 排序
       .sort((a, b) => {
@@ -139,27 +147,54 @@ function menuToRoute(menu: Menu, locale: LocaleType, isTopLevel = false): RouteR
 
     if (childRoutes.length > 0) {
       children = childRoutes
-
-      // 如果有子路由，设置默认重定向到第一个子路由
-      const firstChildPath = childRoutes[0]?.path
-      if (firstChildPath) {
-        // 如果子路由是相对路径，拼接父路径
-        redirect = firstChildPath.startsWith('/')
-          ? firstChildPath
-          : `${menu.path}/${firstChildPath}`
-      }
     }
   }
 
-  // 构建最终路由对象
-  const route = {
+  // 构建路由对象基础配置
+  const baseRoute = {
     path: menu.path,
     name: menu.name || `menu-${menu.id}`,
     meta: baseMeta,
     component,
     children,
-    redirect,
-  } as RouteRecordRaw
+  }
+
+  // 使用后端提供的 redirect，如果没有则不设置
+  // 使用类型断言，因为 Vue Router 的 RouteRecordRaw 是联合类型
+  const route = (
+    menu.redirect ? { ...baseRoute, redirect: menu.redirect } : baseRoute
+  ) as RouteRecordRaw
+
+  // 特殊处理：如果是 Layout 组件但没有子路由，且有对应的视图组件
+  // 则创建一个默认子路由（常见于仪表盘等单页面模块）
+  if (menu.component === 'Layout' && (!children || children.length === 0)) {
+    // 尝试查找同名视图组件，如 /overview -> views/overview/index.vue
+    const pathSegment = menu.path.replace(/^\//, '') // 移除开头的 /
+    const possiblePaths = [
+      `/src/views/${pathSegment}/index.vue`,
+      `/src/views/${pathSegment}/dashboard/index.vue`,
+    ]
+
+    let defaultComponent: (() => Promise<{ default: RouteComponent }>) | undefined
+    for (const p of possiblePaths) {
+      if (viewModules[p]) {
+        defaultComponent = viewModules[p]
+        break
+      }
+    }
+
+    if (defaultComponent) {
+      // 创建默认子路由
+      route.children = [
+        {
+          path: '',
+          name: `${menu.name || `menu-${menu.id}`}-index`,
+          component: defaultComponent,
+          meta: { ...baseMeta },
+        },
+      ]
+    }
+  }
 
   return route
 }
@@ -279,7 +314,7 @@ export const usePermissionStore = defineStore('permission', () => {
     const sortedMenus = [...menus.value].sort((a, b) => a.sortOrder - b.sortOrder)
 
     for (const menu of sortedMenus) {
-      const route = menuToRoute(menu, currentLocale.value, true)
+      const route = menuToRoute(menu, currentLocale.value)
       if (route) {
         generatedRoutes.push(route)
       }
@@ -368,9 +403,98 @@ export const usePermissionStore = defineStore('permission', () => {
 
   /**
    * 根据路由路径获取菜单
+   * 支持匹配完整路径（如 /content/videos）和相对路径（如 videos）
    */
   function getMenuByPath(path: string): Menu | undefined {
-    return flatMenus.value.find((m) => m.path === path)
+    // 1. 先尝试直接匹配
+    const directMatch = flatMenus.value.find((m) => m.path === path)
+    if (directMatch) return directMatch
+
+    // 2. 构建完整路径映射（父路径 + 子路径）
+    function findMenuWithFullPath(items: Menu[], parentPath = ''): Menu | undefined {
+      for (const item of items) {
+        // 跳过没有 path 的菜单
+        if (!item.path) continue
+
+        // 计算当前菜单的完整路径
+        let fullPath: string
+        if (item.path.startsWith('/')) {
+          // 绝对路径
+          fullPath = item.path
+        } else if (parentPath) {
+          // 相对路径，拼接父路径
+          fullPath = `${parentPath}/${item.path}`
+        } else {
+          fullPath = item.path
+        }
+
+        // 检查是否匹配
+        if (fullPath === path) {
+          return item
+        }
+
+        // 递归检查子菜单
+        if (item.children && item.children.length > 0) {
+          const found = findMenuWithFullPath(item.children, fullPath)
+          if (found) return found
+        }
+      }
+      return undefined
+    }
+
+    return findMenuWithFullPath(menus.value)
+  }
+
+  /**
+   * 根据路由路径获取菜单路径（从根到当前菜单的完整链路）
+   * 用于生成面包屑导航
+   * @param routePath 当前路由路径，如 /content/videos 或 /overview/dashboard
+   * @returns 菜单链路数组，从父到子
+   */
+  function getMenuPathByRoutePath(routePath: string): Menu[] {
+    const result: Menu[] = []
+
+    function findMenuPath(items: Menu[], parentPath = '', ancestors: Menu[] = []): boolean {
+      for (const item of items) {
+        // 跳过没有 path 的菜单
+        if (!item.path) continue
+
+        // 计算当前菜单的完整路径
+        let fullPath: string
+        if (item.path.startsWith('/')) {
+          fullPath = item.path
+        } else if (parentPath) {
+          fullPath = `${parentPath}/${item.path}`
+        } else {
+          fullPath = item.path
+        }
+
+        // 精确匹配
+        if (fullPath === routePath) {
+          result.push(...ancestors, item)
+          return true
+        }
+
+        // 如果菜单没有子菜单，但路由路径是其子路径，也算匹配
+        // 例如：菜单 /overview，路由 /overview/dashboard
+        if (!item.children || item.children.length === 0) {
+          if (routePath.startsWith(fullPath + '/')) {
+            result.push(...ancestors, item)
+            return true
+          }
+        }
+
+        // 递归检查子菜单
+        if (item.children && item.children.length > 0) {
+          const found = findMenuPath(item.children, fullPath, [...ancestors, item])
+          if (found) return true
+        }
+      }
+      return false
+    }
+
+    findMenuPath(menus.value)
+    return result
   }
 
   /**
@@ -406,6 +530,7 @@ export const usePermissionStore = defineStore('permission', () => {
     hasAllPermissions,
     getMenuById,
     getMenuByPath,
+    getMenuPathByRoutePath,
     resetPermission,
   }
 })
