@@ -4,6 +4,76 @@
 
 Base URL：/v1
 
+## [GET] 管理员弹幕列表
+
+- 接口路径: GET /admin/video/danmu/list
+- 认证: 需要登录（客户端全局自动携带 Token）
+- 权限: 需要RBAC权限
+- 依赖接口: 无
+- 接口说明: 管理员查看弹幕列表（需管理员权限）
+- HTTP 状态码: 200（业务码 code 判断成功/失败）
+- 响应结构: code=0 成功，code=1 失败；msg 为提示信息
+
+请求参数:
+| 名称 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| userId | query | integer | 否 | 用户ID筛选（可选） |
+| username | query | string | 否 | 用户名筛选（可选） |
+| keyword | query | string | 否 | 关键词筛选（可选） |
+| page | query | integer | 否 | 页码 |
+| pageSize | query | integer | 否 | 每页数量 |
+现在我后端搜索的时候能根据username搜索了，给我对应的页面加上去，然后再优化下列表组件内部的布局让其更加方便可用。因为数据一长就要往下滚动了很烦。
+响应字段:
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| data | object | - |
+| data.list | array<AdminDanmuItem> | - |
+| data.list[].id | integer(uint) | 弹幕ID |
+| data.list[].userId | integer(uint) | 用户ID |
+| data.list[].username | string | 用户名 |
+| data.list[].avatar | string | 用户头像 |
+| data.list[].videoId | integer(uint) | 视频ID |
+| data.list[].videoTitle | string | 视频标题 |
+| data.list[].videoCover | string | 视频封面 |
+| data.list[].videoPartId | integer(uint) | 分P ID |
+| data.list[].content | string | 弹幕内容 |
+| data.list[].timeOffset | integer | 弹幕时间偏移(秒) |
+| data.list[].color | string | 弹幕颜色 |
+| data.list[].fontSize | integer | 字体大小 |
+| data.list[].position | integer | 位置: 0-滚动 1-顶部 2-底部 |
+| data.list[].likeCount | integer(int64) | 点赞数 |
+| data.list[].createdAt | string(date-time) | 创建时间 |
+
+响应示例:
+```json
+{
+  "code": 0,
+  "data": {
+    "list": [
+      {
+        "id": 5001,
+        "userId": 1001,
+        "username": "alice",
+        "avatar": "https://cdn.example.com/avatar/1001.png",
+        "videoId": 2001,
+        "videoTitle": "示例标题",
+        "videoCover": "https://cdn.example.com/cover/2001.jpg",
+        "videoPartId": 1,
+        "content": "示例弹幕",
+        "timeOffset": 12,
+        "color": "#FFFFFF",
+        "fontSize": 25,
+        "position": 0,
+        "likeCount": 3,
+        "createdAt": "2024-06-01T12:00:00Z"
+      }
+    ],
+    "total": 1
+  },
+  "msg": "获取成功"
+}
+```
+
 ## [DELETE] 管理员删除弹幕
 
 - 接口路径: DELETE /admin/video/danmu
@@ -26,7 +96,6 @@ Base URL：/v1
 | data.deleted | integer(int64) | 删除数量 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -75,7 +144,6 @@ Base URL：/v1
 | data.list[].createdAt | string(date-time) | 举报时间 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -89,7 +157,9 @@ Base URL：/v1
         "videoCover": "https://cdn.example.com/cover/2001.jpg",
         "reason": "示例原因",
         "detail": "处理完成",
-        "imageUrls": ["https://example.com/page"],
+        "imageUrls": [
+          "https://example.com/page"
+        ],
         "status": 1,
         "handleNote": "处理完成",
         "handledBy": 9101,
@@ -128,7 +198,6 @@ Base URL：/v1
 | data.handled | integer(int64) | 实际处理数量 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -187,7 +256,6 @@ Base URL：/v1
 | data.list[].createdAt | string(date-time) | 创建时间 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -244,7 +312,6 @@ Base URL：/v1
 | data | object | 视频详情（同用户视频详情返回的 VideoItem，不含 watchProgress） |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -300,7 +367,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -331,7 +397,6 @@ Base URL：/v1
 | data.restored | integer(int64) | 恢复数量 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -365,7 +430,6 @@ Base URL：/v1
 | data.updated | integer(int64) | 更新数量 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -390,7 +454,7 @@ Base URL：/v1
 | 名称 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | name | body | string | 是 | 分区名称 |
-| iconUrl | body | string | 否 | 分区图标URL（可选） |
+| icon | body | string | 否 | 分区图标SVG字符串（可选） |
 | sortOrder | body | integer | 否 | 排序顺序（可选） |
 | isActive | body | boolean | 否 | 是否启用 |
 | isSubmittable | body | boolean | 否 | 是否允许投稿 |
@@ -401,20 +465,19 @@ Base URL：/v1
 | data | Partition | - |
 | data.id | integer(uint) | 分区ID |
 | data.name | string | 分区名称 |
-| data.iconUrl | string | 分区图标URL |
+| data.icon | string | 分区图标SVG字符串 |
 | data.sortOrder | integer | 排序顺序 |
 | data.isActive | boolean | 是否启用 |
 | data.isSubmittable | boolean | 是否允许投稿 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
   "data": {
     "id": 2,
     "name": "示例名称",
-    "iconUrl": "https://example.com/page",
+    "icon": "<svg>...</svg>",
     "sortOrder": 1,
     "isActive": true,
     "isSubmittable": true
@@ -438,7 +501,7 @@ Base URL：/v1
 | --- | --- | --- | --- | --- |
 | id | body | integer | 是 | 分区ID |
 | name | body | string | 是 | 分区名称 |
-| iconUrl | body | string | 否 | 分区图标URL（可选） |
+| icon | body | string | 否 | 分区图标SVG字符串（可选） |
 | sortOrder | body | integer | 否 | 排序顺序（可选） |
 | isActive | body | boolean | 否 | 是否启用 |
 | isSubmittable | body | boolean | 否 | 是否允许投稿 |
@@ -449,7 +512,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -479,7 +541,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -511,13 +572,12 @@ Base URL：/v1
 | data.list | array<Partition> | - |
 | data.list[].id | integer(uint) | 分区ID |
 | data.list[].name | string | 分区名称 |
-| data.list[].iconUrl | string | 分区图标URL |
+| data.list[].icon | string | 分区图标SVG字符串 |
 | data.list[].sortOrder | integer | 排序顺序 |
 | data.list[].isActive | boolean | 是否启用 |
 | data.list[].isSubmittable | boolean | 是否允许投稿 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -526,7 +586,7 @@ Base URL：/v1
       {
         "id": 2,
         "name": "示例名称",
-        "iconUrl": "https://example.com/page",
+        "icon": "<svg>...</svg>",
         "sortOrder": 1,
         "isActive": true,
         "isSubmittable": true

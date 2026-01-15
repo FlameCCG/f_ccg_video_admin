@@ -18,6 +18,7 @@ Base URL：/v1
 | 名称 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | userId | query | integer | 否 | 用户 ID 筛选（可选） |
+| username | query | string | 否 | 用户名筛选（可选） |
 | keyword | query | string | 否 | 关键词筛选（可选） |
 | sort | query | string | 否 | 排序方式（可选） 可选: latest/oldest/likes/replies |
 | page | query | integer | 否 | 页码 |

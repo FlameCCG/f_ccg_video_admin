@@ -4,6 +4,40 @@
 
 Base URL：/v1
 
+
+## [POST] 上传图片
+
+- 接口路径: POST /common/video/image/upload
+- 认证: 需要登录（客户端全局自动携带 Token）
+- 依赖接口: 无
+- 接口说明: 上传图片（需登录）
+- HTTP 状态码: 200（业务码 code 判断成功/失败）
+- 响应结构: code=0 成功，code=1 失败；msg 为提示信息
+
+请求参数:
+| 名称 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| fileHash | body | string | 是 | 文件哈希值 |
+| cover | body | string(binary) | 是 | 图片文件 |
+
+响应字段:
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| data | object | - |
+| data.imageUrl | string | 图片 URL |
+
+响应示例:
+
+```json
+{
+  "code": 0,
+  "data": {
+    "imageUrl": "https://example.com/page"
+  },
+  "msg": "上传成功"
+}
+```
+
 ## [POST] 发送邮箱验证码
 
 - 接口路径: POST /common/captcha/email

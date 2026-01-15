@@ -225,7 +225,8 @@
 
 > `tsc --noEmit` 不能替代 `vue-tsc`：因为 `.vue template` 的类型问题只有 `vue-tsc` 才能稳定兜住。
 
-### Git Hook（强制，防止“检查不出来”）
+### 
+ Hook（强制，防止“检查不出来”）
 
 - **pre-commit**：必须跑 `pnpm check:commit`
 - **pre-push/CI**：跑 Chrome MCP 的 e2e 回归（见下文）

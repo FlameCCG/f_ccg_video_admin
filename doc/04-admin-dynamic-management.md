@@ -18,6 +18,7 @@ Base URL：/v1
 | 名称 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | userId | query | integer | 否 | 用户ID筛选（可选） |
+| username | query | string | 否 | 用户名筛选（可选） |
 | keyword | query | string | 否 | 关键词筛选（可选） |
 | page | query | integer | 否 | 页码 |
 | pageSize | query | integer | 否 | 每页数量 |
@@ -35,7 +36,6 @@ Base URL：/v1
 | data.list[].createdAt | string(date-time) | 创建时间 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -78,7 +78,6 @@ Base URL：/v1
 | data.deleted | integer(int64) | 删除数量 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
