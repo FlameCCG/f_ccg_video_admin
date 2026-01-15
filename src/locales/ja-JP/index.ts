@@ -13,6 +13,8 @@ import banner from './banner'
 import notification from './notification'
 import rbac from './rbac'
 import error from './error'
+import community from './community'
+import siteConfig from './siteConfig'
 
 export default {
   common,
@@ -27,4 +29,6 @@ export default {
   notification,
   rbac,
   error,
+  community,
+  siteConfig,
 }

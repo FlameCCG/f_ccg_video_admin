@@ -30,9 +30,15 @@ export default {
   expand: '展开',
   collapse: '收起',
   selectAll: '全选',
+  deselectAll: '取消全选',
   unselectAll: '取消全选',
   batchDelete: '批量删除',
   batchOperation: '批量操作',
+  clear: '清空',
+  expandAll: '展开全部',
+  collapseAll: '折叠全部',
+  noData: '暂无数据',
+  noChanges: '没有变更',
 
   // 状态
   status: '状态',
@@ -71,7 +77,19 @@ export default {
     networkError: '网络连接失败，请检查网络',
     serverError: '服务器错误，请稍后重试',
     sessionExpired: '会话已过期，请重新登录',
+    selectAtLeastOne: '请至少选择一项',
+    noChanges: '没有变更',
   },
+
+  // 确认删除
+  confirmDelete: '确认删除',
+  confirmDeleteItem: '确定要删除 {item} 吗？此操作不可撤销。',
+  confirmDeleteMessage: '确定要删除吗？此操作不可撤销。',
+
+  // 操作反馈
+  operationSuccess: '操作成功',
+  operationSuccessWithName: '{operation}成功',
+  operationFailed: '操作失败',
 
   // 表格
   table: {
@@ -99,6 +117,9 @@ export default {
     remark: '备注',
     description: '描述',
     sort: '排序',
+    preview: '预览',
+    svgPlaceholder: '请输入 SVG 代码，例如：<svg>...</svg>',
+    invalidSvg: 'SVG 格式无效',
   },
 
   // 时间
@@ -184,4 +205,7 @@ export default {
   no: '否',
   all: '全部',
   none: '无',
+
+  // 其他
+  comingSoon: '功能开发中，敬请期待',
 }

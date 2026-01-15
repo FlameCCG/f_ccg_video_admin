@@ -3,7 +3,7 @@
  * Dashboard Language Pack - Chinese
  */
 export default {
-  title: '数据看板',
+  title: '仪表盘',
   overview: {
     title: '数据概览',
     totalUsers: '总用户数',

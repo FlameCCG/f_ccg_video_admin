@@ -30,9 +30,15 @@ export default {
   expand: '展開',
   collapse: '折りたたむ',
   selectAll: 'すべて選択',
+  deselectAll: '選択解除',
   unselectAll: '選択解除',
   batchDelete: '一括削除',
   batchOperation: '一括操作',
+  clear: 'クリア',
+  expandAll: 'すべて展開',
+  collapseAll: 'すべて折りたたむ',
+  noData: 'データがありません',
+  noChanges: '変更なし',
 
   // ステータス
   status: 'ステータス',
@@ -71,7 +77,19 @@ export default {
     networkError: 'ネットワーク接続に失敗しました。ネットワークを確認してください',
     serverError: 'サーバーエラーが発生しました。後でもう一度お試しください',
     sessionExpired: 'セッションが期限切れです。再度ログインしてください',
+    selectAtLeastOne: '少なくとも1つ選択してください',
+    noChanges: '変更なし',
   },
+
+  // 削除確認
+  confirmDelete: '削除の確認',
+  confirmDeleteItem: '{item}を削除してもよろしいですか？この操作は取り消せません。',
+  confirmDeleteMessage: '削除してもよろしいですか？この操作は取り消せません。',
+
+  // 操作フィードバック
+  operationSuccess: '操作が成功しました',
+  operationSuccessWithName: '{operation}が成功しました',
+  operationFailed: '操作が失敗しました',
 
   // テーブル
   table: {
@@ -99,6 +117,9 @@ export default {
     remark: '備考',
     description: '説明',
     sort: '並び順',
+    preview: 'プレビュー',
+    svgPlaceholder: 'SVGコードを入力してください。例：<svg>...</svg>',
+    invalidSvg: 'SVG形式が無効です',
   },
 
   // 時間
@@ -184,4 +205,7 @@ export default {
   no: 'いいえ',
   all: 'すべて',
   none: 'なし',
+
+  // その他
+  comingSoon: '近日公開予定',
 }

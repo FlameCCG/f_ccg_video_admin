@@ -35,6 +35,7 @@ export default {
   edit: {
     title: '编辑用户',
     username: '用户名',
+    usernameLength: '用户名长度为2-20个字符',
     email: '邮箱',
     avatar: '头像',
     description: '个人简介',
@@ -52,7 +53,9 @@ export default {
     duration: '封禁时长',
     durationPlaceholder: '请输入封禁天数',
     durationUnit: '天',
+    daysRequired: '请输入有效的封禁天数（1-3650天）',
     permanent: '永久封禁',
+    permanentWarning: '永久封禁后，该用户将无法登录系统，请谨慎操作！',
     reason: '封禁原因',
     reasonPlaceholder: '请输入封禁原因',
     confirmBan: '确定要封禁该用户吗？',

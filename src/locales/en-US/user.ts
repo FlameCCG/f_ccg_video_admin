@@ -35,6 +35,7 @@ export default {
   edit: {
     title: 'Edit User',
     username: 'Username',
+    usernameLength: 'Username must be 2-20 characters',
     email: 'Email',
     avatar: 'Avatar',
     description: 'Bio',
@@ -52,7 +53,10 @@ export default {
     duration: 'Ban Duration',
     durationPlaceholder: 'Enter ban duration in days',
     durationUnit: 'days',
+    daysRequired: 'Please enter a valid ban duration (1-3650 days)',
     permanent: 'Permanent Ban',
+    permanentWarning:
+      'After permanent ban, this user will not be able to log in. Please proceed with caution!',
     reason: 'Ban Reason',
     reasonPlaceholder: 'Enter ban reason',
     confirmBan: 'Are you sure you want to ban this user?',

@@ -30,9 +30,15 @@ export default {
   expand: 'Expand',
   collapse: 'Collapse',
   selectAll: 'Select All',
+  deselectAll: 'Deselect All',
   unselectAll: 'Unselect All',
   batchDelete: 'Batch Delete',
   batchOperation: 'Batch Operation',
+  clear: 'Clear',
+  expandAll: 'Expand All',
+  collapseAll: 'Collapse All',
+  noData: 'No Data',
+  noChanges: 'No changes',
 
   // Status
   status: 'Status',
@@ -72,7 +78,19 @@ export default {
     networkError: 'Network connection failed, please check your network',
     serverError: 'Server error, please try again later',
     sessionExpired: 'Session expired, please log in again',
+    selectAtLeastOne: 'Please select at least one item',
+    noChanges: 'No changes',
   },
+
+  // Confirm delete
+  confirmDelete: 'Confirm Delete',
+  confirmDeleteItem: 'Are you sure you want to delete {item}? This action cannot be undone.',
+  confirmDeleteMessage: 'Are you sure you want to delete? This action cannot be undone.',
+
+  // Operation feedback
+  operationSuccess: 'Operation successful',
+  operationSuccessWithName: '{operation} successful',
+  operationFailed: 'Operation failed',
 
   // Table
   table: {
@@ -100,6 +118,9 @@ export default {
     remark: 'Remark',
     description: 'Description',
     sort: 'Sort',
+    preview: 'Preview',
+    svgPlaceholder: 'Enter SVG code, e.g.: <svg>...</svg>',
+    invalidSvg: 'Invalid SVG format',
   },
 
   // Time
@@ -185,4 +206,7 @@ export default {
   no: 'No',
   all: 'All',
   none: 'None',
+
+  // Other
+  comingSoon: 'Coming soon',
 }

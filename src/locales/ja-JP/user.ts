@@ -35,6 +35,7 @@ export default {
   edit: {
     title: 'ユーザー編集',
     username: 'ユーザー名',
+    usernameLength: 'ユーザー名は2〜20文字で入力してください',
     email: 'メールアドレス',
     avatar: 'アバター',
     description: '自己紹介',
@@ -52,7 +53,10 @@ export default {
     duration: 'BAN期間',
     durationPlaceholder: 'BAN日数を入力',
     durationUnit: '日',
+    daysRequired: '有効なBAN期間を入力してください（1〜3650日）',
     permanent: '永久BAN',
+    permanentWarning:
+      '永久BANすると、このユーザーはログインできなくなります。慎重に操作してください！',
     reason: 'BAN理由',
     reasonPlaceholder: 'BAN理由を入力',
     confirmBan: 'このユーザーをBANしてもよろしいですか？',

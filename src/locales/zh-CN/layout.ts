@@ -27,7 +27,7 @@ export default {
     title: '主题设置',
     pearl: '珍珠白',
     obsidian: '黑曜石',
-    cyberpunk: '赛博朋克',
+    aurum: '鎏金',
     sakura: '樱',
     light: '浅色',
     dark: '深色',
