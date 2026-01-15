@@ -9,7 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { NTree, NSpace, NButton, NIcon, NInput, NEmpty } from 'naive-ui'
 import type { TreeOption } from 'naive-ui'
 import type { Menu } from '@/api/types'
-import { getIconComponent } from '@/utils/menuIcons'
+import { SvgIcon } from '@/components/common'
 
 interface Props {
   /** 菜单列表 */
@@ -63,11 +63,12 @@ function getMenuTitle(menu: Menu): string {
 /** 将菜单转换为树选项 */
 function convertToTreeOptions(menus: Menu[]): TreeOption[] {
   return menus.map((menu) => {
-    const IconComp = getIconComponent(menu.icon)
+    // 仅支持后端返回的 SVG 字符串渲染图标
+    const svgIcon = menu.icon?.trim().startsWith('<svg') ? menu.icon : null
     return {
       key: menu.id,
       label: getMenuTitle(menu),
-      prefix: IconComp ? () => h(NIcon, { size: 16 }, () => h(IconComp)) : undefined,
+      prefix: svgIcon ? () => h(SvgIcon, { svg: svgIcon, size: 16 }) : undefined,
       children: menu.children ? convertToTreeOptions(menu.children) : undefined,
     }
   })
