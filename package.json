@@ -27,6 +27,7 @@
     "axios": "^1.13.2",
     "naive-ui": "^2.43.2",
     "pinia": "^3.0.4",
+    "swiper": "^12.0.3",
     "vue": "^3.5.24",
     "vue-i18n": "^11.2.8",
     "vue-router": "^4.6.4"
@@ -43,6 +44,7 @@
     "@vitest/coverage-v8": "^4.0.16",
     "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.8.1",
+    "esbuild": "^0.25.12",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
