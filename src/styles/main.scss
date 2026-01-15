@@ -7,6 +7,10 @@
 @use 'tokens/themes';
 @use 'base/reset';
 @use 'base/typography';
+@use 'base/accessibility';
+@use 'base/page-layouts';
+@use 'transitions/page-transitions';
+@use 'transitions/micro-interactions';
 
 // ============================================
 // 2. Tailwind CSS with Theme Integration

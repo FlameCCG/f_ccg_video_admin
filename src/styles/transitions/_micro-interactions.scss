@@ -1,0 +1,334 @@
+// Micro Interactions
+// 微交互动效样式
+
+// ============================================
+// 1. Interactive Elements Base
+// ============================================
+
+// 可交互元素基础类
+.interactive {
+  transition:
+    transform var(--duration-fast) var(--easing-ease-out),
+    box-shadow var(--duration-fast) var(--easing-ease-out),
+    background-color var(--duration-fast) var(--easing-ease-out),
+    border-color var(--duration-fast) var(--easing-ease-out),
+    color var(--duration-fast) var(--easing-ease-out);
+  will-change: transform;
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
+
+// ============================================
+// 2. Card Hover Effects
+// ============================================
+
+.card-hover {
+  transition:
+    transform var(--duration-normal) var(--easing-ease-out),
+    box-shadow var(--duration-normal) var(--easing-ease-out);
+  will-change: transform, box-shadow;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+.card-hover-subtle {
+  transition:
+    transform var(--duration-fast) var(--easing-ease-out),
+    box-shadow var(--duration-fast) var(--easing-ease-out);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+// ============================================
+// 3. Button Effects
+// ============================================
+
+.btn-press {
+  transition: transform var(--duration-fast) var(--easing-ease-out);
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+.btn-glow {
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, var(--color-primary-light) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity var(--duration-normal) var(--easing-ease-out);
+    pointer-events: none;
+  }
+
+  &:hover::after {
+    opacity: 0.15;
+  }
+}
+
+// ============================================
+// 4. Icon Animations
+// ============================================
+
+.icon-spin {
+  transition: transform var(--duration-slow) var(--easing-ease-in-out);
+
+  &:hover {
+    transform: rotate(180deg);
+  }
+}
+
+.icon-bounce {
+  transition: transform var(--duration-fast) var(--easing-bounce);
+
+  &:hover {
+    transform: scale(1.15);
+  }
+}
+
+.icon-pulse {
+  animation: icon-pulse 2s var(--easing-ease-in-out) infinite;
+}
+
+@keyframes icon-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+// ============================================
+// 5. Link Effects
+// ============================================
+
+.link-underline {
+  position: relative;
+  text-decoration: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: currentcolor;
+    transition: width var(--duration-normal) var(--easing-ease-out);
+  }
+
+  &:hover::after {
+    width: 100%;
+  }
+}
+
+.link-highlight {
+  transition:
+    color var(--duration-fast) var(--easing-ease-out),
+    background-color var(--duration-fast) var(--easing-ease-out);
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: var(--radius-xs);
+
+  &:hover {
+    background-color: var(--color-primary-light);
+    color: var(--color-primary);
+  }
+}
+
+// ============================================
+// 6. Focus Ring
+// ============================================
+
+.focus-ring {
+  outline: none;
+  transition: box-shadow var(--duration-fast) var(--easing-ease-out);
+
+  &:focus-visible {
+    box-shadow:
+      0 0 0 2px var(--color-surface),
+      0 0 0 4px var(--color-primary);
+  }
+}
+
+// ============================================
+// 7. Skeleton Loading Animation
+// ============================================
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-skeleton);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--color-skeleton-highlight) 50%,
+      transparent 100%
+    );
+    animation: skeleton-shimmer 1.5s infinite;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+// ============================================
+// 8. Loading Spinner
+// ============================================
+
+.spinner {
+  animation: spinner-rotate 1s linear infinite;
+}
+
+@keyframes spinner-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ============================================
+// 9. Ripple Effect
+// ============================================
+
+.ripple {
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background-color: currentcolor;
+    border-radius: 50%;
+    opacity: 0.2;
+    transform: translate(-50%, -50%);
+    transition:
+      width var(--duration-slow) var(--easing-ease-out),
+      height var(--duration-slow) var(--easing-ease-out),
+      opacity var(--duration-slow) var(--easing-ease-out);
+  }
+
+  &:active::before {
+    width: 200%;
+    height: 200%;
+    opacity: 0;
+  }
+}
+
+// ============================================
+// 10. Stagger Animation Utilities
+// ============================================
+
+// 交错动画延迟类 (手动定义以避免 @for 循环)
+.stagger-1 {
+  animation-delay: 50ms;
+}
+
+.stagger-2 {
+  animation-delay: 100ms;
+}
+
+.stagger-3 {
+  animation-delay: 150ms;
+}
+
+.stagger-4 {
+  animation-delay: 200ms;
+}
+
+.stagger-5 {
+  animation-delay: 250ms;
+}
+
+.stagger-6 {
+  animation-delay: 300ms;
+}
+
+.stagger-7 {
+  animation-delay: 350ms;
+}
+
+.stagger-8 {
+  animation-delay: 400ms;
+}
+
+.stagger-9 {
+  animation-delay: 450ms;
+}
+
+.stagger-10 {
+  animation-delay: 500ms;
+}
+
+// ============================================
+// Reduced Motion Support
+// ============================================
+
+@media (prefers-reduced-motion: reduce) {
+  .interactive,
+  .card-hover,
+  .card-hover-subtle,
+  .btn-press,
+  .btn-glow,
+  .icon-spin,
+  .icon-bounce,
+  .link-underline,
+  .link-highlight,
+  .focus-ring {
+    transition: none;
+
+    &:hover,
+    &:active,
+    &:focus-visible {
+      transform: none;
+    }
+  }
+
+  .icon-pulse,
+  .skeleton-shimmer::after,
+  .spinner {
+    animation: none;
+  }
+
+  .ripple::before {
+    display: none;
+  }
+}

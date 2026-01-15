@@ -2,6 +2,7 @@
 // 从 Sass 变量生成运行时 CSS Variables
 
 @use 'sass:map';
+@use 'sass:meta';
 @use 'colors' as *;
 @use 'spacing' as *;
 @use 'typography' as *;
@@ -70,8 +71,8 @@
 
 :root {
   // 字体族
-  --font-sans: #{inspect($font-family-sans)};
-  --font-mono: #{inspect($font-family-mono)};
+  --font-sans: #{meta.inspect($font-family-sans)};
+  --font-mono: #{meta.inspect($font-family-mono)};
 
   // 字体大小
   @each $size-name, $size-value in $font-size {
@@ -153,11 +154,11 @@ $theme-meta: (
     'label-zh': '黑曜石',
     'label-ja': 'オブシディアン',
   ),
-  'cyberpunk': (
+  'aurum': (
     'is-dark': true,
-    'label': 'Cyberpunk',
-    'label-zh': '赛博朋克',
-    'label-ja': 'サイバーパンク',
+    'label': 'Aurum',
+    'label-zh': '鎏金',
+    'label-ja': 'オーラム',
   ),
   'sakura': (
     'is-dark': false,
