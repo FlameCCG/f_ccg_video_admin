@@ -121,8 +121,8 @@ async function doLogin(): Promise<void> {
 
     setTimeout(() => {
       showCaptchaModal.value = false
-      void router.push({ path: '/dashboard' })
-    }, 1000)
+      void router.push({ path: '/' })
+    }, 500)
   } catch (error: unknown) {
     captchaRef.value?.fail()
     captchaData.verified = false
