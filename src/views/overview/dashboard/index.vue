@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 数据看板页面
+ * 仪表盘页面
  * Dashboard Page - 运营总览
  * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6
  */
