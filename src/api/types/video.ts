@@ -94,6 +94,76 @@ export interface AdminVideoItem {
 }
 
 /**
+ * 视频分区信息
+ */
+export interface VideoPartition {
+  /** 分区 ID */
+  id: number
+  /** 分区名称 */
+  name: string
+  /** 分区图标 */
+  icon: string
+  /** 是否启用 */
+  isActive: boolean
+  /** 是否允许投稿 */
+  isSubmittable: boolean
+}
+
+/**
+ * 视频标签
+ */
+export interface VideoTag {
+  /** 标签 ID */
+  id: number
+  /** 标签名称 */
+  name: string
+}
+
+/**
+ * 视频资源
+ */
+export interface VideoResource {
+  /** 资源 ID */
+  id: number
+  /** 清晰度描述 */
+  resolution: string
+  /** 源文件名 */
+  sourceFileName: string
+  /** 文件 URL */
+  fileUrl: string
+  /** 文件大小（字节） */
+  fileSize: number
+  /** 码率 (kbps) */
+  bitrate: number
+  /** 格式 */
+  format: string
+  /** 编码 */
+  codec: string
+  /** 是否需要 VIP */
+  isVip: boolean
+  /** 是否为源文件 */
+  isSource: boolean
+}
+
+/**
+ * 视频分P
+ */
+export interface VideoPart {
+  /** 分P ID */
+  id: number
+  /** 分P标题 */
+  title: string
+  /** 排序 */
+  sortOrder: number
+  /** 时长（秒） */
+  duration: number
+  /** 弹幕数 */
+  danmuCount: number
+  /** 分P资源列表 */
+  resources: VideoResource[]
+}
+
+/**
  * 视频详情
  */
 export interface VideoDetail {
@@ -105,8 +175,6 @@ export interface VideoDetail {
   description: string
   /** 封面 */
   cover: string
-  /** 作者信息 */
-  author: VideoAuthorDetail
   /** 时长（秒） */
   duration: number
   /** 播放数 */
@@ -129,36 +197,22 @@ export interface VideoDetail {
   status: VideoStatus
   /** 创建时间 */
   createdAt: string
-  /** 视频资源列表 */
+  /** 分区信息 */
+  partition: VideoPartition
+  /** 作者信息 */
+  author: VideoAuthorDetail
+  /** 标签列表 */
+  tags: VideoTag[]
+  /** 视频资源列表（非分P视频或分P视频的主资源） */
   resources: VideoResource[]
-  /** 分P列表 */
+  /** 分P列表（分P视频才有） */
   parts: VideoPart[]
-}
-
-/**
- * 视频资源
- */
-export interface VideoResource {
-  /** 资源 URL */
-  url: string
-  /** 清晰度 */
-  quality: string
-  /** 格式 */
-  format: string
-}
-
-/**
- * 视频分P
- */
-export interface VideoPart {
-  /** 分P ID */
-  id: number
-  /** 分P标题 */
-  title: string
-  /** 时长（秒） */
-  duration: number
-  /** 排序 */
-  sortOrder: number
+  /** 当前用户是否点赞 */
+  isLiked: boolean
+  /** 当前用户是否收藏 */
+  isFavorited: boolean
+  /** 当前用户是否投币 */
+  isCoined: boolean
 }
 
 /**
@@ -230,6 +284,60 @@ export interface ReviewVideoResult {
 }
 
 /**
+ * 弹幕位置类型
+ * 0=滚动 1=顶部 2=底部
+ */
+export type DanmuPosition = 0 | 1 | 2
+
+/**
+ * 弹幕列表项
+ */
+export interface AdminDanmuItem {
+  /** 弹幕 ID */
+  id: number
+  /** 用户 ID */
+  userId: number
+  /** 用户名 */
+  username: string
+  /** 用户头像 */
+  avatar: string
+  /** 视频 ID */
+  videoId: number
+  /** 视频标题 */
+  videoTitle: string
+  /** 视频封面 */
+  videoCover: string
+  /** 分P ID */
+  videoPartId: number
+  /** 弹幕内容 */
+  content: string
+  /** 弹幕时间偏移(秒) */
+  timeOffset: number
+  /** 弹幕颜色 */
+  color: string
+  /** 字体大小 */
+  fontSize: number
+  /** 位置: 0-滚动 1-顶部 2-底部 */
+  position: DanmuPosition
+  /** 点赞数 */
+  likeCount: number
+  /** 创建时间 */
+  createdAt: string
+}
+
+/**
+ * 弹幕列表查询参数
+ */
+export interface DanmuListParams extends PaginationParams {
+  /** 用户 ID 筛选（可选） */
+  userId?: number
+  /** 用户名筛选（可选） */
+  username?: string
+  /** 关键词筛选（可选） */
+  keyword?: string
+}
+
+/**
  * 删除弹幕参数
  */
 export interface DeleteDanmuParams {
@@ -253,8 +361,8 @@ export interface Partition {
   id: number
   /** 分区名称 */
   name: string
-  /** 分区图标 URL */
-  iconUrl: string
+  /** 分区图标（SVG 字符串） */
+  icon: string
   /** 排序顺序 */
   sortOrder: number
   /** 是否启用 */
@@ -269,8 +377,8 @@ export interface Partition {
 export interface CreatePartitionParams {
   /** 分区名称 */
   name: string
-  /** 分区图标 URL（可选） */
-  iconUrl?: string
+  /** 分区图标（SVG 字符串，可选） */
+  icon?: string
   /** 排序顺序（可选） */
   sortOrder?: number
   /** 是否启用 */
@@ -287,8 +395,8 @@ export interface UpdatePartitionParams {
   id: number
   /** 分区名称 */
   name: string
-  /** 分区图标 URL（可选） */
-  iconUrl?: string
+  /** 分区图标（SVG 字符串，可选） */
+  icon?: string
   /** 排序顺序（可选） */
   sortOrder?: number
   /** 是否启用 */

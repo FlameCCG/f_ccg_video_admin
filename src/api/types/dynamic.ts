@@ -27,6 +27,8 @@ export interface DynamicItem {
 export interface DynamicListParams extends PaginationParams {
   /** 用户 ID 筛选（可选） */
   userId?: number
+  /** 用户名筛选（可选） */
+  username?: string
   /** 关键词筛选（可选） */
   keyword?: string
 }

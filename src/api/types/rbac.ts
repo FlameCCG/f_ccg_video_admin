@@ -40,6 +40,8 @@ export interface Menu {
   parentId: number
   /** 排序顺序 */
   sortOrder: number
+  /** 重定向的路由 */
+  redirect?: string
   /** 子菜单 */
   children?: Menu[]
 }

@@ -14,6 +14,8 @@ import type {
   RestoreVideoResult,
   ReviewVideoParams,
   ReviewVideoResult,
+  AdminDanmuItem,
+  DanmuListParams,
   DeleteDanmuParams,
   DeleteDanmuResult,
   Partition,
@@ -68,6 +70,16 @@ export function restoreVideo(params: RestoreVideoParams): Promise<RestoreVideoRe
  */
 export function reviewVideo(params: ReviewVideoParams): Promise<ReviewVideoResult> {
   return request.put('/admin/video/review', params)
+}
+
+// ============ 弹幕管理 ============
+
+/**
+ * 获取弹幕列表
+ * GET /admin/video/danmu/list
+ */
+export function getDanmuList(params?: DanmuListParams): Promise<PaginatedData<AdminDanmuItem>> {
+  return request.get('/admin/video/danmu/list', { params })
 }
 
 /**

@@ -1,6 +1,150 @@
 /**
- * 站点统计相关类型定义
+ * 站点统计与配置相关类型定义
  */
+
+// ============ 站点配置类型 ============
+
+/** 配置名称类型 */
+export type SiteConfigName = 'site' | 'logger' | 'email' | 'transcode' | 'thirdLogin' | 'jwt'
+
+/** 内容审核配置 */
+export interface ContentReviewConfig {
+  enable: boolean
+}
+
+/** 登录配置 */
+export interface LoginConfig {
+  qqLogin: boolean
+  usernamePwdLogin: boolean
+  textGraphicCaptcha: boolean
+  textClickCaptcha: boolean
+  textClickCaptchaTTL: number
+  textClickCaptchaPadding: number
+}
+
+/** 注册配置 */
+export interface RegisterConfig {
+  emailCaptcha: boolean
+  textGraphicCaptcha: boolean
+  slideCaptcha: boolean
+  slideCaptchaTTL: number
+  slideCaptchaPadding: number
+}
+
+/** 本地存储配置 */
+export interface LocalStorageConfig {
+  enable: boolean
+  path: string
+}
+
+/** MinIO 存储配置 */
+export interface MinioStorageConfig {
+  userUploadPrefix: string
+  enable: boolean
+  endpoint: string
+  accessKey: string
+  secretKey: string
+  bucket: string
+  useSSL: boolean
+  publicPrefixes: string[]
+}
+
+/** 存储配置 */
+export interface StorageConfig {
+  maxChunkSize: number
+  chunkSize: number
+  maxFileSize: number
+  maxUploadNum: number
+  chunkDir: string
+  local: LocalStorageConfig
+  minio: MinioStorageConfig
+}
+
+/** 基础站点配置 */
+export interface SiteConfig {
+  contentReview: ContentReviewConfig
+  login: LoginConfig
+  register: RegisterConfig
+  storage: StorageConfig
+}
+
+/** 日志配置 */
+export interface LoggerConfig {
+  debugFileName: string
+  infoFileName: string
+  warnFileName: string
+  errorFileName: string
+  enableConsole: boolean
+  maxSize: number
+  maxAge: number
+  maxBackups: number
+  development: boolean
+}
+
+/** 邮件配置 */
+export interface EmailConfig {
+  domain: string
+  port: number
+  sendEmail: string
+  authCode: string
+  sendNickName: string
+  ssl: boolean
+  tls: boolean
+  isExpire: number
+}
+
+/** 转码配置 */
+export interface TranscodeConfig {
+  maxWorkers: number
+  transcodeResolutions: number[]
+  highBitrateThreshold: number
+  highBitrateMediumTarget: number
+  bitrate1080KbpsReduceRatio: number
+  bitrate720KbpsReduceRatio: number
+  bitrate360KbpsReduceRatio: number
+  cpuMode: boolean
+  crfHigh: number
+  crfMedium: number
+  cpuPreset: string
+  gpuCQPHigh: number
+  gpuCQPMedium: number
+  gpuPreset: string
+  gpuMode: boolean
+  threads: number
+  hardwareScale: boolean
+}
+
+/** QQ 登录配置 */
+export interface QQLoginConfig {
+  appID: string
+  appKey: string
+  redirect: string
+}
+
+/** 第三方登录配置 */
+export interface ThirdLoginConfig {
+  qq: QQLoginConfig
+}
+
+/** JWT 配置 */
+export interface JwtConfig {
+  accessExp: number
+  refreshExp: number
+  accessSecret: string
+  refreshSecret: string
+}
+
+/** 配置类型映射 */
+export interface SiteConfigMap {
+  site: SiteConfig
+  logger: LoggerConfig
+  email: EmailConfig
+  transcode: TranscodeConfig
+  thirdLogin: ThirdLoginConfig
+  jwt: JwtConfig
+}
+
+// ============ 站点统计类型 ============
 
 /**
  * 趋势数据系列

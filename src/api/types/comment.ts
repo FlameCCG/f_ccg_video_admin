@@ -42,6 +42,8 @@ export interface CommentItem {
 export interface CommentListParams extends PaginationParams {
   /** 用户 ID 筛选（可选） */
   userId?: number
+  /** 用户名筛选（可选） */
+  username?: string
   /** 关键词筛选（可选） */
   keyword?: string
   /** 排序方式（可选） */
