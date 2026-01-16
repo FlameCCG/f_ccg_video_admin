@@ -199,15 +199,23 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     ellipsis: { tooltip: true },
   },
   {
-    title: t('video.list.author'),
-    key: 'author',
-    width: 150,
+    title: t('video.list.authorAvatar'),
+    key: 'authorAvatar',
+    width: 80,
+    align: 'center',
     render: (row) => {
       const author = row.author as { id: number; username: string; avatar: string }
-      return h(NSpace, { align: 'center', size: 8 }, () => [
-        h(AppAvatar, { src: author.avatar, text: author.username, size: 28 }),
-        h('span', {}, author.username),
-      ])
+      return h(AppAvatar, { src: author.avatar, text: author.username, size: 32 })
+    },
+  },
+  {
+    title: t('video.list.author'),
+    key: 'author',
+    width: 120,
+    ellipsis: { tooltip: true },
+    render: (row) => {
+      const author = row.author as { id: number; username: string; avatar: string }
+      return author.username
     },
   },
   {
