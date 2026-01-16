@@ -120,15 +120,19 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     fixed: 'left',
   },
   {
-    title: t('community.comment.user'),
-    key: 'user',
-    width: 150,
+    title: t('community.comment.avatar'),
+    key: 'avatar',
+    width: 80,
+    align: 'center',
     render: (row) => {
-      return h(NSpace, { align: 'center', size: 8 }, () => [
-        h(AppAvatar, { src: row.avatar as string, text: row.username as string, size: 28 }),
-        h('span', {}, row.username as string),
-      ])
+      return h(AppAvatar, { src: row.avatar as string, text: row.username as string, size: 32 })
     },
+  },
+  {
+    title: t('community.comment.username'),
+    key: 'username',
+    width: 120,
+    ellipsis: { tooltip: true },
   },
   {
     title: t('community.comment.content'),
