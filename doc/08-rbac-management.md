@@ -31,7 +31,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -63,7 +62,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -83,7 +81,6 @@ Base URL：/v1
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
 请求参数:
-
 - 无
 
 响应字段:
@@ -95,7 +92,6 @@ Base URL：/v1
 | data[].desc | string | 角色描述 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -131,7 +127,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -162,7 +157,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -193,7 +187,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -224,7 +217,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -255,7 +247,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -285,11 +276,117 @@ Base URL：/v1
 | data | array<string> | - |
 
 响应示例:
-
 ```json
 {
   "code": 0,
-  "data": ["普通用户"],
+  "data": [
+    "普通用户"
+  ],
+  "msg": "获取成功"
+}
+```
+
+## [GET] 角色继承树
+
+- 接口路径: GET /admin/rbac/role/inherit/tree
+- 认证: 需要登录（客户端全局自动携带 Token）
+- 权限: 需要RBAC权限
+- 依赖接口: 无
+- 接口说明: 获取角色继承树（需管理员权限）
+- HTTP 状态码: 200（业务码 code 判断成功/失败）
+- 响应结构: code=0 成功，code=1 失败；msg 为提示信息
+
+请求参数:
+
+- 无
+
+响应字段:
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| data | array<RoleInheritTreeNode> | 继承树 |
+| data[].id | integer(uint) | 角色ID |
+| data[].name | string | 角色名称 |
+| data[].desc | string | 角色描述 |
+| data[].children | array<RoleInheritTreeNode> | 子节点 |
+
+响应示例:
+```json
+{
+  "code": 0,
+  "data": [
+    {
+      "id": 3,
+      "name": "普通用户",
+      "desc": "普通用户，拥有基本权限",
+      "children": [
+        {
+          "id": 2,
+          "name": "大会员",
+          "desc": "VIP用户，拥有部分特殊权限",
+          "children": [
+            {
+              "id": 1,
+              "name": "超级管理员",
+              "desc": "管理员，拥有所有权限"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "msg": "获取成功"
+}
+```
+
+## [GET] 指定角色继承树
+
+- 接口路径: GET /admin/rbac/role/{id}/inherit/tree
+- 认证: 需要登录（客户端全局自动携带 Token）
+- 权限: 需要RBAC权限
+- 依赖接口: 无
+- 接口说明: 获取指定角色在继承树中的分支（保留该角色的完整子树，需管理员权限）
+- HTTP 状态码: 200（业务码 code 判断成功/失败）
+- 响应结构: code=0 成功，code=1 失败；msg 为提示信息
+
+请求参数:
+| 名称 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| id | path | integer | 是 | 角色ID |
+
+响应字段:
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| data | array<RoleInheritTreeNode> | 继承树分支 |
+| data[].id | integer(uint) | 角色ID |
+| data[].name | string | 角色名称 |
+| data[].desc | string | 角色描述 |
+| data[].children | array<RoleInheritTreeNode> | 子节点 |
+
+响应示例:
+```json
+{
+  "code": 0,
+  "data": [
+    {
+      "id": 3,
+      "name": "普通用户",
+      "desc": "普通用户，拥有基本权限",
+      "children": [
+        {
+          "id": 2,
+          "name": "大会员",
+          "desc": "VIP用户，拥有部分特殊权限",
+          "children": [
+            {
+              "id": 1,
+              "name": "超级管理员",
+              "desc": "管理员，拥有所有权限"
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "msg": "获取成功"
 }
 ```
@@ -316,7 +413,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -349,7 +445,6 @@ Base URL：/v1
 | data[].desc | string | 角色描述 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -387,7 +482,6 @@ Base URL：/v1
 | data[].action | string | - |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -412,7 +506,6 @@ Base URL：/v1
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
 请求参数:
-
 - 无
 
 响应字段:
@@ -425,7 +518,6 @@ Base URL：/v1
 | data[].tags | array<string> | - |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -434,7 +526,9 @@ Base URL：/v1
       "path": "/path/to/resource",
       "method": "GET",
       "summary": "获取用户列表",
-      "tags": ["示例标签"]
+      "tags": [
+        "示例标签"
+      ]
     }
   ],
   "msg": "获取成功"
@@ -457,7 +551,11 @@ Base URL：/v1
 | title | body | string | 是 | 菜单标题 |
 | titleEn | body | string | 否 | 菜单英文标题 |
 | titleJa | body | string | 否 | 菜单日文标题 |
-| icon | body | string | 否 | 菜单图标（可选） |
+| icon | body | string | 否 | 菜单图标SVG字符串（可选） |
+| path | body | string | 否 | 路由路径（可选） |
+| name | body | string | 否 | 路由名称（可选） |
+| component | body | string | 否 | 前端组件路径/标识（可选） |
+| keepAlive | body | boolean | 否 | 是否缓存（可选） |
 | parentId | body | integer | 否 | 父菜单ID（可选） |
 | sortOrder | body | integer | 否 | 排序顺序（可选） |
 
@@ -467,7 +565,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -493,7 +590,11 @@ Base URL：/v1
 | title | body | string | 否 | 菜单标题（可选） |
 | titleEn | body | string | 否 | 菜单英文标题（可选） |
 | titleJa | body | string | 否 | 菜单日文标题（可选） |
-| icon | body | string | 否 | 菜单图标（可选） |
+| icon | body | string | 否 | 菜单图标SVG字符串（可选） |
+| path | body | string | 否 | 路由路径（可选） |
+| name | body | string | 否 | 路由名称（可选） |
+| component | body | string | 否 | 前端组件路径/标识（可选） |
+| keepAlive | body | boolean | 否 | 是否缓存（可选） |
 | parentId | body | integer | 否 | 父菜单ID（可选） |
 | sortOrder | body | integer | 否 | 排序顺序（可选） |
 
@@ -503,7 +604,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -533,7 +633,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -548,7 +647,7 @@ Base URL：/v1
 - 认证: 需要登录（客户端全局自动携带 Token）
 - 权限: 需要RBAC权限
 - 依赖接口: 无
-- 接口说明: 为角色分配菜单（需管理员权限）
+- 接口说明: 为角色分配菜单（仅直连菜单可编辑，继承菜单将被忽略；需管理员权限）
 - HTTP 状态码: 200（业务码 code 判断成功/失败）
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
@@ -564,7 +663,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -584,7 +682,6 @@ Base URL：/v1
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
 请求参数:
-
 - 无
 
 响应字段:
@@ -595,13 +692,16 @@ Base URL：/v1
 | data[].title | string | 菜单标题 |
 | data[].titleEn | string | 菜单英文标题 |
 | data[].titleJa | string | 菜单日文标题 |
-| data[].icon | string | 菜单图标 |
+| data[].icon | string | 菜单图标SVG字符串 |
+| data[].path | string | 路由路径 |
+| data[].name | string | 路由名称 |
+| data[].component | string | 前端组件路径/标识 |
+| data[].keepAlive | boolean | 是否缓存 |
 | data[].parentId | integer(uint) | 父菜单ID |
 | data[].sortOrder | integer | 排序顺序 |
 | data[].children | array<Menu> | 子菜单 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -609,14 +709,22 @@ Base URL：/v1
     {
       "id": 10,
       "title": "示例标题",
-      "icon": "user",
+      "icon": "<svg>...</svg>",
+      "path": "/example",
+      "name": "Example",
+      "component": "views/example/index",
+      "keepAlive": false,
       "parentId": 10,
       "sortOrder": 1,
       "children": [
         {
           "id": 10,
           "title": "示例标题",
-          "icon": "user",
+          "icon": "<svg>...</svg>",
+          "path": "example-child",
+          "name": "ExampleChild",
+          "component": "views/example/child/index",
+          "keepAlive": false,
           "parentId": 10,
           "sortOrder": 1,
           "children": [
@@ -624,6 +732,10 @@ Base URL：/v1
               "id": null,
               "title": null,
               "icon": null,
+              "path": null,
+              "name": null,
+              "component": null,
+              "keepAlive": null,
               "parentId": null,
               "sortOrder": null,
               "children": null
@@ -648,7 +760,6 @@ Base URL：/v1
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
 请求参数:
-
 - 无
 
 响应字段:
@@ -659,13 +770,16 @@ Base URL：/v1
 | data[].title | string | 菜单标题 |
 | data[].titleEn | string | 菜单英文标题 |
 | data[].titleJa | string | 菜单日文标题 |
-| data[].icon | string | 菜单图标 |
+| data[].icon | string | 菜单图标SVG字符串 |
+| data[].path | string | 路由路径 |
+| data[].name | string | 路由名称 |
+| data[].component | string | 前端组件路径/标识 |
+| data[].keepAlive | boolean | 是否缓存 |
 | data[].parentId | integer(uint) | 父菜单ID |
 | data[].sortOrder | integer | 排序顺序 |
 | data[].children | array<Menu> | 子菜单 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -673,14 +787,22 @@ Base URL：/v1
     {
       "id": 1001,
       "title": "示例标题",
-      "icon": "user",
+      "icon": "<svg>...</svg>",
+      "path": "/example",
+      "name": "Example",
+      "component": "views/example/index",
+      "keepAlive": false,
       "parentId": 1001,
       "sortOrder": 1,
       "children": [
         {
           "id": 1001,
           "title": "示例标题",
-          "icon": "user",
+          "icon": "<svg>...</svg>",
+          "path": "example-child",
+          "name": "ExampleChild",
+          "component": "views/example/child/index",
+          "keepAlive": false,
           "parentId": 1001,
           "sortOrder": 1,
           "children": [
@@ -688,6 +810,10 @@ Base URL：/v1
               "id": null,
               "title": null,
               "icon": null,
+              "path": null,
+              "name": null,
+              "component": null,
+              "keepAlive": null,
               "parentId": null,
               "sortOrder": null,
               "children": null
@@ -707,7 +833,7 @@ Base URL：/v1
 - 认证: 需要登录（客户端全局自动携带 Token）
 - 权限: 需要RBAC权限
 - 依赖接口: 无
-- 接口说明: 根据角色获取菜单列表（需管理员权限）
+- 接口说明: 根据角色获取菜单列表（直连菜单可编辑，继承菜单只读；需管理员权限）
 - HTTP 状态码: 200（业务码 code 判断成功/失败）
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
@@ -719,49 +845,68 @@ Base URL：/v1
 响应字段:
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| data | array<Menu> | - |
-| data[].id | integer(uint) | 菜单ID |
-| data[].title | string | 菜单标题 |
-| data[].titleEn | string | 菜单英文标题 |
-| data[].titleJa | string | 菜单日文标题 |
-| data[].icon | string | 菜单图标 |
-| data[].parentId | integer(uint) | 父菜单ID |
-| data[].sortOrder | integer | 排序顺序 |
-| data[].children | array<Menu> | 子菜单 |
+| data | object | 响应数据 |
+| data.directMenus | array<Menu> | 直连菜单（可编辑） |
+| data.inheritMenus | array<Menu> | 继承菜单（只读） |
+| data.directMenus[].id | integer(uint) | 菜单ID |
+| data.directMenus[].title | string | 菜单标题 |
+| data.directMenus[].titleEn | string | 菜单英文标题 |
+| data.directMenus[].titleJa | string | 菜单日文标题 |
+| data.directMenus[].icon | string | 菜单图标SVG字符串 |
+| data.directMenus[].path | string | 路由路径 |
+| data.directMenus[].name | string | 路由名称 |
+| data.directMenus[].component | string | 前端组件路径/标识 |
+| data.directMenus[].keepAlive | boolean | 是否缓存 |
+| data.directMenus[].parentId | integer(uint) | 父菜单ID |
+| data.directMenus[].sortOrder | integer | 排序顺序 |
+| data.directMenus[].children | array<Menu> | 子菜单 |
+| data.inheritMenus[].id | integer(uint) | 菜单ID |
+| data.inheritMenus[].title | string | 菜单标题 |
+| data.inheritMenus[].titleEn | string | 菜单英文标题 |
+| data.inheritMenus[].titleJa | string | 菜单日文标题 |
+| data.inheritMenus[].icon | string | 菜单图标SVG字符串 |
+| data.inheritMenus[].path | string | 路由路径 |
+| data.inheritMenus[].name | string | 路由名称 |
+| data.inheritMenus[].component | string | 前端组件路径/标识 |
+| data.inheritMenus[].keepAlive | boolean | 是否缓存 |
+| data.inheritMenus[].parentId | integer(uint) | 父菜单ID |
+| data.inheritMenus[].sortOrder | integer | 排序顺序 |
+| data.inheritMenus[].children | array<Menu> | 子菜单 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
-  "data": [
-    {
-      "id": 1,
-      "title": "示例标题",
-      "icon": "user",
-      "parentId": 1,
-      "sortOrder": 1,
-      "children": [
-        {
-          "id": 1,
-          "title": "示例标题",
-          "icon": "user",
-          "parentId": 1,
-          "sortOrder": 1,
-          "children": [
-            {
-              "id": null,
-              "title": null,
-              "icon": null,
-              "parentId": null,
-              "sortOrder": null,
-              "children": null
-            }
-          ]
-        }
-      ]
-    }
-  ],
+  "data": {
+    "directMenus": [
+      {
+        "id": 1,
+        "title": "示例标题",
+        "icon": "<svg>...</svg>",
+        "path": "/example",
+        "name": "Example",
+        "component": "views/example/index",
+        "keepAlive": false,
+        "parentId": 1,
+        "sortOrder": 1,
+        "children": []
+      }
+    ],
+    "inheritMenus": [
+      {
+        "id": 2,
+        "title": "继承示例",
+        "icon": "<svg>...</svg>",
+        "path": "/inherit",
+        "name": "Inherit",
+        "component": "views/inherit/index",
+        "keepAlive": false,
+        "parentId": 2,
+        "sortOrder": 2,
+        "children": []
+      }
+    ]
+  },
   "msg": "获取成功"
 }
 ```
@@ -772,7 +917,7 @@ Base URL：/v1
 - 认证: 需要登录（客户端全局自动携带 Token）
 - 权限: 需要RBAC权限
 - 依赖接口: 无
-- 接口说明: 移除角色的菜单（需管理员权限）
+- 接口说明: 移除角色的菜单（仅直连菜单可编辑，继承菜单将被忽略；需管理员权限）
 - HTTP 状态码: 200（业务码 code 判断成功/失败）
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
@@ -788,7 +933,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -811,11 +955,9 @@ Base URL：/v1
 | 名称 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | roleName | body | string | 是 | 角色名称 |
-| resource | body | string | 否 | 资源路径（单条） |
-| action | body | string | 否 | 操作方法（单条） |
-| permissions | body | array<object> | 否 | 批量权限（可选） |
-| permissions[].resource | body | string | 否 | - |
-| permissions[].action | body | string | 否 | - |
+| permissions | body | array<object> | 是 | 权限列表（不能为空） |
+| permissions[].resource | body | string | 是 | 资源路径 |
+| permissions[].action | body | string | 是 | 操作方法 |
 
 响应字段:
 | 字段 | 类型 | 说明 |
@@ -823,7 +965,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -846,11 +987,9 @@ Base URL：/v1
 | 名称 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | roleName | body | string | 是 | 角色名称 |
-| resource | body | string | 否 | 资源路径（单条） |
-| action | body | string | 否 | 操作方法（单条） |
-| permissions | body | array<object> | 否 | 批量权限（可选） |
-| permissions[].resource | body | string | 否 | - |
-| permissions[].action | body | string | 否 | - |
+| permissions | body | array<object> | 是 | 权限列表（不能为空） |
+| permissions[].resource | body | string | 是 | 资源路径 |
+| permissions[].action | body | string | 是 | 操作方法 |
 
 响应字段:
 | 字段 | 类型 | 说明 |
@@ -858,7 +997,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -891,7 +1029,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -921,11 +1058,17 @@ Base URL：/v1
 | data | array<array<string>> | - |
 
 响应示例:
-
 ```json
 {
   "code": 0,
-  "data": [["p", "role:admin", "/admin/user/list", "GET"]],
+  "data": [
+    [
+      "p",
+      "role:admin",
+      "/admin/user/list",
+      "GET"
+    ]
+  ],
   "msg": "获取成功"
 }
 ```

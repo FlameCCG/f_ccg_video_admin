@@ -16,11 +16,13 @@ import {
   NSpin,
   NEmpty,
   NAlert,
+  NTooltip,
+  NTag,
   useMessage,
 } from 'naive-ui'
 import type { TreeOption } from 'naive-ui'
 import { getMenus, getRoleMenus, assignMenu, removeMenu } from '@/api/rbac'
-import type { Role, Menu } from '@/api/types'
+import type { Role, Menu, RoleMenusResponse } from '@/api/types'
 import { SvgIcon } from '@/components/common'
 
 interface Props {
@@ -42,11 +44,14 @@ const { t, locale } = useI18n()
 const message = useMessage()
 const queryClient = useQueryClient()
 
-/** 选中的菜单 ID */
+/** 选中的菜单 ID（仅直连菜单可编辑） */
 const checkedKeys = ref<number[]>([])
 
 /** 展开的节点 */
 const expandedKeys = ref<number[]>([])
+
+/** 继承菜单 ID 集合（用于禁用） */
+const inheritedMenuIds = ref<Set<number>>(new Set())
 
 /** 获取所有菜单 */
 const { data: allMenus, isLoading: menusLoading } = useQuery({
@@ -55,14 +60,17 @@ const { data: allMenus, isLoading: menusLoading } = useQuery({
   staleTime: 60 * 1000,
 })
 
-/** 获取角色已分配的菜单 */
+/** 获取角色已分配的菜单（区分直连和继承） */
 const {
-  data: roleMenus,
+  data: roleMenusData,
   isLoading: roleMenusLoading,
   refetch: refetchRoleMenus,
 } = useQuery({
   queryKey: ['roleMenus', computed(() => props.role?.id)],
-  queryFn: () => (props.role ? getRoleMenus({ roleId: props.role.id }) : Promise.resolve([])),
+  queryFn: () =>
+    props.role
+      ? getRoleMenus({ roleId: props.role.id })
+      : Promise.resolve({ directMenus: [], inheritMenus: [] } as RoleMenusResponse),
   enabled: computed(() => !!props.role && props.visible),
   staleTime: 30 * 1000,
 })
@@ -107,16 +115,44 @@ function getMenuTitle(menu: Menu): string {
   return menu.title
 }
 
-/** 将菜单转换为树选项 */
+/** 将菜单转换为树选项（标记继承菜单） */
 function convertToTreeOptions(menus: Menu[]): TreeOption[] {
   return menus.map((menu) => {
+    const isInherited = inheritedMenuIds.value.has(menu.id)
     // 仅支持后端返回的 SVG 字符串渲染图标
     const svgIcon = menu.icon?.trim().startsWith('<svg') ? menu.icon : null
+
     return {
       key: menu.id,
       label: getMenuTitle(menu),
-      prefix: svgIcon ? () => h(SvgIcon, { svg: svgIcon, size: 16 }) : undefined,
+      disabled: isInherited,
+      prefix: () =>
+        h('span', { class: 'tree-node-prefix' }, [
+          svgIcon ? h(SvgIcon, { svg: svgIcon, size: 16 }) : null,
+        ]),
+      suffix: isInherited
+        ? () =>
+            h(
+              NTooltip,
+              { trigger: 'hover' },
+              {
+                trigger: () =>
+                  h(
+                    NTag,
+                    {
+                      size: 'tiny',
+                      type: 'default',
+                      bordered: false,
+                      style: { opacity: 0.6, marginLeft: '8px' },
+                    },
+                    () => t('rbac.menu.inherited')
+                  ),
+                default: () => t('rbac.menu.inheritMenusTip'),
+              }
+            )
+        : undefined,
       children: menu.children ? convertToTreeOptions(menu.children) : undefined,
+      class: isInherited ? 'inherited-menu-node' : '',
     }
   })
 }
@@ -139,8 +175,8 @@ function getAllMenuIds(menus: Menu[]): number[] {
   return ids
 }
 
-/** 获取角色已分配的菜单 ID */
-function getRoleMenuIds(menus: Menu[]): number[] {
+/** 获取菜单 ID 列表 */
+function getMenuIds(menus: Menu[]): number[] {
   const ids: number[] = []
   function traverse(items: Menu[]): void {
     for (const item of items) {
@@ -156,10 +192,17 @@ function getRoleMenuIds(menus: Menu[]): number[] {
 
 /** 监听角色菜单变化，初始化选中状态 */
 watch(
-  () => roleMenus.value,
-  (menus) => {
-    if (menus) {
-      checkedKeys.value = getRoleMenuIds(menus)
+  () => roleMenusData.value,
+  (data) => {
+    if (data) {
+      // 设置继承菜单 ID 集合
+      const inheritIds = getMenuIds(data.inheritMenus)
+      inheritedMenuIds.value = new Set(inheritIds)
+
+      // 直连菜单为可编辑的选中项
+      const directIds = getMenuIds(data.directMenus)
+      // 合并直连和继承菜单作为选中状态（继承菜单会被禁用）
+      checkedKeys.value = [...directIds, ...inheritIds]
     }
   },
   { immediate: true }
@@ -186,15 +229,19 @@ function handleClose(): void {
 
 /** 处理保存 */
 function handleSave(): void {
-  if (!props.role) return
+  if (!props.role || !roleMenusData.value) return
 
   const roleId = props.role.id
-  const currentMenuIds = getRoleMenuIds(roleMenus.value ?? [])
-  const newMenuIds = checkedKeys.value
+  // 当前直连菜单 ID
+  const currentDirectIds = getMenuIds(roleMenusData.value.directMenus)
+  // 继承菜单 ID（不可编辑）
+  const inheritIds = Array.from(inheritedMenuIds.value)
+  // 新选中的菜单 ID（排除继承菜单）
+  const newDirectIds = checkedKeys.value.filter((id) => !inheritIds.includes(id))
 
-  // 计算需要添加和移除的菜单
-  const toAdd = newMenuIds.filter((id) => !currentMenuIds.includes(id))
-  const toRemove = currentMenuIds.filter((id) => !newMenuIds.includes(id))
+  // 计算需要添加和移除的菜单（仅针对直连菜单）
+  const toAdd = newDirectIds.filter((id) => !currentDirectIds.includes(id))
+  const toRemove = currentDirectIds.filter((id) => !newDirectIds.includes(id))
 
   // 执行操作
   const promises: Promise<unknown>[] = []
@@ -217,21 +264,24 @@ function handleSave(): void {
   })
 }
 
-/** 全选 */
+/** 全选（仅选择非继承菜单） */
 function handleSelectAll(): void {
   if (allMenus.value) {
-    checkedKeys.value = getAllMenuIds(allMenus.value)
+    const allIds = getAllMenuIds(allMenus.value)
+    // 继承菜单保持选中状态
+    checkedKeys.value = allIds
   }
 }
 
-/** 取消全选 */
+/** 取消全选（保留继承菜单的选中状态） */
 function handleDeselectAll(): void {
-  checkedKeys.value = []
+  // 仅保留继承菜单的选中状态
+  checkedKeys.value = Array.from(inheritedMenuIds.value)
 }
 </script>
 
 <template>
-  <n-drawer :show="visible" :width="480" placement="right" @update:show="handleClose">
+  <n-drawer :show="visible" :width="520" placement="right" @update:show="handleClose">
     <n-drawer-content :title="t('rbac.menu.assignMenus')" :native-scrollbar="false" closable>
       <template #default>
         <n-spin :show="isLoading">
@@ -250,6 +300,16 @@ function handleDeselectAll(): void {
             {{ t('rbac.role.name') }}: {{ role.name }}
           </n-alert>
 
+          <!-- 继承菜单提示 -->
+          <n-alert
+            v-if="inheritedMenuIds.size > 0"
+            type="warning"
+            :show-icon="true"
+            style="margin-bottom: 16px"
+          >
+            {{ t('rbac.menu.inheritMenusTip') }}
+          </n-alert>
+
           <!-- 菜单树 -->
           <n-tree
             v-if="treeOptions.length > 0"
@@ -262,6 +322,16 @@ function handleDeselectAll(): void {
             key-field="key"
             label-field="label"
             children-field="children"
+            :render-label="
+              ({ option }) =>
+                h(
+                  'span',
+                  {
+                    class: inheritedMenuIds.has(option.key as number) ? 'inherited-menu-label' : '',
+                  },
+                  option.label as string
+                )
+            "
           />
 
           <!-- 空状态 -->
@@ -282,3 +352,20 @@ function handleDeselectAll(): void {
     </n-drawer-content>
   </n-drawer>
 </template>
+
+<style scoped>
+:deep(.inherited-menu-label) {
+  opacity: 0.5;
+  color: var(--color-text-muted);
+}
+
+:deep(.n-tree-node.n-tree-node--disabled) {
+  opacity: 0.6;
+}
+
+:deep(.tree-node-prefix) {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 4px;
+}
+</style>

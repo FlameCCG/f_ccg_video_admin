@@ -22,11 +22,13 @@ import type {
   AssignMenuParams,
   RemoveMenuParams,
   GetRoleMenusParams,
+  RoleMenusResponse,
   AssignPermissionParams,
   RemovePermissionParams,
   ReplaceRolePermissionsParams,
   GetRolePermissionsParams,
   RolePermissionsList,
+  RoleInheritTreeNode,
 } from './types'
 
 // ============ 角色管理 ============
@@ -101,6 +103,22 @@ export function removeRoleInherit(params: RoleInheritParams): Promise<EmptyData>
  */
 export function getRoleInherits(params: GetRoleInheritsParams): Promise<string[]> {
   return request.get('/admin/rbac/role/inherits', { params })
+}
+
+/**
+ * 获取角色继承树
+ * GET /admin/rbac/role/inherit/tree
+ */
+export function getRoleInheritTree(): Promise<RoleInheritTreeNode[]> {
+  return request.get('/admin/rbac/role/inherit/tree')
+}
+
+/**
+ * 获取指定角色继承树
+ * GET /admin/rbac/role/{id}/inherit/tree
+ */
+export function getRoleInheritTreeById(roleId: number): Promise<RoleInheritTreeNode[]> {
+  return request.get(`/admin/rbac/role/${roleId}/inherit/tree`)
 }
 
 // ============ 用户角色管理 ============
@@ -188,10 +206,10 @@ export function removeMenu(params: RemoveMenuParams): Promise<EmptyData> {
 }
 
 /**
- * 获取角色菜单列表
+ * 获取角色菜单列表（区分直连菜单和继承菜单）
  * GET /admin/rbac/role/menus
  */
-export function getRoleMenus(params: GetRoleMenusParams): Promise<Menu[]> {
+export function getRoleMenus(params: GetRoleMenusParams): Promise<RoleMenusResponse> {
   return request.get('/admin/rbac/role/menus', { params })
 }
 

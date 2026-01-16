@@ -4,7 +4,7 @@
  * User Role Management Drawer
  * Requirements: 18.9 - 用户角色管理
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
@@ -15,10 +15,14 @@ import {
   NTransfer,
   NSpin,
   NAlert,
+  NIcon,
+  NTooltip,
   useMessage,
 } from 'naive-ui'
-import { getRoles, getUserRoles, updateUserRoles } from '@/api/rbac'
-import type { AdminUserListItem } from '@/api/types'
+import type { TransferRenderSourceLabel } from 'naive-ui'
+import { getRoles, getUserRoles, updateUserRoles, getRoleInheritTreeById } from '@/api/rbac'
+import type { AdminUserListItem, RoleInheritTreeNode } from '@/api/types'
+import { RoleInheritTree } from '@/components/rbac'
 
 interface Props {
   /** 是否显示 */
@@ -42,6 +46,18 @@ const queryClient = useQueryClient()
 
 /** 选中的角色 ID */
 const selectedRoleIds = ref<Array<string | number>>([])
+
+/** 是否显示继承树 */
+const showInheritTree = ref(false)
+
+/** 当前查看继承树的角色 ID */
+const viewingTreeRoleId = ref<number | null>(null)
+
+/** 当前查看的角色继承树数据 */
+const roleTreeData = ref<RoleInheritTreeNode[]>([])
+
+/** 是否正在加载角色继承树 */
+const loadingRoleTree = ref(false)
 
 /** 获取所有角色 */
 const { data: allRoles, isLoading: rolesLoading } = useQuery({
@@ -108,6 +124,10 @@ watch(
   (visible) => {
     if (visible && props.user) {
       void refetchUserRoles()
+      // 重置继承树状态
+      showInheritTree.value = false
+      viewingTreeRoleId.value = null
+      roleTreeData.value = []
     }
   }
 )
@@ -131,31 +151,132 @@ function handleSave(): void {
 function handleTransferChange(value: Array<string | number>): void {
   selectedRoleIds.value = value
 }
+
+/** 查看角色继承树 */
+async function handleViewRoleTree(roleId: number): Promise<void> {
+  viewingTreeRoleId.value = roleId
+  showInheritTree.value = true
+  loadingRoleTree.value = true
+
+  try {
+    const data = await getRoleInheritTreeById(roleId)
+    roleTreeData.value = data
+  } catch (error) {
+    message.error(t('common.tips.operationFailed'))
+    roleTreeData.value = []
+  } finally {
+    loadingRoleTree.value = false
+  }
+}
+
+/** 返回角色列表 */
+function handleBackToList(): void {
+  showInheritTree.value = false
+  viewingTreeRoleId.value = null
+  roleTreeData.value = []
+}
+
+/** 树形图标 SVG */
+const treeIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M18 9H6"/><path d="M18 15H6"/></svg>`
+
+/** 自定义渲染穿梭框标签 */
+const renderLabel: TransferRenderSourceLabel = ({ option }) => {
+  const roleId = option.value as number
+  return h(
+    'div',
+    {
+      class: 'transfer-label-wrapper',
+    },
+    [
+      h('span', { class: 'transfer-label-text' }, option.label as string),
+      h(
+        NTooltip,
+        { trigger: 'hover' },
+        {
+          trigger: () =>
+            h(
+              NButton,
+              {
+                size: 'tiny',
+                quaternary: true,
+                class: 'transfer-label-btn',
+                onClick: (e: MouseEvent) => {
+                  e.stopPropagation()
+                  void handleViewRoleTree(roleId)
+                },
+              },
+              {
+                icon: () => h(NIcon, { innerHTML: treeIconSvg }),
+              }
+            ),
+          default: () => t('rbac.role.inheritTree.view'),
+        }
+      ),
+    ]
+  )
+}
 </script>
 
 <template>
-  <n-drawer :show="visible" :width="500" placement="right" @update:show="handleClose">
+  <n-drawer :show="visible" :width="600" placement="right" @update:show="handleClose">
     <n-drawer-content :title="t('rbac.userRole.title')" :native-scrollbar="false" closable>
-      <n-spin :show="isLoading">
+      <template #header-extra>
+        <n-button v-if="showInheritTree" size="small" quaternary @click="handleBackToList">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.back') }}
+        </n-button>
+      </template>
+
+      <n-spin :show="isLoading || loadingRoleTree">
         <!-- 用户信息 -->
         <n-alert v-if="user" type="info" :show-icon="false" style="margin-bottom: 16px">
           {{ t('rbac.userRole.currentUser') }}: {{ user.username }}
-          <template v-if="selectedRoleIds.length > 0">
+          <template v-if="selectedRoleIds.length > 0 && !showInheritTree">
             &nbsp;|&nbsp;{{ t('rbac.userRole.selectedCount') }}: {{ selectedRoleIds.length }}
           </template>
         </n-alert>
 
+        <!-- 角色继承树 -->
+        <template v-if="showInheritTree">
+          <role-inherit-tree
+            :data="roleTreeData"
+            :loading="loadingRoleTree"
+            :highlight-role-id="viewingTreeRoleId"
+          />
+        </template>
+
         <!-- 角色穿梭框 -->
-        <n-transfer
-          v-model:value="selectedRoleIds"
-          :options="transferOptions"
-          :source-title="t('rbac.userRole.availableRoles')"
-          :target-title="t('rbac.userRole.assignedRoles')"
-          source-filterable
-          target-filterable
-          style="height: 400px"
-          @update:value="handleTransferChange"
-        />
+        <template v-else>
+          <n-transfer
+            v-model:value="selectedRoleIds"
+            :options="transferOptions"
+            :source-title="t('rbac.userRole.availableRoles')"
+            :target-title="t('rbac.userRole.assignedRoles')"
+            :render-source-label="renderLabel"
+            :render-target-label="renderLabel"
+            source-filterable
+            target-filterable
+            style="height: 400px"
+            @update:value="handleTransferChange"
+          />
+        </template>
       </n-spin>
 
       <template #footer>
@@ -163,7 +284,12 @@ function handleTransferChange(value: Array<string | number>): void {
           <n-button :disabled="isLoading" @click="handleClose">
             {{ t('common.cancel') }}
           </n-button>
-          <n-button type="primary" :loading="isLoading" @click="handleSave">
+          <n-button
+            type="primary"
+            :loading="isLoading"
+            :disabled="showInheritTree"
+            @click="handleSave"
+          >
             {{ t('common.save') }}
           </n-button>
         </n-space>
@@ -173,18 +299,28 @@ function handleTransferChange(value: Array<string | number>): void {
 </template>
 
 <style scoped lang="scss">
-.transfer-source-list {
-  padding: var(--spacing-2);
+:deep(.transfer-label-wrapper) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--spacing-2);
 }
 
-.transfer-item {
-  padding: var(--spacing-2) var(--spacing-3);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: background-color var(--motion-fast);
+:deep(.transfer-label-text) {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.transfer-label-btn) {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity var(--motion-fast);
 
   &:hover {
-    background-color: var(--color-surface-hover);
+    opacity: 1;
   }
 }
 </style>

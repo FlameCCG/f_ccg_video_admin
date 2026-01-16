@@ -15,6 +15,7 @@ import { DataTable, TableActions } from '@/components/table'
 import { RoleMenuDrawer, RolePermissionDrawer } from '@/components/rbac'
 import RoleFormModal from './components/RoleFormModal.vue'
 import RoleInheritDrawer from './components/RoleInheritDrawer.vue'
+import RoleInheritTreeModal from './components/RoleInheritTreeModal.vue'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -37,6 +38,11 @@ const editingRole = ref<Role | null>(null)
 /** 继承抽屉状态 */
 const inheritDrawerVisible = ref(false)
 const inheritingRole = ref<Role | null>(null)
+
+/** 继承树弹窗状态 */
+const inheritTreeModalVisible = ref(false)
+const highlightRoleId = ref<number | null>(null)
+const viewTreeRoleId = ref<number | null>(null)
 
 /** 菜单分配抽屉状态 */
 const menuDrawerVisible = ref(false)
@@ -150,6 +156,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
           { key: 'menus', label: t('rbac.role.assignMenus') },
           { key: 'permissions', label: t('rbac.role.assignPermissions') },
           { key: 'inherit', label: t('rbac.role.inherit') },
+          { key: 'viewTree', label: t('rbac.role.inheritTree.view') },
           { key: 'delete', label: t('common.delete'), type: 'error' },
         ],
         onAction: (key: string) => handleAction(key, row as unknown as Role),
@@ -177,6 +184,10 @@ function handleAction(key: string, row: Role): void {
   } else if (key === 'inherit') {
     inheritingRole.value = row
     inheritDrawerVisible.value = true
+  } else if (key === 'viewTree') {
+    viewTreeRoleId.value = row.id
+    highlightRoleId.value = row.id
+    inheritTreeModalVisible.value = true
   } else if (key === 'delete') {
     confirmDelete(row)
   }
@@ -212,6 +223,13 @@ function handleFormSubmit(data: CreateRoleParams | UpdateRoleParams): void {
 /** 处理刷新 */
 function handleRefresh(): void {
   void refetch()
+}
+
+/** 处理查看继承树 */
+function handleViewInheritTree(): void {
+  viewTreeRoleId.value = null
+  highlightRoleId.value = null
+  inheritTreeModalVisible.value = true
 }
 
 /** 处理页码变化 */
@@ -254,6 +272,34 @@ function handlePageSizeChange(pageSize: number): void {
                 </n-icon>
               </template>
               {{ t('rbac.role.create') }}
+            </n-button>
+            <n-button size="small" secondary @click="handleViewInheritTree">
+              <template #icon>
+                <n-icon>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M12 3v18" />
+                    <path d="M18 9H6" />
+                    <path d="M18 15H6" />
+                    <circle cx="12" cy="3" r="1" />
+                    <circle cx="6" cy="9" r="1" />
+                    <circle cx="18" cy="9" r="1" />
+                    <circle cx="6" cy="15" r="1" />
+                    <circle cx="18" cy="15" r="1" />
+                    <circle cx="12" cy="21" r="1" />
+                  </svg>
+                </n-icon>
+              </template>
+              {{ t('rbac.role.inheritTree.viewSystem') }}
             </n-button>
             <n-button size="small" secondary @click="handleRefresh">
               <template #icon>
@@ -316,6 +362,13 @@ function handlePageSizeChange(pageSize: number): void {
     <role-permission-drawer
       v-model:visible="permissionDrawerVisible"
       :role="permissionAssigningRole"
+    />
+
+    <!-- 角色继承树弹窗 -->
+    <role-inherit-tree-modal
+      v-model:visible="inheritTreeModalVisible"
+      :highlight-role-id="highlightRoleId"
+      :role-id="viewTreeRoleId"
     />
   </div>
 </template>

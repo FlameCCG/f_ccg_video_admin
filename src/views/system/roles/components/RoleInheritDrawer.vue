@@ -19,12 +19,14 @@ import {
   NList,
   NListItem,
   NThing,
+  NIcon,
   useMessage,
   useDialog,
 } from 'naive-ui'
 import type { SelectOption } from 'naive-ui'
 import { getRoleInherits, inheritRole, removeRoleInherit, getRoles } from '@/api/rbac'
 import type { Role } from '@/api/types'
+import RoleInheritTreeModal from './RoleInheritTreeModal.vue'
 
 interface Props {
   /** 是否显示 */
@@ -46,6 +48,9 @@ const queryClient = useQueryClient()
 
 /** 选择的父角色 ID */
 const selectedParentRoleId = ref<number | null>(null)
+
+/** 继承树弹窗状态 */
+const treeModalVisible = ref(false)
 
 /** 获取所有角色列表 */
 const { data: allRoles } = useQuery({
@@ -123,6 +128,11 @@ function handleClose(): void {
   emit('update:visible', false)
 }
 
+/** 处理查看继承树 */
+function handleViewTree(): void {
+  treeModalVisible.value = true
+}
+
 /** 处理添加继承 */
 function handleAddInherit(): void {
   if (!props.role || !selectedParentRoleId.value) return
@@ -158,6 +168,31 @@ function handleRemoveInherit(parentRoleName: string): void {
 <template>
   <n-drawer :show="visible" :width="400" placement="right" @update:show="handleClose">
     <n-drawer-content :title="t('rbac.role.inherit')" closable>
+      <template #header-extra>
+        <n-button size="small" quaternary @click="handleViewTree">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 3v18" />
+                <path d="M18 9H6" />
+                <path d="M18 15H6" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('rbac.role.inheritTree.view') }}
+        </n-button>
+      </template>
+
       <template v-if="role">
         <n-space vertical :size="16">
           <!-- 当前角色信息 -->
@@ -216,6 +251,12 @@ function handleRemoveInherit(parentRoleName: string): void {
       </template>
     </n-drawer-content>
   </n-drawer>
+
+  <!-- 继承树弹窗 -->
+  <role-inherit-tree-modal
+    v-model:visible="treeModalVisible"
+    :highlight-role-id="role?.id ?? null"
+  />
 </template>
 
 <style scoped lang="scss">

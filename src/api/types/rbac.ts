@@ -240,34 +240,38 @@ export interface GetRoleMenusParams {
   roleId: number
 }
 
+/**
+ * 角色菜单响应（区分直连菜单和继承菜单）
+ */
+export interface RoleMenusResponse {
+  /** 直连菜单（可编辑） */
+  directMenus: Menu[]
+  /** 继承菜单（只读） */
+  inheritMenus: Menu[]
+}
+
 // ============ 权限管理 ============
 
 /**
  * 分配权限参数
+ * 注意：单条 resource/action 已不再支持，必须使用 permissions 数组
  */
 export interface AssignPermissionParams {
   /** 角色名称 */
   roleName: string
-  /** 资源路径（单条） */
-  resource?: string
-  /** 操作方法（单条） */
-  action?: string
-  /** 批量权限（可选） */
-  permissions?: Permission[]
+  /** 权限列表（必填，不能为空） */
+  permissions: Permission[]
 }
 
 /**
  * 移除权限参数
+ * 注意：单条 resource/action 已不再支持，必须使用 permissions 数组
  */
 export interface RemovePermissionParams {
   /** 角色名称 */
   roleName: string
-  /** 资源路径（单条） */
-  resource?: string
-  /** 操作方法（单条） */
-  action?: string
-  /** 批量权限（可选） */
-  permissions?: Permission[]
+  /** 权限列表（必填，不能为空） */
+  permissions: Permission[]
 }
 
 /**
@@ -293,3 +297,17 @@ export interface GetRolePermissionsParams {
  * 格式: [["p", "role:admin", "/admin/user/list", "GET"], ...]
  */
 export type RolePermissionsList = string[][]
+
+/**
+ * 角色继承树节点
+ */
+export interface RoleInheritTreeNode {
+  /** 角色 ID */
+  id: number
+  /** 角色名称 */
+  name: string
+  /** 角色描述 */
+  desc: string
+  /** 子节点 */
+  children?: RoleInheritTreeNode[]
+}
