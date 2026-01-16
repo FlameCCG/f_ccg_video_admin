@@ -7,6 +7,55 @@
 /** 配置名称类型 */
 export type SiteConfigName = 'site' | 'logger' | 'email' | 'transcode' | 'thirdLogin' | 'jwt'
 
+// ============ 公开站点配置类型（无需认证） ============
+
+/** 公开登录配置 */
+export interface PublicLoginConfig {
+  qqLogin: boolean
+  usernamePwdLogin: boolean
+  textGraphicCaptcha: boolean
+  textClickCaptcha: boolean
+  textClickCaptchaTTL: number
+  textClickCaptchaPadding: number
+}
+
+/** 公开注册配置 */
+export interface PublicRegisterConfig {
+  emailCaptcha: boolean
+  textGraphicCaptcha: boolean
+  slideCaptcha: boolean
+  slideCaptchaTTL: number
+  slideCaptchaPadding: number
+}
+
+/** 公开存储配置 */
+export interface PublicStorageConfig {
+  maxChunkSize: number
+  chunkSize: number
+  maxFileSize: number
+  maxUploadNum: number
+}
+
+/** 公开内容审核配置 */
+export interface PublicContentReviewConfig {
+  enable: boolean
+}
+
+/** 公开站点配置 */
+export interface PublicSiteConfig {
+  login: PublicLoginConfig
+  register: PublicRegisterConfig
+  storage: PublicStorageConfig
+  contentReview: PublicContentReviewConfig
+}
+
+/** 公开配置响应 */
+export interface PublicConfigResponse {
+  site: PublicSiteConfig
+}
+
+// ============ 管理后台站点配置类型 ============
+
 /** 内容审核配置 */
 export interface ContentReviewConfig {
   enable: boolean
@@ -20,6 +69,8 @@ export interface LoginConfig {
   textClickCaptcha: boolean
   textClickCaptchaTTL: number
   textClickCaptchaPadding: number
+  /** 滑块验证码开关 */
+  slideCaptcha: boolean
 }
 
 /** 注册配置 */
@@ -55,9 +106,9 @@ export interface StorageConfig {
   chunkSize: number
   maxFileSize: number
   maxUploadNum: number
-  chunkDir: string
-  local: LocalStorageConfig
-  minio: MinioStorageConfig
+  chunkDir?: string
+  local?: LocalStorageConfig
+  minio?: MinioStorageConfig
 }
 
 /** 基础站点配置 */

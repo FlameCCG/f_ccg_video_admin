@@ -33,16 +33,27 @@ const { t } = useI18n()
 const message = useMessage()
 const queryClient = useQueryClient()
 
-// 当前配置类型，从路由路径获取
+// 当前配置类型，从路由路径或 query 参数获取
 const currentTab = computed(() => {
-  const path = route.path
-  const segments = path.split('/')
-  const lastSegment = segments[segments.length - 1] || 'site'
-  // 验证是否为有效的配置名称
+  // 优先从路由路径获取（支持 /system-config/email 这种格式）
+  const pathSegments = route.path.split('/')
+  const lastSegment = pathSegments[pathSegments.length - 1]
+
   const validNames: SiteConfigName[] = ['site', 'logger', 'email', 'transcode', 'thirdLogin', 'jwt']
-  return validNames.includes(lastSegment as SiteConfigName)
-    ? (lastSegment as SiteConfigName)
-    : 'site'
+
+  // 检查路径最后一段是否是有效的配置名
+  if (validNames.includes(lastSegment as SiteConfigName)) {
+    return lastSegment as SiteConfigName
+  }
+
+  // 其次从 query 参数获取
+  const tab = route.query.tab as string | undefined
+  if (tab && validNames.includes(tab as SiteConfigName)) {
+    return tab as SiteConfigName
+  }
+
+  // 默认返回 site
+  return 'site'
 })
 
 // 配置项列表
@@ -132,9 +143,11 @@ const updateMutation = useMutation({
   },
 })
 
-// 切换 tab
+// 切换 tab - 跳转到对应的路由路径
 function handleTabChange(name: string): void {
   const tabName = name as SiteConfigName
+  // 构建目标路径：/system-config/{tabName}
+  // 如果是 site，跳转到 /system-config/site
   void router.push(`/system-config/${tabName}`)
 }
 
@@ -194,37 +207,37 @@ watch(currentTab, () => {
             <div class="config-content">
               <!-- 基础配置 -->
               <site-config-form
-                v-if="tab.key === 'site'"
+                v-if="tab.key === 'site' && siteFormData"
                 v-model="siteFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 日志配置 -->
               <logger-config-form
-                v-else-if="tab.key === 'logger'"
+                v-else-if="tab.key === 'logger' && loggerFormData"
                 v-model="loggerFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 邮件配置 -->
               <email-config-form
-                v-else-if="tab.key === 'email'"
+                v-else-if="tab.key === 'email' && emailFormData"
                 v-model="emailFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 转码配置 -->
               <transcode-config-form
-                v-else-if="tab.key === 'transcode'"
+                v-else-if="tab.key === 'transcode' && transcodeFormData"
                 v-model="transcodeFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 第三方登录 -->
               <third-login-config-form
-                v-else-if="tab.key === 'thirdLogin'"
+                v-else-if="tab.key === 'thirdLogin' && thirdLoginFormData"
                 v-model="thirdLoginFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- JWT配置 -->
               <jwt-config-form
-                v-else-if="tab.key === 'jwt'"
+                v-else-if="tab.key === 'jwt' && jwtFormData"
                 v-model="jwtFormData"
                 :loading="updateMutation.isPending.value"
               />
