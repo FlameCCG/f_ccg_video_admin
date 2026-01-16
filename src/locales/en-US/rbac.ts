@@ -38,6 +38,15 @@ export default {
     noInherit: 'No inheritance relationships',
     addInherit: 'Add Inheritance',
     removeInherit: 'Remove Inheritance',
+    inheritTree: {
+      title: 'Role Inheritance Tree',
+      view: 'View Inheritance Tree',
+      viewSystem: 'System Role Inheritance Tree',
+      hint: 'The inheritance tree shows the relationships between roles. Child roles inherit all permissions from parent roles.',
+      empty: 'No inheritance relationships',
+      totalRoles: '{count} roles in total',
+      dragHint: 'Drag to move, scroll to zoom',
+    },
     assignMenus: 'Assign Menus',
     assignPermissions: 'Assign Permissions',
     selectRole: 'Select role',
@@ -74,6 +83,11 @@ export default {
     removeSuccess: 'Menu removed successfully',
     assignToRole: 'Assign to Role',
     removeFromRole: 'Remove from Role',
+    directMenus: 'Direct Menus',
+    inheritMenus: 'Inherited Menus',
+    inheritMenusTip:
+      'Menus shown in lighter color are inherited from parent roles and cannot be edited',
+    inherited: 'Inherited',
   },
   permission: {
     title: 'Permission Management',

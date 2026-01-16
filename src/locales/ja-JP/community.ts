@@ -37,6 +37,7 @@ export default {
   comment: {
     title: 'コメント管理',
     user: 'ユーザー',
+    avatar: 'アバター',
     username: 'ユーザー名',
     usernamePlaceholder: 'ユーザー名で検索',
     content: '内容',

@@ -37,6 +37,7 @@ export default {
   comment: {
     title: '评论管控',
     user: '用户',
+    avatar: '头像',
     username: '用户名',
     usernamePlaceholder: '请输入用户名搜索',
     content: '评论内容',

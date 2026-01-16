@@ -17,7 +17,10 @@ export default {
     fullscreen: '全屏',
     exitFullscreen: '退出全屏',
     profile: '个人中心',
-    settings: '设置',
+    settings: '基础配置',
+    permission: '权限管理',
+    switchRole: '切换角色',
+    switchRoleSuccess: '角色切换成功',
     logout: '退出登录',
   },
   breadcrumb: {

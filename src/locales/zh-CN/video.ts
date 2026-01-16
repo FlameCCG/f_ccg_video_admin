@@ -13,6 +13,7 @@ export default {
     title: '视频列表',
     cover: '封面',
     videoTitle: '标题',
+    authorAvatar: '头像',
     author: '作者',
     status: '状态',
     partition: '分区',

@@ -37,6 +37,7 @@ export default {
   comment: {
     title: 'Comment Moderation',
     user: 'User',
+    avatar: 'Avatar',
     username: 'Username',
     usernamePlaceholder: 'Search by username',
     content: 'Content',

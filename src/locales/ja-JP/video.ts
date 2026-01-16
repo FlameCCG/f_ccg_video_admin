@@ -13,6 +13,7 @@ export default {
     title: '動画一覧',
     cover: 'サムネイル',
     videoTitle: 'タイトル',
+    authorAvatar: 'アバター',
     author: '投稿者',
     status: 'ステータス',
     partition: 'カテゴリ',

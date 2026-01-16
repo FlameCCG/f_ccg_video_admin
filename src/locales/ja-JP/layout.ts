@@ -17,7 +17,10 @@ export default {
     fullscreen: 'フルスクリーン',
     exitFullscreen: 'フルスクリーン解除',
     profile: 'プロフィール',
-    settings: '設定',
+    settings: '基本設定',
+    permission: '権限管理',
+    switchRole: 'ロール切替',
+    switchRoleSuccess: 'ロールの切り替えに成功しました',
     logout: 'ログアウト',
   },
   breadcrumb: {

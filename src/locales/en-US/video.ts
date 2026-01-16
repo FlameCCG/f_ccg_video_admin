@@ -13,6 +13,7 @@ export default {
     title: 'Video List',
     cover: 'Cover',
     videoTitle: 'Title',
+    authorAvatar: 'Avatar',
     author: 'Author',
     status: 'Status',
     partition: 'Partition',

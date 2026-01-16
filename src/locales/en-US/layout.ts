@@ -17,7 +17,10 @@ export default {
     fullscreen: 'Fullscreen',
     exitFullscreen: 'Exit fullscreen',
     profile: 'Profile',
-    settings: 'Settings',
+    settings: 'Site Config',
+    permission: 'Permission',
+    switchRole: 'Switch Role',
+    switchRoleSuccess: 'Role switched successfully',
     logout: 'Logout',
   },
   breadcrumb: {
