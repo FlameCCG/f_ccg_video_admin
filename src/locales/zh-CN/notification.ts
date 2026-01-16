@@ -8,6 +8,7 @@ export default {
     title: '标题',
     content: '内容',
     receiver: '接收者',
+    senderAvatar: '头像',
     sender: '发送者',
     link: '链接',
     createdAt: '创建时间',

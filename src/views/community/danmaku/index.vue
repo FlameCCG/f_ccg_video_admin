@@ -129,15 +129,19 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     fixed: 'left',
   },
   {
-    title: t('community.danmaku.user'),
-    key: 'user',
-    width: 140,
+    title: t('community.danmaku.avatar'),
+    key: 'avatar',
+    width: 80,
+    align: 'center',
     render: (row) => {
-      return h(NSpace, { align: 'center', size: 8 }, () => [
-        h(AppAvatar, { src: row.avatar as string, text: row.username as string, size: 28 }),
-        h('span', { class: 'truncate max-w-[80px]' }, row.username as string),
-      ])
+      return h(AppAvatar, { src: row.avatar as string, text: row.username as string, size: 32 })
     },
+  },
+  {
+    title: t('community.danmaku.username'),
+    key: 'username',
+    width: 120,
+    ellipsis: { tooltip: true },
   },
   {
     title: t('community.danmaku.content'),
@@ -164,30 +168,26 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     },
   },
   {
-    title: t('community.danmaku.video'),
-    key: 'video',
-    width: 200,
+    title: t('community.danmaku.videoCover'),
+    key: 'videoCover',
+    width: 100,
     render: (row) => {
-      return h(NSpace, { align: 'center', size: 8 }, () => [
-        h(NImage, {
-          src: row.videoCover as string,
-          width: 48,
-          height: 32,
-          objectFit: 'cover',
-          lazy: true,
-          previewDisabled: true,
-          style: { borderRadius: '4px', flexShrink: 0 },
-        }),
-        h(
-          NTooltip,
-          { trigger: 'hover' },
-          {
-            trigger: () => h('span', { class: 'truncate max-w-[120px]' }, row.videoTitle as string),
-            default: () => row.videoTitle as string,
-          }
-        ),
-      ])
+      return h(NImage, {
+        src: row.videoCover as string,
+        width: 80,
+        height: 48,
+        objectFit: 'cover',
+        lazy: true,
+        previewDisabled: false,
+        style: { borderRadius: '4px' },
+      })
     },
+  },
+  {
+    title: t('community.danmaku.videoTitle'),
+    key: 'videoTitle',
+    width: 180,
+    ellipsis: { tooltip: true },
   },
   {
     title: t('community.danmaku.timeOffset'),

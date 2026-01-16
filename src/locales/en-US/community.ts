@@ -66,6 +66,7 @@ export default {
     description:
       'Manage all danmaku content on the platform, with filtering by user, keyword and batch deletion.',
     user: 'User',
+    avatar: 'Avatar',
     username: 'Username',
     usernamePlaceholder: 'Search by username',
     userId: 'User ID',
@@ -74,6 +75,8 @@ export default {
     keywordPlaceholder: 'Search danmaku content',
     content: 'Content',
     video: 'Video',
+    videoCover: 'Video Cover',
+    videoTitle: 'Video Title',
     timeOffset: 'Time',
     color: 'Color',
     fontSize: 'Font Size',

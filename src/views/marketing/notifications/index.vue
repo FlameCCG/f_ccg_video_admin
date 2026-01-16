@@ -137,17 +137,25 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     },
   },
   {
-    title: t('notification.list.sender'),
-    key: 'actionUserName',
-    width: 150,
+    title: t('notification.list.senderAvatar'),
+    key: 'actionUserAvatar',
+    width: 80,
+    align: 'center',
     render: (row) => {
       const avatar = row.actionUserAvatar as string
       const name = row.actionUserName as string
       if (!name) return '-'
-      return h(NSpace, { align: 'center', size: 8 }, () => [
-        h(AppAvatar, { src: avatar, text: name, size: 28 }),
-        h('span', {}, name),
-      ])
+      return h(AppAvatar, { src: avatar, text: name, size: 32 })
+    },
+  },
+  {
+    title: t('notification.list.sender'),
+    key: 'actionUserName',
+    width: 120,
+    ellipsis: { tooltip: true },
+    render: (row) => {
+      const name = row.actionUserName as string
+      return name || '-'
     },
   },
   {

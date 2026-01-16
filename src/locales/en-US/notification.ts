@@ -8,6 +8,7 @@ export default {
     title: 'Title',
     content: 'Content',
     receiver: 'Receiver',
+    senderAvatar: 'Avatar',
     sender: 'Sender',
     link: 'Link',
     createdAt: 'Created At',

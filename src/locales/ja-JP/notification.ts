@@ -8,6 +8,7 @@ export default {
     title: 'タイトル',
     content: '内容',
     receiver: '受信者',
+    senderAvatar: 'アバター',
     sender: '送信者',
     link: 'リンク',
     createdAt: '作成日時',
