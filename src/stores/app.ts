@@ -12,7 +12,7 @@ import { localeConfigs, DEFAULT_LOCALE, LOCALE_STORAGE_KEY } from '@/locales'
 /**
  * 主题名称类型
  */
-export type ThemeName = 'pearl' | 'obsidian' | 'aurum' | 'sakura'
+export type ThemeName = 'pearl' | 'obsidian' | 'cyberpunk' | 'sakura'
 
 /**
  * 主题配置接口
@@ -44,10 +44,10 @@ export const themeConfigs: ThemeConfig[] = [
     isDark: true,
   },
   {
-    name: 'aurum',
-    label: 'Aurum',
-    labelZh: '鎏金',
-    labelJa: 'オーラム',
+    name: 'cyberpunk',
+    label: 'Cyberpunk',
+    labelZh: '赛博朋克',
+    labelJa: 'サイバーパンク',
     isDark: true,
   },
   {
@@ -137,7 +137,7 @@ export const useAppStore = defineStore('app', () => {
 
   /**
    * 切换深色/浅色主题
-   * 深色主题之间切换：obsidian <-> aurum
+   * 深色主题之间切换：obsidian <-> cyberpunk
    * 浅色主题之间切换：pearl <-> sakura
    */
   function toggleDark(): void {
@@ -146,7 +146,7 @@ export const useAppStore = defineStore('app', () => {
       setTheme(currentTheme.value === 'obsidian' ? 'pearl' : 'sakura')
     } else {
       // 当前是浅色，切换到深色
-      setTheme(currentTheme.value === 'pearl' ? 'obsidian' : 'aurum')
+      setTheme(currentTheme.value === 'pearl' ? 'obsidian' : 'cyberpunk')
     }
   }
 

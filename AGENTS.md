@@ -105,16 +105,16 @@
 - `<html data-theme="obsidian">`
 - `src/styles/tokens/themes.scss` 生成：
   - `:root { --color-bg: ... }`
-  - `[data-theme="aurum"] { --color-bg: ... }` 等
+  - `[data-theme="cyberpunk"] { --color-bg: ... }` 等
 - Tailwind 颜色统一走 `var(--color-xxx)`，禁止写死颜色值（仅允许在 tokens 文件里出现）
 
 ### 2) 高级主题（至少 4 套，且“有性格”）
 
 建议主题（命名可调整）：
 
-1. **Pearl（珍珠白）**：高端浅色、温润背景、低饱和强调色
-2. **Obsidian（黑曜石）**：深色低对比、适合长时间操作
-3. **Aurum（鎏金）**：深色 + 金色点缀（克制的奢华）
+1. **Pearl（珍珠白）**：高端浅色、温润背景、低饱和强调色、极简优雅
+2. **Obsidian（黑曜石）**：深色低对比、适合长时间操作、专业沉稳
+3. **Cyberpunk（赛博朋克）**：深色 + 霓虹青紫点缀、未来科技感
 4. **Sakura（樱）**：浅色 + 轻樱粉点缀（日系、现代、克制）
 
 要求：

@@ -28,18 +28,18 @@ const currentTheme = computed(() => appStore.currentTheme)
 
 /** 涓婚棰滆壊鏄犲皠 */
 const themeColors: Record<ThemeName, string> = {
-  pearl: '#f5f5f5',
-  obsidian: '#1a1a1a',
-  aurum: '#0c0a09',
-  sakura: '#fdf2f8',
+  pearl: '#f8f9fa',
+  obsidian: '#0d1117',
+  cyberpunk: '#0a0e1a',
+  sakura: '#fff5f7',
 }
 
 /** 涓婚寮鸿皟鑹叉槧灏?*/
 const themeAccentColors: Record<ThemeName, string> = {
-  pearl: '#4f46e5',
-  obsidian: '#818cf8',
-  aurum: '#fbbf24',
-  sakura: '#ec4899',
+  pearl: '#5c7cfa',
+  obsidian: '#7c8aff',
+  cyberpunk: '#06b6d4',
+  sakura: '#ff6b9d',
 }
 
 /** 鑾峰彇涓婚鏍囩 */

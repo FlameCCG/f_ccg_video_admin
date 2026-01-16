@@ -22,23 +22,23 @@ describe('app store', () => {
       expect(themeConfigs.length).toBe(4)
     })
 
-    it('should have pearl, obsidian, aurum, and sakura themes', () => {
+    it('should have pearl, obsidian, cyberpunk, and sakura themes', () => {
       const themeNames = themeConfigs.map((t) => t.name)
       expect(themeNames).toContain('pearl')
       expect(themeNames).toContain('obsidian')
-      expect(themeNames).toContain('aurum')
+      expect(themeNames).toContain('cyberpunk')
       expect(themeNames).toContain('sakura')
     })
 
     it('should have correct isDark values', () => {
       const pearl = themeConfigs.find((t) => t.name === 'pearl')
       const obsidian = themeConfigs.find((t) => t.name === 'obsidian')
-      const aurum = themeConfigs.find((t) => t.name === 'aurum')
+      const cyberpunk = themeConfigs.find((t) => t.name === 'cyberpunk')
       const sakura = themeConfigs.find((t) => t.name === 'sakura')
 
       expect(pearl?.isDark).toBe(false)
       expect(obsidian?.isDark).toBe(true)
-      expect(aurum?.isDark).toBe(true)
+      expect(cyberpunk?.isDark).toBe(true)
       expect(sakura?.isDark).toBe(false)
     })
   })

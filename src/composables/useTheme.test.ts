@@ -32,11 +32,11 @@ describe('useTheme', () => {
       expect(obsidian?.labelZh).toBe('黑曜石')
     })
 
-    it('should have aurum theme as dark theme', () => {
-      const aurum = themeConfigs.find((t) => t.name === 'aurum')
-      expect(aurum).toBeDefined()
-      expect(aurum?.isDark).toBe(true)
-      expect(aurum?.label).toBe('Aurum')
+    it('should have cyberpunk theme as dark theme', () => {
+      const cyberpunk = themeConfigs.find((t) => t.name === 'cyberpunk')
+      expect(cyberpunk).toBeDefined()
+      expect(cyberpunk?.isDark).toBe(true)
+      expect(cyberpunk?.label).toBe('Cyberpunk')
     })
 
     it('should have sakura theme as light theme', () => {
@@ -66,7 +66,7 @@ describe('useTheme', () => {
 
   describe('ThemeName type', () => {
     it('should accept valid theme names', () => {
-      const validNames: ThemeName[] = ['pearl', 'obsidian', 'aurum', 'sakura']
+      const validNames: ThemeName[] = ['pearl', 'obsidian', 'cyberpunk', 'sakura']
       validNames.forEach((name) => {
         const theme = themeConfigs.find((t) => t.name === name)
         expect(theme).toBeDefined()

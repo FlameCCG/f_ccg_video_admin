@@ -30,7 +30,7 @@ export default {
     title: 'Theme Settings',
     pearl: 'Pearl',
     obsidian: 'Obsidian',
-    aurum: 'Aurum',
+    cyberpunk: 'Cyberpunk',
     sakura: 'Sakura',
     light: 'Light',
     dark: 'Dark',
