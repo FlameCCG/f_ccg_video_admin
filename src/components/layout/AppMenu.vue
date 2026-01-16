@@ -75,22 +75,28 @@ function convertToMenuOptions(menus: Menu[]): MenuOption[] {
 const menuOptions = computed(() => convertToMenuOptions(permissionStore.menus))
 
 /** 根据路由路径查找菜单 ID */
-function findMenuIdByPath(menus: Menu[], path: string): string {
+function findMenuIdByPath(menus: Menu[], path: string, parentPath = ''): string {
   for (const menu of menus) {
-    // 检查当前菜单的路径是否匹配
+    // 计算当前菜单的完整路径
+    let currentPath: string
     if (menu.path) {
-      // 完整路径匹配
-      if (menu.path === path) {
-        return String(menu.id)
+      if (menu.path.startsWith('/')) {
+        currentPath = menu.path
+      } else {
+        currentPath = parentPath ? `${parentPath}/${menu.path}` : `/${menu.path}`
       }
-      // 子路径匹配（如 /overview/dashboard 匹配 dashboard）
-      if (path.endsWith('/' + menu.path) || path === '/' + menu.path) {
-        return String(menu.id)
-      }
+    } else {
+      currentPath = parentPath
     }
+
+    // 检查当前菜单的路径是否匹配
+    if (currentPath && currentPath === path) {
+      return String(menu.id)
+    }
+
     // 递归检查子菜单
     if (menu.children && menu.children.length > 0) {
-      const childId = findMenuIdByPath(menu.children, path)
+      const childId = findMenuIdByPath(menu.children, path, currentPath)
       if (childId) return childId
     }
   }
@@ -101,23 +107,43 @@ function findMenuIdByPath(menus: Menu[], path: string): string {
 function findExpandedKeys(menus: Menu[], path: string): string[] {
   const keys: string[] = []
 
-  function findParent(items: Menu[], _parentId?: string): boolean {
+  function findParent(items: Menu[], parentPath = ''): boolean {
     for (const menu of items) {
       const currentId = String(menu.id)
+
+      // 计算当前菜单的完整路径
+      let currentPath: string
+      if (menu.path) {
+        if (menu.path.startsWith('/')) {
+          currentPath = menu.path
+        } else {
+          currentPath = parentPath ? `${parentPath}/${menu.path}` : `/${menu.path}`
+        }
+      } else {
+        currentPath = parentPath
+      }
 
       if (menu.children && menu.children.length > 0) {
         // 检查子菜单是否匹配
         for (const child of menu.children) {
+          let childPath: string
           if (child.path) {
-            const fullPath = menu.path ? `${menu.path}/${child.path}` : child.path
-            if (path === fullPath || path.endsWith('/' + child.path)) {
-              keys.push(currentId)
-              return true
+            if (child.path.startsWith('/')) {
+              childPath = child.path
+            } else {
+              childPath = currentPath ? `${currentPath}/${child.path}` : `/${child.path}`
             }
+          } else {
+            childPath = currentPath
+          }
+
+          if (path === childPath) {
+            keys.push(currentId)
+            return true
           }
         }
         // 递归检查更深层级
-        if (findParent(menu.children, currentId)) {
+        if (findParent(menu.children, currentPath)) {
           keys.push(currentId)
           return true
         }
@@ -143,11 +169,18 @@ const expandedKeys = computed(() => {
 /** 根据菜单 ID 查找菜单路径 */
 function findMenuPath(menus: Menu[], menuId: string, parentPath = ''): string | null {
   for (const menu of menus) {
-    const currentPath = menu.path
-      ? parentPath
-        ? `${parentPath}/${menu.path}`
-        : menu.path
-      : parentPath
+    // 如果菜单路径是绝对路径（以 / 开头），直接使用
+    // 否则拼接父路径
+    let currentPath: string
+    if (menu.path) {
+      if (menu.path.startsWith('/')) {
+        currentPath = menu.path
+      } else {
+        currentPath = parentPath ? `${parentPath}/${menu.path}` : `/${menu.path}`
+      }
+    } else {
+      currentPath = parentPath
+    }
 
     if (String(menu.id) === menuId) {
       return currentPath || null
