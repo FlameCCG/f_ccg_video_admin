@@ -30,7 +30,7 @@ const currentTheme = computed(() => appStore.currentTheme)
 const themeColors: Record<ThemeName, string> = {
   pearl: '#f8f9fa',
   obsidian: '#0d1117',
-  cyberpunk: '#0a0e1a',
+  cyberpunk: '#0a0118',
   sakura: '#fff5f7',
 }
 
@@ -38,7 +38,7 @@ const themeColors: Record<ThemeName, string> = {
 const themeAccentColors: Record<ThemeName, string> = {
   pearl: '#5c7cfa',
   obsidian: '#7c8aff',
-  cyberpunk: '#06b6d4',
+  cyberpunk: '#00d9ff',
   sakura: '#ff6b9d',
 }
 
