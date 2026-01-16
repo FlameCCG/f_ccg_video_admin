@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
@@ -15,6 +15,7 @@ import {
 } from 'naive-ui'
 
 import { useAuthStore } from '@/stores/auth'
+import { getPublicSiteConfig } from '@/api/site'
 import SlideCaptcha from '@/components/captcha/SlideCaptcha.vue'
 import LanguageDropdown from '@/components/common/LanguageDropdown.vue'
 import ThemeDropdown from '@/components/common/ThemeDropdown.vue'
@@ -52,6 +53,9 @@ const captchaData = reactive({
 
 const showCaptchaModal = ref(false)
 
+/** 滑块验证码是否启用（默认 true，安全优先） */
+const slideCaptchaEnabled = ref(true)
+
 // ==================== 计算属性 ====================
 const isLoading = computed(() => authStore.isLoggingIn)
 
@@ -73,7 +77,24 @@ const rules: FormRules = {
   ],
 }
 
+// ==================== 生命周期 ====================
+onMounted(() => {
+  void fetchPublicSiteConfig()
+})
+
 // ==================== 方法 ====================
+
+/** 获取公开站点配置（无需认证） */
+async function fetchPublicSiteConfig(): Promise<void> {
+  try {
+    const config = await getPublicSiteConfig()
+    slideCaptchaEnabled.value = config.site.register.slideCaptcha ?? true
+  } catch {
+    // 获取配置失败时默认启用滑块验证码（安全优先）
+    slideCaptchaEnabled.value = true
+  }
+}
+
 function handleCaptchaConfirm(result: { token: string; x: number; y: number }): void {
   captchaData.token = result.token
   captchaData.x = result.x
@@ -97,8 +118,16 @@ function handleCaptchaRefresh(): void {
 async function handleLoginClick(): Promise<void> {
   try {
     await formRef.value?.validate()
-    showCaptchaModal.value = true
-    captchaRef.value?.refresh()
+
+    if (slideCaptchaEnabled.value) {
+      // 滑块验证码启用：弹出验证码弹窗
+      showCaptchaModal.value = true
+      captchaRef.value?.refresh()
+    } else {
+      // 滑块验证码关闭：直接登录
+      captchaData.verified = true
+      await doLogin()
+    }
   } catch {
     // 表单验证失败
   }
@@ -108,23 +137,36 @@ async function doLogin(): Promise<void> {
   if (!captchaData.verified) return
 
   try {
-    await authStore.login({
-      username: formData.username,
-      password: formData.password,
-      slideCaptchaToken: captchaData.token,
-      slideCaptchaX: captchaData.x,
-      slideCaptchaY: captchaData.y,
-    })
+    const loginParams = slideCaptchaEnabled.value
+      ? {
+          username: formData.username,
+          password: formData.password,
+          slideCaptchaToken: captchaData.token,
+          slideCaptchaX: captchaData.x,
+          slideCaptchaY: captchaData.y,
+        }
+      : {
+          username: formData.username,
+          password: formData.password,
+        }
+
+    await authStore.login(loginParams)
 
     message.success(t('auth.tips.loginSuccess'))
-    captchaRef.value?.success()
 
-    setTimeout(() => {
-      showCaptchaModal.value = false
+    if (slideCaptchaEnabled.value) {
+      captchaRef.value?.success()
+      setTimeout(() => {
+        showCaptchaModal.value = false
+        void router.push({ path: '/' })
+      }, 500)
+    } else {
       void router.push({ path: '/' })
-    }, 500)
+    }
   } catch (error: unknown) {
-    captchaRef.value?.fail()
+    if (slideCaptchaEnabled.value) {
+      captchaRef.value?.fail()
+    }
     captchaData.verified = false
     if (error instanceof Error) {
       message.error(error.message)

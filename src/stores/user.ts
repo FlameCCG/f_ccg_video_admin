@@ -43,8 +43,20 @@ export const useUserStore = defineStore('user', () => {
   /** 角色名列表 */
   const roleNames = computed(() => userInfo.value?.roleNames ?? [])
 
+  /** 角色映射表（角色ID -> 角色名） */
+  const roleMap = computed(() => userInfo.value?.roleMap ?? {})
+
+  /** 角色列表（用于切换，包含 ID 和名称） */
+  const roleList = computed(() => {
+    const map = roleMap.value
+    return Object.entries(map).map(([id, name]) => ({
+      id: Number(id),
+      name,
+    }))
+  })
+
   /** 是否有多个角色（可切换） */
-  const hasMultipleRoles = computed(() => roleNames.value.length > 1)
+  const hasMultipleRoles = computed(() => roleList.value.length > 1)
 
   // ==================== Actions ====================
 
@@ -125,6 +137,8 @@ export const useUserStore = defineStore('user', () => {
     email,
     currentRoleId,
     roleNames,
+    roleMap,
+    roleList,
     hasMultipleRoles,
 
     // Actions

@@ -50,6 +50,7 @@ import { useUserStore } from '@/stores/user'
 import { usePermissionStore } from '@/stores/permission'
 import { useAppStore } from '@/stores/app'
 import { WHITE_LIST_ROUTES } from './routes'
+import type { Menu } from '@/api/types'
 
 /**
  * 检查路由是否在白名单中
@@ -218,14 +219,43 @@ function checkRoutePermission(to: RouteLocationNormalized): boolean {
   }
 
   // 检查5：检查是否是动态添加的路由
-  const flatMenus = permissionStore.flatMenus
-  const hasAccess = flatMenus.some((m) => {
-    if (!m.path) return false
-    const menuFullPath = m.path.startsWith('/') ? m.path : `/${m.path}`
-    return to.path === menuFullPath || to.path.startsWith(menuFullPath + '/')
-  })
+  // 需要考虑子菜单的相对路径，构建完整路径进行匹配
+  const hasAccess = checkMenuPathRecursive(permissionStore.menus, to.path)
 
   return hasAccess
+}
+
+/**
+ * 递归检查菜单路径权限
+ * 处理子菜单的相对路径，构建完整路径进行匹配
+ */
+function checkMenuPathRecursive(menus: Menu[], targetPath: string, parentPath = ''): boolean {
+  for (const menu of menus) {
+    if (!menu.path) continue
+
+    // 构建完整路径
+    let fullPath: string
+    if (menu.path.startsWith('/')) {
+      fullPath = menu.path
+    } else if (parentPath) {
+      fullPath = `${parentPath}/${menu.path}`
+    } else {
+      fullPath = `/${menu.path}`
+    }
+
+    // 精确匹配或前缀匹配
+    if (targetPath === fullPath || targetPath.startsWith(fullPath + '/')) {
+      return true
+    }
+
+    // 递归检查子菜单
+    if (menu.children && menu.children.length > 0) {
+      if (checkMenuPathRecursive(menu.children, targetPath, fullPath)) {
+        return true
+      }
+    }
+  }
+  return false
 }
 
 /**
@@ -358,6 +388,19 @@ export function setupRouterGuard(router: Router): void {
     }
   })
 }
+
+/**
+ * ============================================================================
+ * 添加动态路由（导出供外部使用）
+ * ============================================================================
+ *
+ * 【调用时机】
+ * - 路由守卫在权限加载完成后调用
+ * - 切换角色后需要手动调用
+ *
+ * @param router Vue Router 实例
+ */
+export { addDynamicRoutes }
 
 /**
  * ============================================================================

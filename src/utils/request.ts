@@ -249,7 +249,8 @@ async function handleTokenError(config: AxiosRequestConfig): Promise<AxiosRespon
 
     return axios(retryConfig)
   } catch {
-    // 刷新失败，跳转登录
+    // 刷新失败，先清除 token 再跳转登录（防止循环刷新）
+    clearTokens()
     redirectToLogin()
     return Promise.reject(new BusinessError(1, '认证失败，请重新登录'))
   }
