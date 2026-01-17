@@ -159,9 +159,9 @@ async function handleViewRoleTree(roleId: number): Promise<void> {
   loadingRoleTree.value = true
 
   try {
-    const data = await getRoleInheritTreeById(roleId)
-    roleTreeData.value = data
-  } catch (error) {
+    const treeData = await getRoleInheritTreeById(roleId)
+    roleTreeData.value = treeData
+  } catch {
     message.error(t('common.tips.operationFailed'))
     roleTreeData.value = []
   } finally {
@@ -188,7 +188,7 @@ const renderLabel: TransferRenderSourceLabel = ({ option }) => {
       class: 'transfer-label-wrapper',
     },
     [
-      h('span', { class: 'transfer-label-text' }, option.label as string),
+      h('span', { class: 'transfer-label-text' }, String(option.label)),
       h(
         NTooltip,
         { trigger: 'hover' },
@@ -220,28 +220,31 @@ const renderLabel: TransferRenderSourceLabel = ({ option }) => {
 <template>
   <n-drawer :show="visible" :width="600" placement="right" @update:show="handleClose">
     <n-drawer-content :title="t('rbac.userRole.title')" :native-scrollbar="false" closable>
-      <template #header-extra>
-        <n-button v-if="showInheritTree" size="small" quaternary @click="handleBackToList">
-          <template #icon>
-            <n-icon>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M19 12H5" />
-                <path d="M12 19l-7-7 7-7" />
-              </svg>
-            </n-icon>
-          </template>
-          {{ t('common.back') }}
-        </n-button>
+      <template #header>
+        <div class="drawer-header-with-extra">
+          <span>{{ t('rbac.userRole.title') }}</span>
+          <n-button v-if="showInheritTree" size="small" quaternary @click="handleBackToList">
+            <template #icon>
+              <n-icon>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M19 12H5" />
+                  <path d="M12 19l-7-7 7-7" />
+                </svg>
+              </n-icon>
+            </template>
+            {{ t('common.back') }}
+          </n-button>
+        </div>
       </template>
 
       <n-spin :show="isLoading || loadingRoleTree">
@@ -322,5 +325,13 @@ const renderLabel: TransferRenderSourceLabel = ({ option }) => {
   &:hover {
     opacity: 1;
   }
+}
+
+.drawer-header-with-extra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--spacing-3);
 }
 </style>

@@ -126,7 +126,7 @@ watch(
   () => props.data,
   () => {
     setTimeout(() => {
-      fitView({ padding: 0.2 })
+      void fitView({ padding: 0.2 })
     }, 100)
   },
   { deep: true }
@@ -156,19 +156,18 @@ watch(
             :min-zoom="0.2"
             :max-zoom="2"
             fit-view-on-init
-            :fit-view-options="{ padding: 0.2 }"
           >
             <Background />
             <Controls />
 
             <!-- 自定义节点模板 -->
-            <template #node-default="{ data }">
+            <template #node-default="{ data: nodeData }">
               <div
                 class="role-flow-node"
-                :class="{ 'role-flow-node--highlighted': data.isHighlighted }"
+                :class="{ 'role-flow-node--highlighted': nodeData.isHighlighted }"
               >
-                <div class="role-flow-node__name">{{ data.label }}</div>
-                <div v-if="data.desc" class="role-flow-node__desc">{{ data.desc }}</div>
+                <div class="role-flow-node__name">{{ nodeData.label }}</div>
+                <div v-if="nodeData.desc" class="role-flow-node__desc">{{ nodeData.desc }}</div>
               </div>
             </template>
           </VueFlow>
@@ -277,7 +276,7 @@ watch(
   }
 
   svg {
-    fill: currentColor;
+    fill: currentcolor;
   }
 }
 

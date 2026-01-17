@@ -85,43 +85,43 @@ $themes: (
     'skeleton-highlight': #30363d,
   ),
   'cyberpunk': (
-    // 背景层级 - 深邃黑紫 + 霓虹点缀
-    'bg': #0a0118,
-    'bg-elevated': #120828,
-    'surface': #1a0f2e,
-    'surface-hover': #251640,
-    'surface-active': #2f1d52,
-    // 边框 - 霓虹紫青边框
-    'border': #3d2463,
-    'border-light': #2a1845,
-    'border-strong': #5b3a8f,
-    // 文字 - 高对比霓虹感
-    'text': #e0f2fe,
-    'text-secondary': #a5b4fc,
-    'text-muted': #818cf8,
-    'text-disabled': #4c1d95,
-    // 主色 - 霓虹青色（更亮）
-    'primary': #00d9ff,
-    'primary-hover': #33e3ff,
-    'primary-pressed': #00b8d4,
-    'primary-light': rgba(0, 217, 255, 0.2),
-    // 功能色 - 强烈霓虹风格
-    'success': #00ff9f,
+    // 背景层级 - 深邃科技黑蓝
+    'bg': #010b14,
+    'bg-elevated': #021220,
+    'surface': rgba(2, 18, 32, 0.9),
+    'surface-hover': rgba(4, 30, 50, 0.9),
+    'surface-active': rgba(6, 40, 70, 0.9),
+    // 边框 - 科技蓝青
+    'border': #00334d,
+    'border-light': #004d73,
+    'border-strong': #006699,
+    // 文字 - 高对比冷色
+    'text': #e0f7fa,
+    'text-secondary': #81d4fa,
+    'text-muted': #4fc3f7,
+    'text-disabled': #29b6f6,
+    // 主色 - 强力霓虹青
+    'primary': #00f3ff,
+    'primary-hover': #50f7ff,
+    'primary-pressed': #00c2cc,
+    'primary-light': rgba(0, 243, 255, 0.15),
+    // 功能色 - 赛博朋克 2077 风格
+    'success': #00ff9f, // 保持霓虹绿
     'success-hover': #33ffb8,
-    'success-light': rgba(0, 255, 159, 0.2),
-    'warning': #ffb800,
-    'warning-hover': #ffd000,
-    'warning-light': rgba(255, 184, 0, 0.2),
-    'danger': #ff0080,
-    'danger-hover': #ff33a1,
-    'danger-light': rgba(255, 0, 128, 0.2),
-    'info': #a855f7,
-    'info-hover': #c084fc,
-    'info-light': rgba(168, 85, 247, 0.2),
-    // 特殊 - 霓虹光晕效果
-    'overlay': rgba(10, 1, 24, 0.85),
-    'skeleton': #1a0f2e,
-    'skeleton-highlight': #2f1d52,
+    'success-light': rgba(0, 255, 159, 0.15),
+    'warning': #fcee0a, // 赛博黄
+    'warning-hover': #fff566,
+    'warning-light': rgba(252, 238, 10, 0.15),
+    'danger': #ff003c, // 赛博红
+    'danger-hover': #ff3366,
+    'danger-light': rgba(255, 0, 60, 0.15),
+    'info': #fcee0a, // 使用赛博黄作为辅助强调
+    'info-hover': #fff566,
+    'info-light': rgba(252, 238, 10, 0.15),
+    // 特殊
+    'overlay': rgba(1, 11, 20, 0.9),
+    'skeleton': #021220,
+    'skeleton-highlight': #041e32,
   ),
   'sakura': (
     // 背景层级 - 日系樱花粉

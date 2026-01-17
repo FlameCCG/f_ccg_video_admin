@@ -167,30 +167,33 @@ function handleRemoveInherit(parentRoleName: string): void {
 
 <template>
   <n-drawer :show="visible" :width="400" placement="right" @update:show="handleClose">
-    <n-drawer-content :title="t('rbac.role.inherit')" closable>
-      <template #header-extra>
-        <n-button size="small" quaternary @click="handleViewTree">
-          <template #icon>
-            <n-icon>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M12 3v18" />
-                <path d="M18 9H6" />
-                <path d="M18 15H6" />
-              </svg>
-            </n-icon>
-          </template>
-          {{ t('rbac.role.inheritTree.view') }}
-        </n-button>
+    <n-drawer-content closable>
+      <template #header>
+        <div class="drawer-header-with-extra">
+          <span>{{ t('rbac.role.inherit') }}</span>
+          <n-button size="small" quaternary @click="handleViewTree">
+            <template #icon>
+              <n-icon>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 3v18" />
+                  <path d="M18 9H6" />
+                  <path d="M18 15H6" />
+                </svg>
+              </n-icon>
+            </template>
+            {{ t('rbac.role.inheritTree.view') }}
+          </n-button>
+        </div>
       </template>
 
       <template v-if="role">
@@ -260,6 +263,14 @@ function handleRemoveInherit(parentRoleName: string): void {
 </template>
 
 <style scoped lang="scss">
+.drawer-header-with-extra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--spacing-3);
+}
+
 .role-inherit-drawer {
   &__current,
   &__add,

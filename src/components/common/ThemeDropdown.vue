@@ -26,22 +26,6 @@ const appStore = useAppStore()
 
 const currentTheme = computed(() => appStore.currentTheme)
 
-/** 涓婚棰滆壊鏄犲皠 */
-const themeColors: Record<ThemeName, string> = {
-  pearl: '#f8f9fa',
-  obsidian: '#0d1117',
-  cyberpunk: '#0a0118',
-  sakura: '#fff5f7',
-}
-
-/** 涓婚寮鸿皟鑹叉槧灏?*/
-const themeAccentColors: Record<ThemeName, string> = {
-  pearl: '#5c7cfa',
-  obsidian: '#7c8aff',
-  cyberpunk: '#00d9ff',
-  sakura: '#ff6b9d',
-}
-
 /** 鑾峰彇涓婚鏍囩 */
 function getThemeLabel(name: ThemeName): string {
   const key = `layout.theme.${name}` as const
@@ -74,7 +58,9 @@ function handleThemeChange(name: ThemeName): void {
         :title="t('layout.header.theme')"
       >
         <NIcon :size="size === 'small' ? 16 : 18" class="theme-trigger__icon">
+          <!-- Pearl: Sun -->
           <svg
+            v-if="currentTheme === 'pearl'"
             xmlns="http://www.w3.org/2000/svg"
             width="1em"
             height="1em"
@@ -94,6 +80,54 @@ function handleThemeChange(name: ThemeName): void {
             <line x1="21" y1="12" x2="23" y2="12" />
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+          <!-- Obsidian: Moon -->
+          <svg
+            v-else-if="currentTheme === 'obsidian'"
+            xmlns="http://www.w3.org/2000/svg"
+            width="1em"
+            height="1em"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+          <!-- Cyberpunk: Hexagon/Chip -->
+          <svg
+            v-else-if="currentTheme === 'cyberpunk'"
+            xmlns="http://www.w3.org/2000/svg"
+            width="1em"
+            height="1em"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
+          <!-- Sakura: Flower -->
+          <svg
+            v-else-if="currentTheme === 'sakura'"
+            xmlns="http://www.w3.org/2000/svg"
+            width="1em"
+            height="1em"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+            />
+            <circle cx="12" cy="12" r="3" />
           </svg>
         </NIcon>
         <span v-if="showLabel" class="theme-trigger__label">
@@ -126,17 +160,74 @@ function handleThemeChange(name: ThemeName): void {
           :class="{ 'is-active': currentTheme === config.name }"
           @click="handleThemeChange(config.name)"
         >
-          <span
-            class="theme-preview"
-            :style="{
-              backgroundColor: themeColors[config.name],
-              borderColor: themeAccentColors[config.name],
-            }"
-          >
-            <span
-              class="theme-accent"
-              :style="{ backgroundColor: themeAccentColors[config.name] }"
-            />
+          <span class="dropdown-option__icon">
+            <svg
+              v-if="config.name === 'pearl'"
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+            <svg
+              v-else-if="config.name === 'obsidian'"
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+            <svg
+              v-else-if="config.name === 'cyberpunk'"
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+            <svg
+              v-else-if="config.name === 'sakura'"
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+              />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
           </span>
           <span class="dropdown-option__name">{{ getThemeLabel(config.name) }}</span>
           <svg
@@ -268,23 +359,5 @@ function handleThemeChange(name: ThemeName): void {
     flex-shrink: 0;
     color: var(--color-primary);
   }
-}
-
-.theme-preview {
-  position: relative;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
-  border: 2px solid;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.theme-accent {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
 }
 </style>

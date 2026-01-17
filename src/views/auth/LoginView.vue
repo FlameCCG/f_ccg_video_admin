@@ -757,24 +757,27 @@ function handleEnterSubmit(): void {
 [data-theme='cyberpunk'] {
   .login-page {
     &__brand {
-      background: #050510;
+      background: #010b14;
+      position: relative;
+      overflow: hidden;
 
       // 透视网格地面
       &::before {
         content: '';
         position: absolute;
-        bottom: -100%;
+        bottom: -50%;
         left: -50%;
         right: -50%;
-        height: 200%;
+        height: 100%;
         background-image:
-          linear-gradient(rgba(217, 70, 239, 0.4) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(217, 70, 239, 0.4) 1px, transparent 1px);
-        background-size: 60px 60px;
+          linear-gradient(rgba(0, 243, 255, 0.2) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 243, 255, 0.2) 1px, transparent 1px);
+        background-size: 40px 40px;
         transform: perspective(500px) rotateX(60deg);
         transform-origin: center top;
-        animation: cyber-grid 20s linear infinite;
-        mask-image: linear-gradient(to top, black 0%, transparent 70%);
+        animation: cyber-grid 10s linear infinite;
+        mask-image: linear-gradient(to top, black 0%, transparent 80%);
+        box-shadow: 0 0 100px rgba(0, 243, 255, 0.2);
       }
 
       // 扫描线
@@ -786,32 +789,245 @@ function handleEnterSubmit(): void {
           0deg,
           transparent,
           transparent 2px,
-          rgba(0, 212, 255, 0.03) 2px,
-          rgba(0, 212, 255, 0.03) 4px
+          rgba(0, 243, 255, 0.05) 2px,
+          rgba(0, 243, 255, 0.05) 4px
         );
         pointer-events: none;
         z-index: 5;
       }
     }
 
-    &__brand-bg {
-      z-index: 2;
+    &__brand-title {
+      position: relative;
+      color: var(--color-primary);
+      text-shadow:
+        2px 2px 0 var(--color-danger),
+        -2px -2px 0 var(--color-warning);
+      animation: glitch 3s infinite;
+
+      &::before,
+      &::after {
+        content: attr(data-text);
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #010b14;
+      }
+
+      &::before {
+        left: 2px;
+        text-shadow: -1px 0 #ff00c1;
+        clip-path: inset(44px 0 calc(100% - 56px) 0);
+        animation: glitch-anim 5s infinite linear alternate-reverse;
+      }
+
+      &::after {
+        left: -2px;
+        text-shadow: -1px 0 #fcee0a;
+        clip-path: inset(44px 0 calc(100% - 56px) 0);
+        animation: glitch-anim2 5s infinite linear alternate-reverse;
+      }
     }
 
+    &__brand-logo {
+      border-color: var(--color-primary);
+      box-shadow:
+        0 0 20px var(--color-primary-light),
+        inset 0 0 20px var(--color-primary-light);
+      background: rgba(0, 243, 255, 0.05);
+
+      svg {
+        filter: drop-shadow(0 0 10px var(--color-primary));
+      }
+    }
+
+    &__form-inner {
+      background: rgba(2, 18, 32, 0.85);
+      border: 1px solid var(--color-primary);
+      box-shadow:
+        0 0 30px rgba(0, 243, 255, 0.1),
+        inset 0 0 20px rgba(0, 243, 255, 0.05);
+      position: relative;
+      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+
+      // HUD Corner Accents
+      &::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        width: 20px;
+        height: 20px;
+        border-top: 2px solid var(--color-warning);
+        border-left: 2px solid var(--color-warning);
+      }
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        width: 20px;
+        height: 20px;
+        border-bottom: 2px solid var(--color-warning);
+        border-right: 2px solid var(--color-warning);
+      }
+    }
+
+    &__input {
+      :deep(.n-input) {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--color-border);
+        color: var(--color-primary);
+
+        &:hover,
+        &:focus-within {
+          border-color: var(--color-warning);
+          box-shadow: 0 0 15px rgba(252, 238, 10, 0.2);
+          background: rgba(252, 238, 10, 0.05);
+        }
+      }
+    }
+
+    &__submit-btn {
+      background: var(--color-warning);
+      color: #000;
+      font-weight: 800;
+      border: none;
+      box-shadow: 0 0 20px rgba(252, 238, 10, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      clip-path: polygon(
+        10px 0,
+        100% 0,
+        100% calc(100% - 10px),
+        calc(100% - 10px) 100%,
+        0 100%,
+        0 10px
+      );
+
+      &:hover {
+        background: #fff566;
+        box-shadow: 0 0 30px var(--color-warning);
+        transform: scale(1.02);
+      }
+    }
+  }
+}
+
+@keyframes cyber-grid {
+  0% {
+    transform: perspective(500px) rotateX(60deg) translateY(0);
+  }
+
+  100% {
+    transform: perspective(500px) rotateX(60deg) translateY(40px);
+  }
+}
+
+@keyframes glitch {
+  0% {
+    text-shadow:
+      2px 2px 0 var(--color-danger),
+      -2px -2px 0 var(--color-info);
+  }
+
+  25% {
+    text-shadow:
+      -2px 2px 0 var(--color-danger),
+      2px -2px 0 var(--color-info);
+  }
+
+  50% {
+    text-shadow:
+      2px -2px 0 var(--color-danger),
+      -2px 2px 0 var(--color-info);
+  }
+
+  75% {
+    text-shadow:
+      -2px -2px 0 var(--color-danger),
+      2px 2px 0 var(--color-info);
+  }
+
+  100% {
+    text-shadow:
+      2px 2px 0 var(--color-danger),
+      -2px -2px 0 var(--color-info);
+  }
+}
+
+@keyframes glitch-anim {
+  0% {
+    clip-path: inset(24px 0 calc(100% - 90px) 0);
+  }
+
+  20% {
+    clip-path: inset(65px 0 calc(100% - 12px) 0);
+  }
+
+  40% {
+    clip-path: inset(89px 0 calc(100% - 5px) 0);
+  }
+
+  60% {
+    clip-path: inset(12px 0 calc(100% - 67px) 0);
+  }
+
+  80% {
+    clip-path: inset(45px 0 calc(100% - 34px) 0);
+  }
+
+  100% {
+    clip-path: inset(78px 0 calc(100% - 89px) 0);
+  }
+}
+
+@keyframes glitch-anim2 {
+  0% {
+    clip-path: inset(12px 0 calc(100% - 45px) 0);
+  }
+
+  20% {
+    clip-path: inset(89px 0 calc(100% - 23px) 0);
+  }
+
+  40% {
+    clip-path: inset(34px 0 calc(100% - 67px) 0);
+  }
+
+  60% {
+    clip-path: inset(67px 0 calc(100% - 12px) 0);
+  }
+
+  80% {
+    clip-path: inset(23px 0 calc(100% - 89px) 0);
+  }
+
+  100% {
+    clip-path: inset(45px 0 calc(100% - 34px) 0);
+  }
+}
+
+// Cyberpunk 主题 - 额外样式覆盖
+[data-theme='cyberpunk'] {
+  .login-page {
     &__orb {
       filter: blur(100px);
       opacity: 0.5;
 
       &--1 {
-        background: #d946ef;
+        background: #00f3ff; // Cyan
       }
 
       &--2 {
-        background: #00d4ff;
+        background: #fcee0a; // Yellow
       }
 
       &--3 {
-        background: #00ff9d;
+        background: #ff003c; // Red
         opacity: 0.3;
       }
     }
@@ -825,11 +1041,11 @@ function handleEnterSubmit(): void {
     }
 
     &__brand-logo {
-      background: rgba(217, 70, 239, 0.15);
-      border-color: rgba(217, 70, 239, 0.5);
+      background: rgba(0, 243, 255, 0.1);
+      border-color: rgba(0, 243, 255, 0.5);
       box-shadow:
-        0 0 30px rgba(217, 70, 239, 0.3),
-        inset 0 0 20px rgba(217, 70, 239, 0.1);
+        0 0 30px rgba(0, 243, 255, 0.2),
+        inset 0 0 20px rgba(0, 243, 255, 0.1);
 
       // 角标装饰
       &::before,
@@ -838,7 +1054,7 @@ function handleEnterSubmit(): void {
         position: absolute;
         width: 12px;
         height: 12px;
-        border: 2px solid #00d4ff;
+        border: 2px solid #fcee0a;
       }
 
       &::before {
@@ -856,8 +1072,8 @@ function handleEnterSubmit(): void {
       }
 
       svg {
-        color: #d946ef;
-        filter: drop-shadow(0 0 10px #d946ef);
+        color: #00f3ff;
+        filter: drop-shadow(0 0 10px #00f3ff);
       }
     }
 
@@ -866,32 +1082,32 @@ function handleEnterSubmit(): void {
       text-transform: uppercase;
       letter-spacing: 0.15em;
       font-size: 2.5rem;
-      background: linear-gradient(180deg, #fff 0%, #d946ef 100%);
+      background: linear-gradient(180deg, #fff 0%, #00f3ff 100%);
       background-clip: text;
       -webkit-text-fill-color: transparent;
       text-shadow: none;
-      filter: drop-shadow(0 0 20px rgba(217, 70, 239, 0.5));
+      filter: drop-shadow(0 0 20px rgba(0, 243, 255, 0.5));
     }
 
     &__brand-desc {
-      color: rgba(224, 224, 255, 0.7);
+      color: rgba(224, 247, 250, 0.7);
     }
 
     &__brand-version {
-      color: rgba(0, 212, 255, 0.6);
+      color: rgba(252, 238, 10, 0.6);
     }
 
     // 表单区域
     &__form-section {
-      background: #050510;
+      background: #010b14;
 
       &::before {
         content: '';
         position: absolute;
         inset: 0;
         background-image:
-          linear-gradient(rgba(42, 42, 90, 0.15) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(42, 42, 90, 0.15) 1px, transparent 1px);
+          linear-gradient(rgba(0, 51, 77, 0.2) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 51, 77, 0.2) 1px, transparent 1px);
         background-size: 40px 40px;
         pointer-events: none;
       }
@@ -899,24 +1115,24 @@ function handleEnterSubmit(): void {
 
     // 流光边框 - 霓虹效果
     &__glow-border {
-      background: linear-gradient(135deg, rgba(217, 70, 239, 0.3), rgba(0, 212, 255, 0.3));
+      background: linear-gradient(135deg, rgba(0, 243, 255, 0.3), rgba(252, 238, 10, 0.3));
       padding: 2px;
 
       &::before {
-        background: rgba(19, 19, 43, 0.95);
+        background: rgba(2, 18, 32, 0.95);
       }
     }
 
     &__glow-line {
       width: 100px;
       height: 100px;
-      background: linear-gradient(90deg, #d946ef, #00d4ff);
+      background: linear-gradient(90deg, #00f3ff, #fcee0a);
       filter: blur(25px);
       opacity: 0.8;
     }
 
     &__form-inner {
-      background: rgba(19, 19, 43, 0.9);
+      background: rgba(2, 18, 32, 0.9);
       backdrop-filter: blur(20px);
     }
 
@@ -927,28 +1143,28 @@ function handleEnterSubmit(): void {
 
     &__input {
       :deep(.n-input) {
-        background-color: rgba(5, 5, 16, 0.6);
-        border-color: rgba(42, 42, 90, 0.8);
+        background-color: rgba(2, 12, 22, 0.6);
+        border-color: rgba(0, 51, 77, 0.8);
 
         &:hover,
         &:focus-within {
-          border-color: #d946ef;
-          box-shadow: 0 0 20px rgba(217, 70, 239, 0.15);
-          background-color: rgba(5, 5, 16, 0.9);
+          border-color: #fcee0a;
+          box-shadow: 0 0 20px rgba(252, 238, 10, 0.15);
+          background-color: rgba(2, 12, 22, 0.9);
         }
       }
     }
 
     &__submit-btn {
-      background: linear-gradient(90deg, #d946ef, #c026d3);
-      border: 1px solid rgba(240, 171, 252, 0.3);
+      background: linear-gradient(90deg, #fcee0a, #d4c808);
+      border: 1px solid rgba(252, 238, 10, 0.3);
       text-transform: uppercase;
       letter-spacing: 0.1em;
       font-family: Orbitron, Rajdhani, sans-serif;
 
       &:hover {
-        background: linear-gradient(90deg, #f0abfc, #d946ef);
-        box-shadow: 0 0 30px rgba(217, 70, 239, 0.4);
+        background: linear-gradient(90deg, #fff566, #fcee0a);
+        box-shadow: 0 0 30px rgba(252, 238, 10, 0.4);
       }
     }
   }
