@@ -161,6 +161,12 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     key: 'coinCount',
     width: 100,
     align: 'right',
+    render: (row) => {
+      const count = Number(row.coinCount)
+      return isNaN(count)
+        ? '-'
+        : count.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+    },
   },
   {
     title: t('user.list.roles'),
