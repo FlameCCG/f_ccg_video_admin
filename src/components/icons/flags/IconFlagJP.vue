@@ -1,0 +1,6 @@
+<template>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 24">
+    <rect width="32" height="24" fill="#fff" />
+    <circle cx="16" cy="12" r="7" fill="#bc002d" />
+  </svg>
+</template>
