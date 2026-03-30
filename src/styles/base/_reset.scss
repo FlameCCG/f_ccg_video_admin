@@ -1,0 +1,86 @@
+// Base Reset Styles
+// 基础重置样式
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizelegibility;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-full);
+
+  &:hover {
+    background: var(--color-text-muted);
+  }
+}
+
+// 选中文本样式
+::selection {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+// 焦点样式
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+// 链接样式
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--easing-ease-out);
+
+  &:hover {
+    color: var(--color-primary-hover);
+  }
+}
+
+// 图片
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+// 按钮重置
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+// 输入框重置
+input,
+textarea,
+select {
+  font-family: inherit;
+}
