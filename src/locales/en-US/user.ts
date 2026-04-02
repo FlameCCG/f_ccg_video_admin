@@ -1,0 +1,83 @@
+/**
+ * English - User Management Module
+ */
+export default {
+  title: 'User Management',
+  banRecords: {
+    title: 'Ban Records',
+  },
+  list: {
+    title: 'User List',
+    avatar: 'Avatar',
+    username: 'Username',
+    email: 'Email',
+    status: 'Status',
+    level: 'Level',
+    exp: 'Experience',
+    coin: 'Coins',
+    roles: 'Roles',
+    registerSource: 'Register Source',
+    registerTime: 'Register Time',
+  },
+  status: {
+    normal: 'Normal',
+    banned: 'Banned',
+    permanentBan: 'Permanently Banned',
+  },
+  filter: {
+    keyword: 'Username/Email',
+    keywordPlaceholder: 'Enter username or email',
+    status: 'User Status',
+    statusPlaceholder: 'Select status',
+    role: 'User Role',
+    rolePlaceholder: 'Select role',
+  },
+  edit: {
+    title: 'Edit User',
+    username: 'Username',
+    usernameLength: 'Username must be 2-20 characters',
+    email: 'Email',
+    avatar: 'Avatar',
+    description: 'Bio',
+    gender: 'Gender',
+    birthday: 'Birthday',
+    genderOptions: {
+      unknown: 'Not specified',
+      male: 'Male',
+      female: 'Female',
+    },
+  },
+  ban: {
+    title: 'Ban User',
+    unbanTitle: 'Unban User',
+    duration: 'Ban Duration',
+    durationPlaceholder: 'Enter ban duration in days',
+    durationUnit: 'days',
+    daysRequired: 'Please enter a valid ban duration (1-3650 days)',
+    permanent: 'Permanent Ban',
+    permanentWarning:
+      'After permanent ban, this user will not be able to log in. Please proceed with caution!',
+    reason: 'Ban Reason',
+    reasonPlaceholder: 'Enter ban reason',
+    confirmBan: 'Are you sure you want to ban this user?',
+    confirmUnban: 'Are you sure you want to unban this user?',
+    banSuccess: 'User banned successfully',
+    unbanSuccess: 'User unbanned successfully',
+  },
+  banRecord: {
+    title: 'Ban Records',
+    userId: 'User ID',
+    username: 'Username',
+    duration: 'Duration',
+    reason: 'Reason',
+    operator: 'Operator',
+    banTime: 'Ban Time',
+    expireTime: 'Expire Time',
+    status: 'Status',
+    statusOptions: {
+      active: 'Active',
+      expired: 'Expired',
+      cancelled: 'Cancelled',
+    },
+  },
+}
