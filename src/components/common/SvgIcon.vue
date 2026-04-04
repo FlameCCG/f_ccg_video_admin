@@ -20,6 +20,30 @@ const props = withDefaults(defineProps<Props>(), {
   color: 'currentColor',
 })
 
+/**
+ * 清理并安全过滤 SVG 字符串以防范 XSS
+ */
+function sanitizeSvg(svg: string): string {
+  // 1. 移除 script 标签
+  let clean = svg.replace(/<script\b[\s\S]*?<\/script>/gi, '')
+  clean = clean.replace(/<script\b[^>]*\/>/gi, '')
+
+  // 2. 移除 onload 等事件处理器以及 javascript: 伪协议
+  clean = clean.replace(
+    /(<[a-zA-Z0-9:-]+)([^>]*)(>)/g,
+    (_match: string, tagStart: string, attrs: string, tagEnd: string) => {
+      const sanitizedAttrs = attrs.replace(/\s*on[a-zA-Z]+\s*=\s*(['"][^'"]*['"]|[^\s>]+)/gi, '')
+      const finalAttrs = sanitizedAttrs.replace(
+        /\s*(href|xlink:href)\s*=\s*(['"]\s*javascript:[^'"]*['"]|[^\s>]*javascript:[^\s>]*)/gi,
+        ''
+      )
+      return `${tagStart}${finalAttrs}${tagEnd}`
+    }
+  )
+
+  return clean
+}
+
 /** 处理后的 SVG 字符串 */
 const processedSvg = computed(() => {
   if (!props.svg) return ''
@@ -55,7 +79,7 @@ const processedSvg = computed(() => {
   // 插入 style 属性
   svg = svg.replace('<svg', `<svg ${styleAttr}`)
 
-  return svg
+  return sanitizeSvg(svg)
 })
 
 /** 是否有有效的 SVG */

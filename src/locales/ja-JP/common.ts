@@ -78,6 +78,7 @@ export default {
     serverError: 'サーバーエラーが発生しました。後でもう一度お試しください',
     sessionExpired: 'セッションが期限切れです。再度ログインしてください',
     selectAtLeastOne: '少なくとも1つ選択してください',
+    selectedActionSummary: '{count}件を選択中です。「{action}」を実行します。',
     noChanges: '変更なし',
   },
 
@@ -208,4 +209,14 @@ export default {
 
   // その他
   comingSoon: '近日公開予定',
+
+  // ホーム画面デモテキスト
+  home: {
+    themeDemo: 'Design Tokensとテーマシステムのデモ',
+    currentTheme: '現在のテーマ: {theme}',
+    dark: 'ダーク',
+    light: 'ライト',
+    selectTheme: 'テーマを選択:',
+    toggleTheme: 'ダーク/ライトの切り替え',
+  },
 }

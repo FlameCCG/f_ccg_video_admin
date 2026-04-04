@@ -6,12 +6,12 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { usePreferredDark, useStorage } from '@vueuse/core'
 import type { LocaleType } from '@/locales'
-import { localeConfigs, DEFAULT_LOCALE, LOCALE_STORAGE_KEY } from '@/locales'
+import { localeConfigs, LOCALE_STORAGE_KEY, getInitialLocale } from '@/locales'
 
 /**
  * 主题名称类型
  */
-export type ThemeName = 'pearl' | 'obsidian' | 'aurum' | 'sakura'
+export type ThemeName = 'pearl' | 'obsidian' | 'cyberpunk' | 'sakura'
 
 /**
  * 主题配置接口
@@ -22,6 +22,8 @@ export interface ThemeConfig {
   labelZh: string
   labelJa: string
   isDark: boolean
+  /** 主题代表色（下拉图标等展示用，与 tokens/_colors.scss 主色一致） */
+  accent: string
 }
 
 /**
@@ -34,6 +36,7 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '珍珠白',
     labelJa: 'パール',
     isDark: false,
+    accent: '#5c7cfa',
   },
   {
     name: 'obsidian',
@@ -41,13 +44,15 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '黑曜石',
     labelJa: 'オブシディアン',
     isDark: true,
+    accent: '#7c8aff',
   },
   {
-    name: 'aurum',
-    label: 'Aurum',
-    labelZh: '鎏金',
-    labelJa: 'オーラム',
+    name: 'cyberpunk',
+    label: 'Cyberpunk',
+    labelZh: '赛博朋克',
+    labelJa: 'サイバーパンク',
     isDark: true,
+    accent: '#00f3ff',
   },
   {
     name: 'sakura',
@@ -55,6 +60,7 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '樱',
     labelJa: 'サクラ',
     isDark: false,
+    accent: '#ff6b9d',
   },
 ]
 
@@ -75,29 +81,6 @@ export function getThemeConfig(themeName: ThemeName): ThemeConfig | undefined {
  */
 function applyTheme(themeName: ThemeName): void {
   document.documentElement.setAttribute('data-theme', themeName)
-}
-
-/**
- * 获取浏览器语言
- */
-function getBrowserLocale(): LocaleType {
-  const browserLang = navigator.language
-  if (browserLang.startsWith('zh')) return 'zh-CN'
-  if (browserLang.startsWith('ja')) return 'ja-JP'
-  if (browserLang.startsWith('en')) return 'en-US'
-  return DEFAULT_LOCALE
-}
-
-/**
- * 获取初始语言
- * 优先级: localStorage > 浏览器语言 > 默认语言
- */
-function getInitialLocale(): LocaleType {
-  const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
-  if (stored && localeConfigs.some((c) => c.locale === stored)) {
-    return stored as LocaleType
-  }
-  return getBrowserLocale()
 }
 
 /**
@@ -136,7 +119,7 @@ export const useAppStore = defineStore('app', () => {
 
   /**
    * 切换深色/浅色主题
-   * 深色主题之间切换：obsidian <-> aurum
+   * 深色主题之间切换：obsidian <-> cyberpunk
    * 浅色主题之间切换：pearl <-> sakura
    */
   function toggleDark(): void {
@@ -145,7 +128,7 @@ export const useAppStore = defineStore('app', () => {
       setTheme(currentTheme.value === 'obsidian' ? 'pearl' : 'sakura')
     } else {
       // 当前是浅色，切换到深色
-      setTheme(currentTheme.value === 'pearl' ? 'obsidian' : 'aurum')
+      setTheme(currentTheme.value === 'pearl' ? 'obsidian' : 'cyberpunk')
     }
   }
 

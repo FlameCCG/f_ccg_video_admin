@@ -78,6 +78,7 @@ export default {
     serverError: '服务器错误，请稍后重试',
     sessionExpired: '会话已过期，请重新登录',
     selectAtLeastOne: '请至少选择一项',
+    selectedActionSummary: '当前已勾选 {count} 项，将执行“{action}”操作。',
     noChanges: '没有变更',
   },
 
@@ -208,4 +209,14 @@ export default {
 
   // 其他
   comingSoon: '功能开发中，敬请期待',
+
+  // 首页演示文案
+  home: {
+    themeDemo: 'Design Tokens 与主题系统演示',
+    currentTheme: '当前主题: {theme}',
+    dark: '深色',
+    light: '浅色',
+    selectTheme: '选择主题:',
+    toggleTheme: '切换深色/浅色',
+  },
 }

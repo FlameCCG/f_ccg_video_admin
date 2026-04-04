@@ -1,13 +1,26 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { NButton, NCard, NSpace, NSelect, NH1, NText, NDivider } from 'naive-ui'
 import { useTheme, themeConfigs, type ThemeName } from '@/composables'
 
+const { t } = useI18n()
 const { currentTheme, setTheme, toggleDark, isDark } = useTheme()
 
-const themeOptions = themeConfigs.map((t) => ({
-  label: `${t.labelZh} (${t.label})`,
-  value: t.name,
-}))
+const themeOptions = computed(() => {
+  return themeConfigs.map((tConf) => {
+    let localizedLabel = tConf.label
+    try {
+      localizedLabel = t(`layout.theme.${tConf.name}`)
+    } catch {
+      // Fallback to default label if translation fails
+    }
+    return {
+      label: `${localizedLabel} (${tConf.label})`,
+      value: tConf.name,
+    }
+  })
+})
 
 const handleThemeChange = (value: ThemeName) => {
   setTheme(value)
@@ -17,21 +30,27 @@ const handleThemeChange = (value: ThemeName) => {
 <template>
   <div class="home-view">
     <NCard class="demo-card">
-      <NH1>Design Tokens 与主题系统演示</NH1>
-      <NText depth="3">当前主题: {{ currentTheme }} ({{ isDark ? '深色' : '浅色' }})</NText>
+      <NH1>{{ t('common.home.themeDemo') }}</NH1>
+      <NText depth="3">
+        {{
+          t('common.home.currentTheme', {
+            theme: `${currentTheme} (${isDark ? t('common.home.dark') : t('common.home.light')})`,
+          })
+        }}
+      </NText>
 
       <NDivider />
 
       <NSpace vertical size="large">
         <NSpace align="center">
-          <NText>选择主题:</NText>
+          <NText>{{ t('common.home.selectTheme') }}</NText>
           <NSelect
             :value="currentTheme"
             :options="themeOptions"
             style="width: 200px"
             @update:value="handleThemeChange"
           />
-          <NButton @click="toggleDark">切换深色/浅色</NButton>
+          <NButton @click="toggleDark">{{ t('common.home.toggleTheme') }}</NButton>
         </NSpace>
 
         <NDivider />

@@ -22,24 +22,36 @@ describe('app store', () => {
       expect(themeConfigs.length).toBe(4)
     })
 
-    it('should have pearl, obsidian, aurum, and sakura themes', () => {
+    it('should have pearl, obsidian, cyberpunk, and sakura themes', () => {
       const themeNames = themeConfigs.map((t) => t.name)
       expect(themeNames).toContain('pearl')
       expect(themeNames).toContain('obsidian')
-      expect(themeNames).toContain('aurum')
+      expect(themeNames).toContain('cyberpunk')
       expect(themeNames).toContain('sakura')
     })
 
     it('should have correct isDark values', () => {
       const pearl = themeConfigs.find((t) => t.name === 'pearl')
       const obsidian = themeConfigs.find((t) => t.name === 'obsidian')
-      const aurum = themeConfigs.find((t) => t.name === 'aurum')
+      const cyberpunk = themeConfigs.find((t) => t.name === 'cyberpunk')
       const sakura = themeConfigs.find((t) => t.name === 'sakura')
 
       expect(pearl?.isDark).toBe(false)
       expect(obsidian?.isDark).toBe(true)
-      expect(aurum?.isDark).toBe(true)
+      expect(cyberpunk?.isDark).toBe(true)
       expect(sakura?.isDark).toBe(false)
+    })
+
+    it('should expose accent colors for theme icons', () => {
+      const pearl = themeConfigs.find((t) => t.name === 'pearl')
+      const obsidian = themeConfigs.find((t) => t.name === 'obsidian')
+      const cyberpunk = themeConfigs.find((t) => t.name === 'cyberpunk')
+      const sakura = themeConfigs.find((t) => t.name === 'sakura')
+
+      expect(pearl?.accent).toBe('#5c7cfa')
+      expect(obsidian?.accent).toBe('#7c8aff')
+      expect(cyberpunk?.accent).toBe('#00f3ff')
+      expect(sakura?.accent).toBe('#ff6b9d')
     })
   })
 

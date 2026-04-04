@@ -79,6 +79,7 @@ export default {
     serverError: 'Server error, please try again later',
     sessionExpired: 'Session expired, please log in again',
     selectAtLeastOne: 'Please select at least one item',
+    selectedActionSummary: '{count} items selected. This will perform "{action}".',
     noChanges: 'No changes',
   },
 
@@ -209,4 +210,14 @@ export default {
 
   // Other
   comingSoon: 'Coming soon',
+
+  // Home view demonstration text
+  home: {
+    themeDemo: 'Design Tokens & Theme System Demonstration',
+    currentTheme: 'Current Theme: {theme}',
+    dark: 'Dark',
+    light: 'Light',
+    selectTheme: 'Select Theme:',
+    toggleTheme: 'Toggle Dark/Light',
+  },
 }
