@@ -4,7 +4,7 @@
  * 鏀寔 hover 灞曞紑锛屽甫鏂囧瓧 A 鍥炬爣
  * 鍙湪鐧诲綍椤靛拰甯冨眬澶撮儴澶嶇敤
  */
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
 import { NPopover, NIcon } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useLocale, type LocaleType } from '@/composables/useLocale'
@@ -14,9 +14,9 @@ import IconFlagUS from '@/components/icons/flags/IconFlagUS.vue'
 import IconFlagJP from '@/components/icons/flags/IconFlagJP.vue'
 
 interface Props {
-  /** 鏄惁鏄剧ず褰撳墠璇█鍚嶇О */
+  /** 是否显示当前语言名称 */
   showLabel?: boolean
-  /** 鎸夐挳澶у皬 */
+  /** 按钮大小 */
   size?: 'small' | 'medium' | 'large'
 }
 
@@ -28,20 +28,20 @@ withDefaults(defineProps<Props>(), {
 const { t } = useI18n()
 const { currentLocale, localeConfigs, setLocale } = useLocale()
 
-/** 褰撳墠璇█閰嶇疆 */
+/** 当前语言配置 */
 const currentConfig = computed(() => {
   return localeConfigs.find((c) => c.locale === currentLocale.value)
 })
 
-/** 鑾峰彇鍥芥棗鍥炬爣缁勪欢 */
-function getFlagIcon(locale: string) {
+/** 获取国旗图标组件 */
+function getFlagIcon(locale: string): Component | null {
   switch (locale) {
     case 'zh-CN':
-      return IconFlagCN
+      return IconFlagCN as unknown as Component
     case 'en-US':
-      return IconFlagUS
+      return IconFlagUS as unknown as Component
     case 'ja-JP':
-      return IconFlagJP
+      return IconFlagJP as unknown as Component
     default:
       return null
   }
