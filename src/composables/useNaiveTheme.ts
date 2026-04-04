@@ -1,588 +1,18 @@
 import { computed } from 'vue'
 import { darkTheme, type GlobalThemeOverrides } from 'naive-ui'
-import { useTheme, type ThemeName } from './useTheme'
+import { useTheme } from './useTheme'
 
 /**
  * 获取 CSS Variable 的实际值
  */
 function getCssVar(name: string): string {
+  if (typeof window === 'undefined') return ''
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
 /**
- * 各主题的 Naive UI GlobalThemeOverrides 配置
- * 与 Design Tokens 对齐
- */
-const themeOverridesMap: Record<ThemeName, GlobalThemeOverrides> = {
-  pearl: {
-    common: {
-      primaryColor: '#4f46e5',
-      primaryColorHover: '#4338ca',
-      primaryColorPressed: '#3730a3',
-      primaryColorSuppl: '#4f46e5',
-      infoColor: '#3b82f6',
-      infoColorHover: '#2563eb',
-      infoColorPressed: '#1d4ed8',
-      infoColorSuppl: '#3b82f6',
-      successColor: '#10b981',
-      successColorHover: '#059669',
-      successColorPressed: '#047857',
-      successColorSuppl: '#10b981',
-      warningColor: '#f59e0b',
-      warningColorHover: '#d97706',
-      warningColorPressed: '#b45309',
-      warningColorSuppl: '#f59e0b',
-      errorColor: '#ef4444',
-      errorColorHover: '#dc2626',
-      errorColorPressed: '#b91c1c',
-      errorColorSuppl: '#ef4444',
-      textColorBase: '#1a1a1a',
-      textColor1: '#1a1a1a',
-      textColor2: '#525252',
-      textColor3: '#a3a3a3',
-      textColorDisabled: '#d4d4d4',
-      placeholderColor: '#a3a3a3',
-      placeholderColorDisabled: '#d4d4d4',
-      iconColor: '#525252',
-      iconColorHover: '#1a1a1a',
-      iconColorPressed: '#1a1a1a',
-      iconColorDisabled: '#d4d4d4',
-      dividerColor: '#e5e5e5',
-      borderColor: '#e5e5e5',
-      closeIconColor: '#a3a3a3',
-      closeIconColorHover: '#525252',
-      closeIconColorPressed: '#1a1a1a',
-      closeColorHover: 'rgba(0, 0, 0, 0.06)',
-      closeColorPressed: 'rgba(0, 0, 0, 0.1)',
-      clearColor: '#a3a3a3',
-      clearColorHover: '#525252',
-      clearColorPressed: '#1a1a1a',
-      scrollbarColor: 'rgba(0, 0, 0, 0.2)',
-      scrollbarColorHover: 'rgba(0, 0, 0, 0.3)',
-      progressRailColor: '#e5e5e5',
-      railColor: '#e5e5e5',
-      popoverColor: '#ffffff',
-      tableColor: '#ffffff',
-      cardColor: '#ffffff',
-      modalColor: '#ffffff',
-      bodyColor: '#fafafa',
-      tagColor: '#f5f5f5',
-      avatarColor: '#e5e5e5',
-      invertedColor: '#1a1a1a',
-      inputColor: '#ffffff',
-      codeColor: '#f5f5f5',
-      tabColor: '#ffffff',
-      actionColor: '#f5f5f5',
-      tableHeaderColor: '#fafafa',
-      hoverColor: 'rgba(0, 0, 0, 0.04)',
-      tableColorHover: 'rgba(0, 0, 0, 0.04)',
-      tableColorStriped: 'rgba(0, 0, 0, 0.02)',
-      pressedColor: 'rgba(0, 0, 0, 0.08)',
-      opacityDisabled: '0.5',
-      inputColorDisabled: '#f5f5f5',
-      buttonColor2: 'rgba(79, 70, 229, 0.1)',
-      buttonColor2Hover: 'rgba(79, 70, 229, 0.15)',
-      buttonColor2Pressed: 'rgba(79, 70, 229, 0.2)',
-      boxShadow1: '0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06)',
-      boxShadow2: '0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.07)',
-      boxShadow3: '0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08)',
-      borderRadius: '8px',
-      borderRadiusSmall: '6px',
-      fontFamily:
-        'Inter, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif',
-      fontFamilyMono:
-        'JetBrains Mono, SF Mono, Fira Code, Consolas, Monaco, Andale Mono, Ubuntu Mono, monospace',
-      fontSize: '14px',
-      fontSizeMini: '12px',
-      fontSizeTiny: '12px',
-      fontSizeSmall: '13px',
-      fontSizeMedium: '14px',
-      fontSizeLarge: '15px',
-      fontSizeHuge: '16px',
-      lineHeight: '1.5',
-      heightMini: '24px',
-      heightTiny: '28px',
-      heightSmall: '32px',
-      heightMedium: '36px',
-      heightLarge: '40px',
-      heightHuge: '44px',
-    },
-    Button: {
-      borderRadiusMedium: '8px',
-      borderRadiusSmall: '6px',
-      borderRadiusLarge: '10px',
-    },
-    Card: {
-      borderRadius: '12px',
-      paddingMedium: '16px',
-      paddingLarge: '20px',
-    },
-    Input: {
-      borderRadius: '8px',
-    },
-    Select: {
-      borderRadius: '8px',
-    },
-    DataTable: {
-      borderRadius: '12px',
-    },
-    Dialog: {
-      borderRadius: '16px',
-    },
-    Drawer: {
-      borderRadius: '0',
-    },
-    Dropdown: {
-      borderRadius: '8px',
-    },
-    Menu: {
-      borderRadius: '8px',
-    },
-    Message: {
-      borderRadius: '8px',
-    },
-    Notification: {
-      borderRadius: '12px',
-    },
-    Popover: {
-      borderRadius: '8px',
-    },
-    Tag: {
-      borderRadius: '6px',
-    },
-    Tooltip: {
-      borderRadius: '6px',
-    },
-  },
-  obsidian: {
-    common: {
-      primaryColor: '#818cf8',
-      primaryColorHover: '#a5b4fc',
-      primaryColorPressed: '#6366f1',
-      primaryColorSuppl: '#818cf8',
-      infoColor: '#60a5fa',
-      infoColorHover: '#93c5fd',
-      infoColorPressed: '#3b82f6',
-      infoColorSuppl: '#60a5fa',
-      successColor: '#34d399',
-      successColorHover: '#6ee7b7',
-      successColorPressed: '#10b981',
-      successColorSuppl: '#34d399',
-      warningColor: '#fbbf24',
-      warningColorHover: '#fcd34d',
-      warningColorPressed: '#f59e0b',
-      warningColorSuppl: '#fbbf24',
-      errorColor: '#f87171',
-      errorColorHover: '#fca5a5',
-      errorColorPressed: '#ef4444',
-      errorColorSuppl: '#f87171',
-      textColorBase: '#fafafa',
-      textColor1: '#fafafa',
-      textColor2: '#a3a3a3',
-      textColor3: '#737373',
-      textColorDisabled: '#525252',
-      placeholderColor: '#737373',
-      placeholderColorDisabled: '#525252',
-      iconColor: '#a3a3a3',
-      iconColorHover: '#fafafa',
-      iconColorPressed: '#fafafa',
-      iconColorDisabled: '#525252',
-      dividerColor: '#2e2e2e',
-      borderColor: '#2e2e2e',
-      closeIconColor: '#737373',
-      closeIconColorHover: '#a3a3a3',
-      closeIconColorPressed: '#fafafa',
-      closeColorHover: 'rgba(255, 255, 255, 0.08)',
-      closeColorPressed: 'rgba(255, 255, 255, 0.12)',
-      clearColor: '#737373',
-      clearColorHover: '#a3a3a3',
-      clearColorPressed: '#fafafa',
-      scrollbarColor: 'rgba(255, 255, 255, 0.2)',
-      scrollbarColorHover: 'rgba(255, 255, 255, 0.3)',
-      progressRailColor: '#2e2e2e',
-      railColor: '#2e2e2e',
-      popoverColor: '#1a1a1a',
-      tableColor: '#1a1a1a',
-      cardColor: '#1a1a1a',
-      modalColor: '#1a1a1a',
-      bodyColor: '#0a0a0a',
-      tagColor: '#262626',
-      avatarColor: '#2e2e2e',
-      invertedColor: '#fafafa',
-      inputColor: '#1a1a1a',
-      codeColor: '#262626',
-      tabColor: '#1a1a1a',
-      actionColor: '#262626',
-      tableHeaderColor: '#141414',
-      hoverColor: 'rgba(255, 255, 255, 0.06)',
-      tableColorHover: 'rgba(255, 255, 255, 0.06)',
-      tableColorStriped: 'rgba(255, 255, 255, 0.03)',
-      pressedColor: 'rgba(255, 255, 255, 0.1)',
-      opacityDisabled: '0.4',
-      inputColorDisabled: '#262626',
-      buttonColor2: 'rgba(129, 140, 248, 0.15)',
-      buttonColor2Hover: 'rgba(129, 140, 248, 0.2)',
-      buttonColor2Pressed: 'rgba(129, 140, 248, 0.25)',
-      boxShadow1: '0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3)',
-      boxShadow2: '0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.35)',
-      boxShadow3: '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4)',
-      borderRadius: '8px',
-      borderRadiusSmall: '6px',
-      fontFamily:
-        'Inter, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif',
-      fontFamilyMono:
-        'JetBrains Mono, SF Mono, Fira Code, Consolas, Monaco, Andale Mono, Ubuntu Mono, monospace',
-      fontSize: '14px',
-      fontSizeMini: '12px',
-      fontSizeTiny: '12px',
-      fontSizeSmall: '13px',
-      fontSizeMedium: '14px',
-      fontSizeLarge: '15px',
-      fontSizeHuge: '16px',
-      lineHeight: '1.5',
-      heightMini: '24px',
-      heightTiny: '28px',
-      heightSmall: '32px',
-      heightMedium: '36px',
-      heightLarge: '40px',
-      heightHuge: '44px',
-    },
-    Button: {
-      borderRadiusMedium: '8px',
-      borderRadiusSmall: '6px',
-      borderRadiusLarge: '10px',
-    },
-    Card: {
-      borderRadius: '12px',
-      paddingMedium: '16px',
-      paddingLarge: '20px',
-    },
-    Input: {
-      borderRadius: '8px',
-    },
-    Select: {
-      borderRadius: '8px',
-    },
-    DataTable: {
-      borderRadius: '12px',
-    },
-    Dialog: {
-      borderRadius: '16px',
-    },
-    Drawer: {
-      borderRadius: '0',
-    },
-    Dropdown: {
-      borderRadius: '8px',
-    },
-    Menu: {
-      borderRadius: '8px',
-    },
-    Message: {
-      borderRadius: '8px',
-    },
-    Notification: {
-      borderRadius: '12px',
-    },
-    Popover: {
-      borderRadius: '8px',
-    },
-    Tag: {
-      borderRadius: '6px',
-    },
-    Tooltip: {
-      borderRadius: '6px',
-    },
-  },
-  aurum: {
-    common: {
-      primaryColor: '#fbbf24',
-      primaryColorHover: '#fcd34d',
-      primaryColorPressed: '#f59e0b',
-      primaryColorSuppl: '#fbbf24',
-      infoColor: '#60a5fa',
-      infoColorHover: '#93c5fd',
-      infoColorPressed: '#3b82f6',
-      infoColorSuppl: '#60a5fa',
-      successColor: '#34d399',
-      successColorHover: '#6ee7b7',
-      successColorPressed: '#10b981',
-      successColorSuppl: '#34d399',
-      warningColor: '#fb923c',
-      warningColorHover: '#fdba74',
-      warningColorPressed: '#f97316',
-      warningColorSuppl: '#fb923c',
-      errorColor: '#f87171',
-      errorColorHover: '#fca5a5',
-      errorColorPressed: '#ef4444',
-      errorColorSuppl: '#f87171',
-      textColorBase: '#fafaf9',
-      textColor1: '#fafaf9',
-      textColor2: '#a8a29e',
-      textColor3: '#78716c',
-      textColorDisabled: '#57534e',
-      placeholderColor: '#78716c',
-      placeholderColorDisabled: '#57534e',
-      iconColor: '#a8a29e',
-      iconColorHover: '#fafaf9',
-      iconColorPressed: '#fafaf9',
-      iconColorDisabled: '#57534e',
-      dividerColor: '#292524',
-      borderColor: '#292524',
-      closeIconColor: '#78716c',
-      closeIconColorHover: '#a8a29e',
-      closeIconColorPressed: '#fafaf9',
-      closeColorHover: 'rgba(255, 255, 255, 0.08)',
-      closeColorPressed: 'rgba(255, 255, 255, 0.12)',
-      clearColor: '#78716c',
-      clearColorHover: '#a8a29e',
-      clearColorPressed: '#fafaf9',
-      scrollbarColor: 'rgba(255, 255, 255, 0.2)',
-      scrollbarColorHover: 'rgba(255, 255, 255, 0.3)',
-      progressRailColor: '#292524',
-      railColor: '#292524',
-      popoverColor: '#1c1917',
-      tableColor: '#1c1917',
-      cardColor: '#1c1917',
-      modalColor: '#1c1917',
-      bodyColor: '#0c0a09',
-      tagColor: '#292524',
-      avatarColor: '#292524',
-      invertedColor: '#fafaf9',
-      inputColor: '#1c1917',
-      codeColor: '#292524',
-      tabColor: '#1c1917',
-      actionColor: '#292524',
-      tableHeaderColor: '#1c1917',
-      hoverColor: 'rgba(255, 255, 255, 0.06)',
-      tableColorHover: 'rgba(255, 255, 255, 0.06)',
-      tableColorStriped: 'rgba(255, 255, 255, 0.03)',
-      pressedColor: 'rgba(255, 255, 255, 0.1)',
-      opacityDisabled: '0.4',
-      inputColorDisabled: '#292524',
-      buttonColor2: 'rgba(251, 191, 36, 0.15)',
-      buttonColor2Hover: 'rgba(251, 191, 36, 0.2)',
-      buttonColor2Pressed: 'rgba(251, 191, 36, 0.25)',
-      boxShadow1: '0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3)',
-      boxShadow2: '0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.35)',
-      boxShadow3: '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4)',
-      borderRadius: '8px',
-      borderRadiusSmall: '6px',
-      fontFamily:
-        'Inter, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif',
-      fontFamilyMono:
-        'JetBrains Mono, SF Mono, Fira Code, Consolas, Monaco, Andale Mono, Ubuntu Mono, monospace',
-      fontSize: '14px',
-      fontSizeMini: '12px',
-      fontSizeTiny: '12px',
-      fontSizeSmall: '13px',
-      fontSizeMedium: '14px',
-      fontSizeLarge: '15px',
-      fontSizeHuge: '16px',
-      lineHeight: '1.5',
-      heightMini: '24px',
-      heightTiny: '28px',
-      heightSmall: '32px',
-      heightMedium: '36px',
-      heightLarge: '40px',
-      heightHuge: '44px',
-    },
-    Button: {
-      borderRadiusMedium: '8px',
-      borderRadiusSmall: '6px',
-      borderRadiusLarge: '10px',
-      textColorPrimary: '#0c0a09',
-      textColorHoverPrimary: '#0c0a09',
-      textColorPressedPrimary: '#0c0a09',
-      textColorFocusPrimary: '#0c0a09',
-    },
-    Card: {
-      borderRadius: '12px',
-      paddingMedium: '16px',
-      paddingLarge: '20px',
-    },
-    Input: {
-      borderRadius: '8px',
-    },
-    Select: {
-      borderRadius: '8px',
-    },
-    DataTable: {
-      borderRadius: '12px',
-    },
-    Dialog: {
-      borderRadius: '16px',
-    },
-    Drawer: {
-      borderRadius: '0',
-    },
-    Dropdown: {
-      borderRadius: '8px',
-    },
-    Menu: {
-      borderRadius: '8px',
-    },
-    Message: {
-      borderRadius: '8px',
-    },
-    Notification: {
-      borderRadius: '12px',
-    },
-    Popover: {
-      borderRadius: '8px',
-    },
-    Tag: {
-      borderRadius: '6px',
-    },
-    Tooltip: {
-      borderRadius: '6px',
-    },
-  },
-  sakura: {
-    common: {
-      primaryColor: '#ec4899',
-      primaryColorHover: '#f472b6',
-      primaryColorPressed: '#db2777',
-      primaryColorSuppl: '#ec4899',
-      infoColor: '#3b82f6',
-      infoColorHover: '#2563eb',
-      infoColorPressed: '#1d4ed8',
-      infoColorSuppl: '#3b82f6',
-      successColor: '#10b981',
-      successColorHover: '#059669',
-      successColorPressed: '#047857',
-      successColorSuppl: '#10b981',
-      warningColor: '#f59e0b',
-      warningColorHover: '#d97706',
-      warningColorPressed: '#b45309',
-      warningColorSuppl: '#f59e0b',
-      errorColor: '#ef4444',
-      errorColorHover: '#dc2626',
-      errorColorPressed: '#b91c1c',
-      errorColorSuppl: '#ef4444',
-      textColorBase: '#1f2937',
-      textColor1: '#1f2937',
-      textColor2: '#4b5563',
-      textColor3: '#9ca3af',
-      textColorDisabled: '#d1d5db',
-      placeholderColor: '#9ca3af',
-      placeholderColorDisabled: '#d1d5db',
-      iconColor: '#4b5563',
-      iconColorHover: '#1f2937',
-      iconColorPressed: '#1f2937',
-      iconColorDisabled: '#d1d5db',
-      dividerColor: '#f9a8d4',
-      borderColor: '#f9a8d4',
-      closeIconColor: '#9ca3af',
-      closeIconColorHover: '#4b5563',
-      closeIconColorPressed: '#1f2937',
-      closeColorHover: 'rgba(0, 0, 0, 0.06)',
-      closeColorPressed: 'rgba(0, 0, 0, 0.1)',
-      clearColor: '#9ca3af',
-      clearColorHover: '#4b5563',
-      clearColorPressed: '#1f2937',
-      scrollbarColor: 'rgba(0, 0, 0, 0.2)',
-      scrollbarColorHover: 'rgba(0, 0, 0, 0.3)',
-      progressRailColor: '#fce7f3',
-      railColor: '#fce7f3',
-      popoverColor: '#ffffff',
-      tableColor: '#ffffff',
-      cardColor: '#ffffff',
-      modalColor: '#ffffff',
-      bodyColor: '#fdf2f8',
-      tagColor: '#fce7f3',
-      avatarColor: '#f9a8d4',
-      invertedColor: '#1f2937',
-      inputColor: '#ffffff',
-      codeColor: '#fce7f3',
-      tabColor: '#ffffff',
-      actionColor: '#fce7f3',
-      tableHeaderColor: '#fdf2f8',
-      hoverColor: 'rgba(236, 72, 153, 0.06)',
-      tableColorHover: 'rgba(236, 72, 153, 0.06)',
-      tableColorStriped: 'rgba(236, 72, 153, 0.03)',
-      pressedColor: 'rgba(236, 72, 153, 0.1)',
-      opacityDisabled: '0.5',
-      inputColorDisabled: '#fce7f3',
-      buttonColor2: 'rgba(236, 72, 153, 0.1)',
-      buttonColor2Hover: 'rgba(236, 72, 153, 0.15)',
-      buttonColor2Pressed: 'rgba(236, 72, 153, 0.2)',
-      boxShadow1: '0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06)',
-      boxShadow2: '0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.07)',
-      boxShadow3: '0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08)',
-      borderRadius: '8px',
-      borderRadiusSmall: '6px',
-      fontFamily:
-        'Inter, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, Noto Sans, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif',
-      fontFamilyMono:
-        'JetBrains Mono, SF Mono, Fira Code, Consolas, Monaco, Andale Mono, Ubuntu Mono, monospace',
-      fontSize: '14px',
-      fontSizeMini: '12px',
-      fontSizeTiny: '12px',
-      fontSizeSmall: '13px',
-      fontSizeMedium: '14px',
-      fontSizeLarge: '15px',
-      fontSizeHuge: '16px',
-      lineHeight: '1.5',
-      heightMini: '24px',
-      heightTiny: '28px',
-      heightSmall: '32px',
-      heightMedium: '36px',
-      heightLarge: '40px',
-      heightHuge: '44px',
-    },
-    Button: {
-      borderRadiusMedium: '8px',
-      borderRadiusSmall: '6px',
-      borderRadiusLarge: '10px',
-    },
-    Card: {
-      borderRadius: '12px',
-      paddingMedium: '16px',
-      paddingLarge: '20px',
-    },
-    Input: {
-      borderRadius: '8px',
-    },
-    Select: {
-      borderRadius: '8px',
-    },
-    DataTable: {
-      borderRadius: '12px',
-    },
-    Dialog: {
-      borderRadius: '16px',
-    },
-    Drawer: {
-      borderRadius: '0',
-    },
-    Dropdown: {
-      borderRadius: '8px',
-    },
-    Menu: {
-      borderRadius: '8px',
-    },
-    Message: {
-      borderRadius: '8px',
-    },
-    Notification: {
-      borderRadius: '12px',
-    },
-    Popover: {
-      borderRadius: '8px',
-    },
-    Tag: {
-      borderRadius: '6px',
-    },
-    Tooltip: {
-      borderRadius: '6px',
-    },
-  },
-}
-
-/**
  * Naive UI 主题 composable
- * 与 useTheme 配合使用，提供 Naive UI 的主题配置
+ * 与 useTheme 配合使用，提供 Naive UI 的主题覆盖配置
  */
 export function useNaiveTheme() {
   const { currentTheme, isDark } = useTheme()
@@ -596,9 +26,291 @@ export function useNaiveTheme() {
 
   /**
    * 当前 Naive UI 主题覆盖配置
+   * 动态从 DOM 读取 CSS variables 以实现主题的完美响应
    */
-  const naiveThemeOverrides = computed(() => {
-    return themeOverridesMap[currentTheme.value]
+  const naiveThemeOverrides = computed<GlobalThemeOverrides>(() => {
+    // 依赖 currentTheme 触发重新计算
+    const theme = currentTheme.value
+    const dark = isDark.value
+
+    // 基础颜色读取
+    const primary = getCssVar('--color-primary')
+    const primaryHover = getCssVar('--color-primary-hover')
+    const primaryPressed = getCssVar('--color-primary-pressed')
+
+    const info = getCssVar('--color-info')
+    const infoHover = getCssVar('--color-info-hover')
+    const infoPressed = getCssVar('--color-info-hover') // info 暂无-pressed变量，退化使用-hover
+
+    const success = getCssVar('--color-success')
+    const successHover = getCssVar('--color-success-hover')
+    const successPressed = getCssVar('--color-success-hover')
+
+    const warning = getCssVar('--color-warning')
+    const warningHover = getCssVar('--color-warning-hover')
+    const warningPressed = getCssVar('--color-warning-hover')
+
+    const danger = getCssVar('--color-danger')
+    const dangerHover = getCssVar('--color-danger-hover')
+    const dangerPressed = getCssVar('--color-danger-hover')
+
+    const text = getCssVar('--color-text')
+    const textSecondary = getCssVar('--color-text-secondary')
+    const textMuted = getCssVar('--color-text-muted')
+    const textDisabled = getCssVar('--color-text-disabled')
+
+    const border = getCssVar('--color-border')
+    const surface = getCssVar('--color-surface')
+    const surfaceHover = getCssVar('--color-surface-hover')
+    const surfaceActive = getCssVar('--color-surface-active')
+    const bg = getCssVar('--color-bg')
+    const bgElevated = getCssVar('--color-bg-elevated')
+
+    const radiusMd = getCssVar('--radius-md') || '8px'
+    const radiusSm = getCssVar('--radius-sm') || '6px'
+    const radiusLg = getCssVar('--radius-lg') || '12px'
+
+    const shadow1 = getCssVar('--shadow-elev-1')
+    const shadow2 = getCssVar('--shadow-elev-2')
+    const shadow3 = getCssVar('--shadow-elev-3')
+
+    return {
+      common: {
+        primaryColor: primary,
+        primaryColorHover: primaryHover,
+        primaryColorPressed: primaryPressed,
+        primaryColorSuppl: primary,
+
+        infoColor: info,
+        infoColorHover: infoHover,
+        infoColorPressed: infoPressed,
+        infoColorSuppl: info,
+
+        successColor: success,
+        successColorHover: successHover,
+        successColorPressed: successPressed,
+        successColorSuppl: success,
+
+        warningColor: warning,
+        warningColorHover: warningHover,
+        warningColorPressed: warningPressed,
+        warningColorSuppl: warning,
+
+        errorColor: danger,
+        errorColorHover: dangerHover,
+        errorColorPressed: dangerPressed,
+        errorColorSuppl: danger,
+
+        textColorBase: text,
+        textColor1: text,
+        textColor2: textSecondary,
+        textColor3: textMuted,
+        textColorDisabled: textDisabled,
+        placeholderColor: textMuted,
+        placeholderColorDisabled: textDisabled,
+
+        iconColor: textSecondary,
+        iconColorHover: text,
+        iconColorPressed: text,
+        iconColorDisabled: textDisabled,
+
+        dividerColor: border,
+        borderColor: border,
+
+        closeIconColor: textMuted,
+        closeIconColorHover: textSecondary,
+        closeIconColorPressed: text,
+        closeColorHover: dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+        closeColorPressed: dark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)',
+
+        clearColor: textMuted,
+        clearColorHover: textSecondary,
+        clearColorPressed: text,
+
+        scrollbarColor: dark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.25)',
+        scrollbarColorHover: dark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.35)',
+
+        progressRailColor: border,
+        railColor: border,
+
+        popoverColor: surface,
+        tableColor: surface,
+        cardColor: surface,
+        modalColor: surface,
+        bodyColor: bg,
+        tagColor: surfaceHover,
+        avatarColor: border,
+        invertedColor: text,
+        inputColor: surface,
+        codeColor: surfaceHover,
+        tabColor: surface,
+        actionColor: surfaceHover,
+        tableHeaderColor: bgElevated || bg,
+        hoverColor: surfaceHover || 'rgba(0, 0, 0, 0.04)',
+        tableColorHover: surfaceHover || 'rgba(0, 0, 0, 0.04)',
+        tableColorStriped: dark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+        pressedColor: surfaceActive || 'rgba(0, 0, 0, 0.08)',
+        opacityDisabled: dark ? '0.4' : '0.5',
+        inputColorDisabled: bg,
+
+        buttonColor2:
+          getCssVar('--color-primary-light') ||
+          (dark ? 'rgba(124, 138, 255, 0.15)' : 'rgba(92, 124, 250, 0.1)'),
+        buttonColor2Hover: dark ? 'rgba(124, 138, 255, 0.2)' : 'rgba(92, 124, 250, 0.15)',
+        buttonColor2Pressed: dark ? 'rgba(124, 138, 255, 0.25)' : 'rgba(92, 124, 250, 0.2)',
+
+        boxShadow1:
+          shadow1 || (dark ? '0 1px 3px 0 rgba(0, 0, 0, 0.4)' : '0 1px 3px 0 rgba(0, 0, 0, 0.08)'),
+        boxShadow2:
+          shadow2 ||
+          (dark ? '0 4px 6px -1px rgba(0, 0, 0, 0.45)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)'),
+        boxShadow3:
+          shadow3 ||
+          (dark ? '0 10px 15px -3px rgba(0, 0, 0, 0.5)' : '0 10px 15px -3px rgba(0, 0, 0, 0.12)'),
+
+        borderRadius: radiusMd,
+        borderRadiusSmall: radiusSm,
+
+        fontFamily: getCssVar('--font-sans') || 'Inter, sans-serif',
+        fontFamilyMono: getCssVar('--font-mono') || 'monospace',
+        fontSize: getCssVar('--text-base') || '14px',
+        fontSizeMini: getCssVar('--text-xs') || '12px',
+        fontSizeTiny: getCssVar('--text-xs') || '12px',
+        fontSizeSmall: getCssVar('--text-sm') || '13px',
+        fontSizeMedium: getCssVar('--text-base') || '14px',
+        fontSizeLarge: getCssVar('--text-lg') || '15px',
+        fontSizeHuge: getCssVar('--text-xl') || '16px',
+      },
+      Button: {
+        borderRadiusMedium: radiusMd,
+        borderRadiusSmall: radiusSm,
+        borderRadiusLarge: radiusLg,
+        ...(theme === 'cyberpunk'
+          ? {
+              textColorPrimary: '#0a0118',
+              textColorHoverPrimary: '#0a0118',
+              textColorPressedPrimary: '#0a0118',
+              textColorFocusPrimary: '#0a0118',
+              borderPrimary: '1px solid rgba(0, 217, 255, 0.3)',
+              borderHoverPrimary: '1px solid rgba(0, 217, 255, 0.5)',
+              borderPressedPrimary: '1px solid rgba(0, 217, 255, 0.7)',
+              borderFocusPrimary: '1px solid rgba(0, 217, 255, 0.5)',
+            }
+          : {}),
+      },
+      Card: {
+        borderRadius: radiusLg,
+        paddingMedium: '16px',
+        paddingLarge: '20px',
+        ...(theme === 'cyberpunk'
+          ? {
+              border: '1px solid rgba(0, 217, 255, 0.15)',
+            }
+          : {}),
+      },
+      Input: {
+        borderRadius: radiusMd,
+        ...(theme === 'cyberpunk'
+          ? {
+              border: '1px solid rgba(0, 217, 255, 0.2)',
+              borderHover: '1px solid rgba(0, 217, 255, 0.4)',
+              borderFocus: '1px solid rgba(0, 217, 255, 0.6)',
+              boxShadowFocus: '0 0 8px 0 rgba(0, 217, 255, 0.3)',
+            }
+          : {}),
+      },
+      Select: {
+        borderRadius: radiusMd,
+      },
+      DataTable: {
+        borderRadius: radiusLg,
+        // 不透明表头，避免赛博朋克半透明叠出鬼影文字
+        thColor: surface,
+        thColorHover: surfaceHover || surface,
+        tdColor: surface,
+        tdColorHover: surfaceHover || surface,
+        borderColor: border,
+        ...(theme === 'cyberpunk'
+          ? {
+              borderColor: 'rgba(0, 217, 255, 0.15)',
+            }
+          : {}),
+      },
+      Dialog: {
+        borderRadius: radiusLg,
+        ...(theme === 'cyberpunk'
+          ? {
+              boxShadow: '0 0 30px 0 rgba(0, 217, 255, 0.3), 0 20px 25px -5px rgba(0, 0, 0, 0.8)',
+            }
+          : {}),
+      },
+      Drawer: {
+        borderRadius: '0',
+        ...(theme === 'cyberpunk'
+          ? {
+              boxShadow: '0 0 20px 0 rgba(0, 217, 255, 0.2)',
+            }
+          : {}),
+      },
+      Dropdown: {
+        borderRadius: radiusMd,
+        ...(theme === 'cyberpunk'
+          ? {
+              boxShadow: '0 0 12px 0 rgba(0, 217, 255, 0.2), 0 4px 6px -1px rgba(0, 0, 0, 0.6)',
+            }
+          : {}),
+      },
+      Menu: {
+        borderRadius: radiusMd,
+        ...(theme === 'cyberpunk'
+          ? {
+              itemColorActive: 'rgba(0, 217, 255, 0.15)',
+              itemColorActiveHover: 'rgba(0, 217, 255, 0.2)',
+              itemColorHover: 'rgba(0, 217, 255, 0.1)',
+            }
+          : {}),
+      },
+      Message: {
+        borderRadius: radiusMd,
+        ...(theme === 'cyberpunk'
+          ? {
+              boxShadow: '0 0 12px 0 rgba(0, 217, 255, 0.3)',
+            }
+          : {}),
+      },
+      Notification: {
+        borderRadius: radiusLg,
+        ...(theme === 'cyberpunk'
+          ? {
+              boxShadow: '0 0 15px 0 rgba(0, 217, 255, 0.3)',
+            }
+          : {}),
+      },
+      Popover: {
+        borderRadius: radiusMd,
+        ...(theme === 'cyberpunk'
+          ? {
+              boxShadow: '0 0 12px 0 rgba(0, 217, 255, 0.2), 0 4px 6px -1px rgba(0, 0, 0, 0.6)',
+            }
+          : {}),
+      },
+      Tag: {
+        borderRadius: radiusSm,
+        ...(theme === 'cyberpunk'
+          ? {
+              border: '1px solid rgba(0, 217, 255, 0.3)',
+            }
+          : {}),
+      },
+      Tooltip: {
+        borderRadius: radiusSm,
+        ...(theme === 'cyberpunk'
+          ? {
+              boxShadow: '0 0 8px 0 rgba(0, 217, 255, 0.3)',
+            }
+          : {}),
+      },
+    }
   })
 
   return {

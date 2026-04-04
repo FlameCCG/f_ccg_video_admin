@@ -11,6 +11,21 @@
 @use 'motion' as *;
 
 // ============================================
+// 阴影变量生成
+// ============================================
+
+// 输出阴影变量，包括原始层级与 elev-0..elev-4 语义别名。
+@mixin emit-shadows($shadow-map) {
+  @each $shadow-name, $shadow-value in $shadow-map {
+    --shadow-#{$shadow-name}: #{$shadow-value};
+  }
+
+  @each $elev-name, $shadow-key in $shadow-elevation {
+    --shadow-#{$elev-name}: #{map.get($shadow-map, $shadow-key)};
+  }
+}
+
+// ============================================
 // 颜色变量生成
 // ============================================
 
@@ -23,9 +38,7 @@
   }
 
   // 阴影变量 (浅色主题)
-  @each $shadow-name, $shadow-value in $shadows-light {
-    --shadow-#{$shadow-name}: #{$shadow-value};
-  }
+  @include emit-shadows($shadows-light);
 }
 
 // 各主题变量生成
@@ -40,15 +53,34 @@
     $is-dark: map.get($meta, 'is-dark');
 
     @if $is-dark {
-      @each $shadow-name, $shadow-value in $shadows-dark {
-        --shadow-#{$shadow-name}: #{$shadow-value};
-      }
+      @include emit-shadows($shadows-dark);
     } @else {
-      @each $shadow-name, $shadow-value in $shadows-light {
-        --shadow-#{$shadow-name}: #{$shadow-value};
-      }
+      @include emit-shadows($shadows-light);
     }
   }
+}
+
+// ============================================
+// 颜色语义别名
+// ============================================
+
+// 这些名字在业务组件里已被引用，但从未在任何主题中定义过，
+// 于是 color / background 直接拿到非法值（等价于未设置）。
+// 只在 :root 声明即可：自定义属性引用是「使用时解析」的，
+// var(--color-danger) 会命中 <html> 上当前 data-theme 覆盖后的值，
+// 因此别名天然跟随主题，无需在每套主题里重复。
+:root {
+  // Naive UI / 通用语义里叫 error，本项目 token 叫 danger
+  --color-error: var(--color-danger);
+
+  // 第三层级文字（弱于 secondary）
+  --color-text-tertiary: var(--color-text-muted);
+
+  // 次级/内凹表面（骨架屏、预览区、只读块）
+  --color-surface-alt: var(--color-surface-hover);
+
+  // 柔和背景
+  --color-bg-soft: var(--color-bg);
 }
 
 // ============================================
@@ -73,6 +105,7 @@
   // 字体族
   --font-sans: #{meta.inspect($font-family-sans)};
   --font-mono: #{meta.inspect($font-family-mono)};
+  --font-display: #{meta.inspect($font-family-display)};
 
   // 字体大小
   @each $size-name, $size-value in $font-size {
@@ -139,31 +172,3 @@
     --duration-slowest: 0ms;
   }
 }
-
-// 主题元数据
-$theme-meta: (
-  'pearl': (
-    'is-dark': false,
-    'label': 'Pearl',
-    'label-zh': '珍珠白',
-    'label-ja': 'パール',
-  ),
-  'obsidian': (
-    'is-dark': true,
-    'label': 'Obsidian',
-    'label-zh': '黑曜石',
-    'label-ja': 'オブシディアン',
-  ),
-  'aurum': (
-    'is-dark': true,
-    'label': 'Aurum',
-    'label-zh': '鎏金',
-    'label-ja': 'オーラム',
-  ),
-  'sakura': (
-    'is-dark': false,
-    'label': 'Sakura',
-    'label-zh': '樱',
-    'label-ja': 'サクラ',
-  ),
-);
