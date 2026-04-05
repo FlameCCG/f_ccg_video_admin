@@ -16,16 +16,20 @@ import type {
   UpdateUserRolesParams,
   GetUserPermissionsParams,
   GetRoleInheritsParams,
+  RoleInheritsDetail,
   CreateMenuParams,
   UpdateMenuParams,
   AssignMenuParams,
   RemoveMenuParams,
   GetRoleMenusParams,
+  RoleMenusResponse,
   AssignPermissionParams,
   RemovePermissionParams,
   ReplaceRolePermissionsParams,
   GetRolePermissionsParams,
-  RolePermissionsList,
+  RolePermissionsDetail,
+  WildcardPermissionOption,
+  RoleInheritTreeNode,
 } from './types'
 
 // ============ 角色管理 ============
@@ -56,10 +60,10 @@ export function updateRole(params: UpdateRoleParams): Promise<EmptyData> {
 
 /**
  * 删除角色
- * DELETE /admin/rbac/role/{id}
+ * DELETE /admin/rbac/role?id=
  */
 export function deleteRole(id: number): Promise<EmptyData> {
-  return request.delete(`/admin/rbac/role/${id}`)
+  return request.delete('/admin/rbac/role', { params: { id } })
 }
 
 /**
@@ -95,11 +99,30 @@ export function removeRoleInherit(params: RoleInheritParams): Promise<EmptyData>
 }
 
 /**
- * 获取角色继承列表
+ * 获取角色继承列表（直接 + 间接）
  * GET /admin/rbac/role/inherits
  */
-export function getRoleInherits(params: GetRoleInheritsParams): Promise<string[]> {
+export function getRoleInherits(params: GetRoleInheritsParams): Promise<RoleInheritsDetail> {
   return request.get('/admin/rbac/role/inherits', { params })
+}
+
+/**
+ * 获取角色继承树
+ * GET /admin/rbac/role/inherit/tree
+ * @param roleId 可选；有值时只返回该角色相关子树
+ */
+export function getRoleInheritTree(roleId?: number): Promise<RoleInheritTreeNode[]> {
+  return request.get('/admin/rbac/role/inherit/tree', {
+    params: roleId != null ? { roleId } : undefined,
+  })
+}
+
+/**
+ * 获取指定角色继承树
+ * GET /admin/rbac/role/inherit/tree?roleId=
+ */
+export function getRoleInheritTreeById(roleId: number): Promise<RoleInheritTreeNode[]> {
+  return request.get('/admin/rbac/role/inherit/tree', { params: { roleId } })
 }
 
 // ============ 用户角色管理 ============
@@ -114,10 +137,10 @@ export function updateUserRoles(params: UpdateUserRolesParams): Promise<EmptyDat
 
 /**
  * 获取用户角色列表
- * GET /admin/rbac/user/{id}/roles
+ * GET /admin/rbac/user/roles?userId=
  */
 export function getUserRoles(userId: number): Promise<Role[]> {
-  return request.get(`/admin/rbac/user/${userId}/roles`)
+  return request.get('/admin/rbac/user/roles', { params: { userId } })
 }
 
 /**
@@ -164,10 +187,10 @@ export function updateMenu(params: UpdateMenuParams): Promise<EmptyData> {
 
 /**
  * 删除菜单
- * DELETE /admin/rbac/menu/{id}
+ * DELETE /admin/rbac/menu?id=
  */
 export function deleteMenu(id: number): Promise<EmptyData> {
-  return request.delete(`/admin/rbac/menu/${id}`)
+  return request.delete('/admin/rbac/menu', { params: { id } })
 }
 
 /**
@@ -187,10 +210,10 @@ export function removeMenu(params: RemoveMenuParams): Promise<EmptyData> {
 }
 
 /**
- * 获取角色菜单列表
+ * 获取角色菜单列表（区分直连菜单和继承菜单）
  * GET /admin/rbac/role/menus
  */
-export function getRoleMenus(params: GetRoleMenusParams): Promise<Menu[]> {
+export function getRoleMenus(params: GetRoleMenusParams): Promise<RoleMenusResponse> {
   return request.get('/admin/rbac/role/menus', { params })
 }
 
@@ -229,9 +252,19 @@ export function replaceRolePermissions(params: ReplaceRolePermissionsParams): Pr
 }
 
 /**
- * 获取角色权限列表
+ * 获取角色权限详情（直接权限 + 有效权限 + 覆盖的具体 API）
  * GET /admin/rbac/role/permissions
  */
-export function getRolePermissions(params: GetRolePermissionsParams): Promise<RolePermissionsList> {
+export function getRolePermissions(
+  params: GetRolePermissionsParams
+): Promise<RolePermissionsDetail> {
   return request.get('/admin/rbac/role/permissions', { params })
+}
+
+/**
+ * 获取系统中已配置的通配符权限列表（跨角色去重）
+ * GET /admin/rbac/permission/wildcards
+ */
+export function getWildcardPermissions(): Promise<WildcardPermissionOption[]> {
+  return request.get('/admin/rbac/permission/wildcards')
 }

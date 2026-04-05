@@ -156,6 +156,24 @@ export interface GetRoleInheritsParams {
   roleId: number
 }
 
+/**
+ * 间接继承项
+ */
+export interface RoleIndirectInheritItem {
+  /** 间接继承到的角色名 */
+  name: string
+  /** 需要解绑的顶层直接父角色名 */
+  via: string
+}
+
+/**
+ * 角色继承详情（直接 + 间接）
+ */
+export interface RoleInheritsDetail {
+  direct: string[]
+  indirect: RoleIndirectInheritItem[]
+}
+
 // ============ 菜单管理 ============
 
 /**
@@ -240,34 +258,36 @@ export interface GetRoleMenusParams {
   roleId: number
 }
 
+/**
+ * 角色菜单响应（区分直连菜单和继承菜单）
+ */
+export interface RoleMenusResponse {
+  /** 直连菜单（可编辑） */
+  directMenus: Menu[]
+  /** 继承菜单（只读） */
+  inheritMenus: Menu[]
+}
+
 // ============ 权限管理 ============
 
 /**
- * 分配权限参数
+ * 分配权限参数，必须使用 permissions 数组。
  */
 export interface AssignPermissionParams {
   /** 角色名称 */
   roleName: string
-  /** 资源路径（单条） */
-  resource?: string
-  /** 操作方法（单条） */
-  action?: string
-  /** 批量权限（可选） */
-  permissions?: Permission[]
+  /** 权限列表（必填，不能为空） */
+  permissions: Permission[]
 }
 
 /**
- * 移除权限参数
+ * 移除权限参数，必须使用 permissions 数组。
  */
 export interface RemovePermissionParams {
   /** 角色名称 */
   roleName: string
-  /** 资源路径（单条） */
-  resource?: string
-  /** 操作方法（单条） */
-  action?: string
-  /** 批量权限（可选） */
-  permissions?: Permission[]
+  /** 权限列表（必填，不能为空） */
+  permissions: Permission[]
 }
 
 /**
@@ -278,6 +298,11 @@ export interface ReplaceRolePermissionsParams {
   roleId: number
   /** 权限列表（为空则清空） */
   permissions?: Permission[]
+  /**
+   * 是否解除继承：取消勾选通配符/继承覆盖的具体 API 时为 true。
+   * 后端会清除该角色全部继承关系与继承菜单，再写入 permissions。
+   */
+  breakInheritance?: boolean
 }
 
 /**
@@ -289,7 +314,62 @@ export interface GetRolePermissionsParams {
 }
 
 /**
- * 角色权限列表响应（Casbin 格式）
- * 格式: [["p", "role:admin", "/admin/user/list", "GET"], ...]
+ * 角色权限来源
+ * - direct：直接绑定
+ * - inherit_direct：直接父角色
+ * - inherit_indirect：间接祖先
+ * - inherited：继承权限的兼容取值
  */
-export type RolePermissionsList = string[][]
+export type RolePermissionSource = 'direct' | 'inherit_direct' | 'inherit_indirect' | 'inherited'
+
+/**
+ * 有效权限项（含来源）
+ */
+export interface EffectivePermissionItem {
+  resource: string
+  action: string
+  source: RolePermissionSource
+  /** 直接持有该策略的角色名（继承时用于定位解除目标） */
+  owner?: string
+  /** 若要取消该继承权限，应解除的直接父角色名 */
+  topParent?: string
+}
+
+/**
+ * 角色权限详情响应
+ * direct: Casbin 格式直接策略 [["role", path, method], ...]
+ * effective: 有效权限（直接 + 继承）
+ * covered: 被覆盖的具体 API key，格式 "METHOD:path"
+ */
+export interface RolePermissionsDetail {
+  direct: string[][]
+  effective: EffectivePermissionItem[]
+  covered: string[]
+}
+
+/**
+ * @deprecated 请使用 RolePermissionsDetail；此类型作为兼容别名。
+ */
+export type RolePermissionsList = RolePermissionsDetail
+
+/**
+ * 系统通配符权限项（跨角色去重）
+ */
+export interface WildcardPermissionOption {
+  resource: string
+  action: string
+}
+
+/**
+ * 角色继承树节点
+ */
+export interface RoleInheritTreeNode {
+  /** 角色 ID */
+  id: number
+  /** 角色名称 */
+  name: string
+  /** 角色描述 */
+  desc: string
+  /** 子节点 */
+  children?: RoleInheritTreeNode[]
+}
