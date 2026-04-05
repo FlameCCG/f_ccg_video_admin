@@ -5,6 +5,9 @@ export default {
   login: {
     title: 'Login',
     subtitle: 'Video Platform Admin Console',
+    brandEyebrow: 'Content operations workspace',
+    secureAccess: 'Secure access',
+    adminOnly: 'Authorized administrators only',
     username: 'Username',
     password: 'Password',
     usernamePlaceholder: 'Enter your username',
@@ -17,6 +20,7 @@ export default {
   captcha: {
     title: 'Security Verification',
     tip: 'Drag the slider to complete verification',
+    verifying: 'Verifying security credentials',
     loading: 'Loading...',
     success: 'Verification successful',
     failed: 'Verification failed, please try again',

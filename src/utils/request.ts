@@ -80,32 +80,26 @@ class TokenRefresher {
       throw new Error('No refresh token available')
     }
 
-    try {
-      // 直接使用 axios 发送请求，绕过拦截器避免循环
-      const response = await axios.post<ApiResponse<RefreshTokenResponse>>(
-        '/v1/common/user/login/refresh',
-        { refreshToken },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      )
-
-      const { code, data, msg } = response.data
-
-      if (code === 0 && data) {
-        setTokens(data.accessToken, data.refreshToken)
-        return data.accessToken
+    // 直接使用 axios 发送请求，绕过拦截器避免循环
+    const response = await axios.post<ApiResponse<RefreshTokenResponse>>(
+      '/v1/common/user/login/refresh',
+      { refreshToken },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
       }
+    )
 
-      // 刷新失败
-      throw new Error(msg || 'Token refresh failed')
-    } catch (error) {
-      // 刷新失败，清除 token
-      clearTokens()
-      throw error
+    const { code, data, msg } = response.data
+
+    if (code === 0 && data) {
+      setTokens(data.accessToken, data.refreshToken)
+      return data.accessToken
     }
+
+    // 刷新失败
+    throw new Error(msg || 'Token refresh failed')
   }
 
   /**
@@ -154,28 +148,13 @@ export function setLoginRedirectHandler(handler: () => void): void {
   redirectToLogin = handler
 }
 
-// ==================== Token 错误检测 ====================
+// ==================== Axios 扩展配置 ====================
 
-/**
- * 检测是否为 Token 相关错误
- * 通过检测 msg 中的关键词判断
- */
-function isTokenError(msg: string): boolean {
-  const tokenKeywords = [
-    'token',
-    'Token',
-    'TOKEN',
-    '登录',
-    '认证',
-    '授权',
-    '过期',
-    'expired',
-    'unauthorized',
-    'Unauthorized',
-    'invalid',
-    'Invalid',
-  ]
-  return tokenKeywords.some((keyword) => msg.includes(keyword))
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /** 为 true 时不自动弹出业务错误 toast，由调用方自行处理 */
+    silent?: boolean
+  }
 }
 
 // ==================== 创建 Axios 实例 ====================
@@ -246,18 +225,15 @@ async function handleTokenError(config: AxiosRequestConfig): Promise<AxiosRespon
       },
     }
 
-    return axios(retryConfig)
+    return request(retryConfig)
   } catch {
-    // 刷新失败，跳转登录
+    // 刷新失败，先清除 token 再跳转登录（防止循环刷新）
+    clearTokens()
     redirectToLogin()
     return Promise.reject(new BusinessError(1, '认证失败，请重新登录'))
   }
 }
 
-/**
- * 响应拦截器
- * 处理 code=0/1 业务状态，业务错误显示 msg 提示
- */
 request.interceptors.response.use(
   async (response: AxiosResponse<ApiResponse>) => {
     const { code, msg, data } = response.data
@@ -268,31 +244,41 @@ request.interceptors.response.use(
       return data as AxiosResponse
     }
 
-    // 业务失败 - 检查是否为 Token 相关错误
-    if (isTokenError(msg)) {
-      // Token 错误 - 尝试刷新并重试
-      return handleTokenError(response.config)
+    // 普通业务错误（含无权限等）- 展示后端 msg，并 reject 供调用方结束 loading
+    const errorMsg = (typeof msg === 'string' && msg.trim()) || '请求失败'
+    if (!response.config?.silent) {
+      showErrorMessage(errorMsg)
     }
-
-    // 普通业务错误 - 显示 msg 提示
-    showErrorMessage(msg)
-    return Promise.reject(new BusinessError(code, msg))
+    return Promise.reject(new BusinessError(code, errorMsg))
   },
   async (error: unknown) => {
     // 网络错误或非 200 状态码
     if (axios.isAxiosError(error)) {
       const status = error.response?.status
+      const silent = Boolean(error.config?.silent)
 
       // 401 状态码 - 尝试刷新 Token
       if (status === 401 && error.config) {
         return handleTokenError(error.config)
       }
 
+      // 业务体可能挂在 HTTP 4xx 上（部分网关/中间层）
+      const body = error.response?.data as ApiResponse | undefined
+      if (body && typeof body === 'object' && body.code === 1 && body.msg) {
+        const bizMsg = body.msg.trim() || '请求失败'
+        if (!silent) {
+          showErrorMessage(bizMsg)
+        }
+        return Promise.reject(new BusinessError(1, bizMsg))
+      }
+
       // 其他网络错误
       const errorMsg = error.response ? `请求失败: ${status}` : '网络连接失败，请检查网络'
 
-      showErrorMessage(errorMsg)
-    } else {
+      if (!silent) {
+        showErrorMessage(errorMsg)
+      }
+    } else if (!(error instanceof BusinessError)) {
       showErrorMessage('请求发生未知错误')
     }
 

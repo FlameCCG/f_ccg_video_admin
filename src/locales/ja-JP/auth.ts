@@ -5,6 +5,9 @@ export default {
   login: {
     title: 'ログイン',
     subtitle: '動画サイト管理コンソール',
+    brandEyebrow: 'コンテンツ運用ワークスペース',
+    secureAccess: 'セキュアアクセス',
+    adminOnly: '認証済み管理者のみアクセスできます',
     username: 'ユーザー名',
     password: 'パスワード',
     usernamePlaceholder: 'ユーザー名を入力',
@@ -17,6 +20,7 @@ export default {
   captcha: {
     title: 'セキュリティ認証',
     tip: 'スライダーをドラッグして認証を完了してください',
+    verifying: 'セキュリティ情報を確認しています',
     loading: '読み込み中...',
     success: '認証成功',
     failed: '認証失敗、もう一度お試しください',

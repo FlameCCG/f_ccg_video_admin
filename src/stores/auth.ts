@@ -5,7 +5,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { adminLogin, refreshToken as refreshTokenApi } from '@/api/auth'
-import { getAccessToken, getRefreshToken, setTokens, clearTokens, hasToken } from '@/utils/storage'
+import {
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+  clearTokens,
+  isTokenExpired,
+} from '@/utils/storage'
 import type { LoginCredentials, JwtToken } from '@/api/types'
 
 /**
@@ -29,20 +35,24 @@ export const useAuthStore = defineStore('auth', () => {
   // ==================== 计算属性 ====================
 
   /** 是否已登录 */
-  const isLoggedIn = computed(() => !!accessToken.value)
+  const isLoggedIn = computed(() => !!accessToken.value && !isTokenExpired(accessToken.value))
 
   // ==================== Actions ====================
 
   /**
    * 登录
    * @param credentials 登录凭证（包含滑块验证码信息）
+   * @param options.silent 为 true 时不自动弹出错误 toast（滑块失败由组件内反馈）
    * @returns JWT Token
    */
-  async function login(credentials: LoginCredentials): Promise<JwtToken> {
+  async function login(
+    credentials: LoginCredentials,
+    options?: { silent?: boolean }
+  ): Promise<JwtToken> {
     isLoggingIn.value = true
 
     try {
-      const result = await adminLogin(credentials)
+      const result = await adminLogin(credentials, options?.silent ? { silent: true } : undefined)
 
       // 存储 Token
       accessToken.value = result.accessToken
@@ -111,7 +121,8 @@ export const useAuthStore = defineStore('auth', () => {
    * 检查是否有有效的 Token
    */
   function checkAuth(): boolean {
-    return hasToken()
+    const token = getAccessToken()
+    return !!token && !isTokenExpired(token)
   }
 
   return {

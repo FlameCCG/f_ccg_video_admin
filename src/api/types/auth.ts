@@ -51,9 +51,9 @@ export interface SlideCaptchaVerify {
 }
 
 /**
- * 管理员登录凭证
+ * 管理员登录凭证（滑块验证码参数可选，取决于后端配置）
  */
-export interface LoginCredentials extends SlideCaptchaVerify {
+export interface LoginCredentials extends Partial<SlideCaptchaVerify> {
   /** 用户名或邮箱 */
   username: string
   /** 密码 */
