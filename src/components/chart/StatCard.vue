@@ -4,7 +4,10 @@
  * 用于展示单个统计数据
  */
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { NCard, NStatistic, NNumberAnimation } from 'naive-ui'
+
+const { t } = useI18n()
 
 type TrendType = 'up' | 'down' | 'flat'
 
@@ -231,7 +234,7 @@ const cardPadding = computed(() => {
           <span class="stat-card__trend-value" :style="{ color: trendColor }">
             {{ Math.abs(trendValue).toFixed(1) }}%
           </span>
-          <span class="stat-card__trend-label">较昨日</span>
+          <span class="stat-card__trend-label">{{ t('dashboard.comparison.yesterday') }}</span>
         </div>
       </div>
     </div>
