@@ -18,6 +18,8 @@ import {
 import type { NotificationItem } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { AppAvatar } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
+import { normalizeExternalHref } from '@/utils'
 import NotificationFormModal from './components/NotificationFormModal.vue'
 
 const { t } = useI18n()
@@ -33,6 +35,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 表单弹窗状态 */
 const formModalVisible = ref(false)
@@ -137,17 +140,25 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     },
   },
   {
-    title: t('notification.list.sender'),
-    key: 'actionUserName',
-    width: 150,
+    title: t('notification.list.senderAvatar'),
+    key: 'actionUserAvatar',
+    width: 80,
+    align: 'center',
     render: (row) => {
       const avatar = row.actionUserAvatar as string
       const name = row.actionUserName as string
       if (!name) return '-'
-      return h(NSpace, { align: 'center', size: 8 }, () => [
-        h(AppAvatar, { src: avatar, text: name, size: 28 }),
-        h('span', {}, name),
-      ])
+      return h(AppAvatar, { src: avatar, text: name, size: 32 })
+    },
+  },
+  {
+    title: t('notification.list.sender'),
+    key: 'actionUserName',
+    width: 120,
+    ellipsis: { tooltip: true },
+    render: (row) => {
+      const name = row.actionUserName as string
+      return name || '-'
     },
   },
   {
@@ -158,10 +169,11 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     render: (row) => {
       const link = row.link as string
       if (!link) return '-'
+      const href = normalizeExternalHref(link)
       return h(
         'a',
         {
-          href: link,
+          href,
           target: '_blank',
           rel: 'noopener noreferrer',
           class: 'notification-link',
@@ -216,7 +228,7 @@ function handleAction(key: string, row: NotificationItem): void {
     editingNotification.value = row
     formModalVisible.value = true
   } else if (key === 'delete') {
-    confirmDelete([row.id])
+    confirmDelete(resolveTargetIds(row.id))
   }
 }
 
@@ -237,7 +249,11 @@ function handleBatchAction(key: string): void {
 function confirmDelete(ids: number[]): void {
   dialog.warning({
     title: t('notification.delete.title'),
-    content: t('notification.delete.confirm', { count: ids.length }),
+    content: createDialogContent(
+      t('notification.delete.title'),
+      ids.length,
+      t('notification.delete.confirm', { count: ids.length })
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {
@@ -255,15 +271,20 @@ function handleFormSubmit(data: {
   videoTitle?: string
   link?: string
 }): void {
+  const payload = {
+    ...data,
+    link: data.link ? normalizeExternalHref(data.link) : data.link,
+  }
+
   if (editingNotification.value) {
     // 更新
     updateMutation.mutate({
       id: editingNotification.value.id,
-      ...data,
+      ...payload,
     })
   } else {
     // 创建
-    createMutation.mutate(data)
+    createMutation.mutate(payload)
   }
 }
 

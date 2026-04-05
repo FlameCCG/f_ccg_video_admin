@@ -102,8 +102,8 @@ watch(
         title: notification.title,
         content: notification.content,
         receiverId: notification.receiverID,
-        videoId: notification.articleID || null,
-        videoTitle: notification.articleTitle || '',
+        videoId: notification.videoID || null,
+        videoTitle: notification.videoTitle || '',
         link: notification.link || '',
       }
       receiverType.value = notification.receiverID === -1 ? 'all' : 'user'
