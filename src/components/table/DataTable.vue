@@ -10,7 +10,8 @@ import { NDataTable, NPagination, NSpace, NSpin } from 'naive-ui'
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 
 /** 表格行数据类型 */
-type RowData = Record<string, unknown>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RowData = any
 
 interface Props {
   /** 表格列配置 */
@@ -110,15 +111,14 @@ watch(
   }
 )
 
-/** 表格列配置（添加选择列，避免重复） */
+/** 表格列配置（添加选择列，避免重复；默认不 fixed，避免强制横向滚动/叠字） */
 const tableColumns = computed(() => {
-  // 检查是否已有选择列
   const hasSelectionColumn = props.columns.some((col) => 'type' in col && col.type === 'selection')
   if (!props.selectable || hasSelectionColumn) return props.columns
   return [
     {
       type: 'selection' as const,
-      fixed: 'left' as const,
+      width: 40,
     },
     ...props.columns,
   ]
@@ -285,12 +285,15 @@ function handlePageSizeChange(pageSize: number): void {
     :deep(.n-data-table-base-table-body) {
       flex: 1;
       min-height: 0;
-      overflow: auto;
 
-      // 精致滚动条
+      // 仅纵向滚动；横向由列宽自适应吃掉，避免底部横条与叠字
+      overflow: hidden auto;
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--color-border) 70%, transparent) transparent;
+
       &::-webkit-scrollbar {
         width: 6px;
-        height: 6px;
+        height: 0;
       }
 
       &::-webkit-scrollbar-track {
@@ -334,6 +337,38 @@ function handlePageSizeChange(pageSize: number): void {
     :deep(.n-data-table-td) {
       border-bottom: 1px solid var(--color-border-light);
       color: var(--color-text-secondary);
+    }
+
+    // 若业务仍用 fixed：去掉阴影线，避免赛博朋克主题下「黑影分割」
+    :deep(.n-data-table-th--fixed-left),
+    :deep(.n-data-table-th--fixed-right),
+    :deep(.n-data-table-td--fixed-left),
+    :deep(.n-data-table-td--fixed-right) {
+      background-color: var(--color-surface) !important;
+      box-shadow: none !important;
+    }
+
+    :deep(.n-data-table-th--fixed-left),
+    :deep(.n-data-table-th--fixed-right) {
+      background: color-mix(in srgb, var(--color-surface) 95%, var(--color-primary) 5%) !important;
+    }
+
+    :deep(.n-data-table-tr:hover .n-data-table-td--fixed-left),
+    :deep(.n-data-table-tr:hover .n-data-table-td--fixed-right) {
+      background-color: color-mix(
+        in srgb,
+        var(--color-surface) 97%,
+        var(--color-primary) 3%
+      ) !important;
+    }
+
+    :deep(.n-data-table-tr--selected .n-data-table-td--fixed-left),
+    :deep(.n-data-table-tr--selected .n-data-table-td--fixed-right) {
+      background-color: color-mix(
+        in srgb,
+        var(--color-surface) 92%,
+        var(--color-primary) 8%
+      ) !important;
     }
 
     // 选中行样式

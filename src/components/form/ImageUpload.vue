@@ -8,7 +8,7 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NUpload, NButton, NIcon, useMessage } from 'naive-ui'
 import type { UploadFileInfo, UploadInst, UploadCustomRequestOptions } from 'naive-ui'
-import { getAccessToken } from '@/utils/storage'
+import { request } from '@/utils/request'
 
 interface Props {
   /** 已上传的图片列表 */
@@ -47,7 +47,7 @@ const props = withDefaults(defineProps<Props>(), {
   value: () => [],
   action: '/v1/common/video/image/upload',
   max: 1,
-  maxSize: 5,
+  maxSize: 20,
   accept: 'image/*',
   disabled: false,
   showFileList: true,
@@ -96,6 +96,25 @@ const canUpload = computed(() => {
   return fileList.value.length < props.max
 })
 
+/** image-card 宽高 CSS 变量（同时驱动触发器与预览卡片） */
+const uploadSizeStyle = computed(() => ({
+  '--upload-w': `${props.imageWidth}px`,
+  '--upload-h': `${props.imageHeight}px`,
+}))
+
+/**
+ * 超扁/超窄预览时的紧凑布局：
+ * - compact：横向排列图标+文字（高度不足以竖排时）
+ * - iconOnly：仅显示 + 号（高度极小时避免「上传」溢出）
+ */
+const isCompactTrigger = computed(() => props.imageHeight < 88)
+const isIconOnlyTrigger = computed(() => props.imageHeight < 52)
+const triggerIconSize = computed(() => {
+  if (isIconOnlyTrigger.value) return 18
+  if (isCompactTrigger.value) return 18
+  return 24
+})
+
 /** 计算文件 SHA-256 哈希 */
 async function calculateFileHash(file: File): Promise<string> {
   const buffer = await file.arrayBuffer()
@@ -129,64 +148,41 @@ async function customRequest(options: UploadCustomRequestOptions): Promise<void>
       })
     }
 
-    // 发送请求
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', props.action)
+    // 整理上传路径：如果 action 包含 baseURL 路径前缀（如 '/v1'），则剥离，避免重复拼接路径
+    const actionUrl = props.action.startsWith('/v1') ? props.action.substring(3) : props.action
 
-    // 设置请求头
-    const token = getAccessToken()
-    if (token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-    }
-    if (props.headers) {
-      Object.entries(props.headers).forEach(([key, value]) => {
-        xhr.setRequestHeader(key, value)
+    // 用统一的 request client 上传，实现 token 拦截与刷新
+    request
+      .post(actionUrl, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...props.headers,
+        },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percent = Math.round((progressEvent.loaded / progressEvent.total) * 100)
+            onProgress({ percent })
+          }
+        },
       })
-    }
-
-    // 上传进度
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        onProgress({ percent: Math.round((e.loaded / e.total) * 100) })
-      }
-    }
-
-    // 上传完成
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText) as {
-            code: number
-            data: { imageUrl: string }
-            msg: string
-          }
-          if (response.code === 0 && response.data?.imageUrl) {
-            file.url = response.data.imageUrl
-            onFinish()
-            updateValue()
-            emit('success', response.data.imageUrl, file)
-          } else {
-            message.error(response.msg || t('common.fileUpload.uploadFailed'))
-            onError()
-          }
-        } catch {
+      .then((res: unknown) => {
+        const data = res as { imageUrl?: string } | null
+        if (data && data.imageUrl) {
+          file.url = data.imageUrl
+          onFinish()
+          updateValue()
+          emit('success', data.imageUrl, file)
+        } else {
           message.error(t('common.fileUpload.uploadFailed'))
           onError()
         }
-      } else {
-        message.error(t('common.fileUpload.uploadFailed'))
+      })
+      .catch((err: unknown) => {
+        const error = err as { msg?: string } | null
+        message.error(error?.msg || t('common.fileUpload.uploadFailed'))
         onError()
-      }
-    }
-
-    // 上传错误
-    xhr.onerror = () => {
-      message.error(t('common.fileUpload.uploadFailed'))
-      onError()
-      emit('error', new Error('Upload failed'), file)
-    }
-
-    xhr.send(formData)
+        emit('error', err instanceof Error ? err : new Error(String(err)), file)
+      })
   } catch {
     message.error(t('common.fileUpload.uploadFailed'))
     onError()
@@ -251,7 +247,15 @@ defineExpose({
 </script>
 
 <template>
-  <div class="image-upload">
+  <div
+    class="image-upload"
+    :class="{
+      'image-upload--image-card': listType === 'image-card',
+      'image-upload--compact': listType === 'image-card' && isCompactTrigger,
+      'image-upload--icon-only': listType === 'image-card' && isIconOnlyTrigger,
+    }"
+    :style="uploadSizeStyle"
+  >
     <n-upload
       ref="uploadRef"
       v-model:file-list="fileList"
@@ -266,14 +270,15 @@ defineExpose({
       @before-upload="handleBeforeUpload"
       @remove="handleRemove"
     >
-      <!-- 上传按钮 -->
+      <!-- 上传按钮尺寸由外层 image-card 容器控制。 -->
       <template v-if="listType === 'image-card'">
         <div
           v-if="canUpload"
           class="image-upload__trigger"
-          :style="{ width: `${imageWidth}px`, height: `${imageHeight}px` }"
+          :title="t('common.upload')"
+          :aria-label="t('common.upload')"
         >
-          <n-icon size="24" color="var(--color-text-muted)">
+          <n-icon :size="triggerIconSize" color="var(--color-text-muted)">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -287,7 +292,9 @@ defineExpose({
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </n-icon>
-          <span class="image-upload__text">{{ t('common.upload') }}</span>
+          <span v-if="!isIconOnlyTrigger" class="image-upload__text">
+            {{ t('common.upload') }}
+          </span>
         </div>
       </template>
 
@@ -329,49 +336,119 @@ defineExpose({
 
 <style scoped lang="scss">
 .image-upload {
+  --upload-w: 100px;
+  --upload-h: 100px;
+
   &__trigger {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: var(--spacing-1);
-    border: 1px dashed var(--color-border);
-    border-radius: var(--radius-md);
-    background-color: var(--color-surface-alt);
-    cursor: pointer;
-    transition:
-      border-color var(--duration-fast) var(--easing-standard),
-      background-color var(--duration-fast) var(--easing-standard);
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    padding: 4px;
 
-    &:hover {
-      border-color: var(--color-primary);
-      background-color: var(--color-primary-light);
-    }
+    // 不在这里画边框，避免与 Naive image-card 触发器叠成双层虚线
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    overflow: hidden;
   }
 
   &__text {
+    flex-shrink: 0;
+    max-width: 100%;
+    overflow: hidden;
     font-size: var(--text-xs);
+    line-height: 1.2;
     color: var(--color-text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__tip {
     margin-top: var(--spacing-2);
     font-size: var(--text-xs);
+    line-height: 1.5;
     color: var(--color-text-muted);
+    overflow-wrap: anywhere;
   }
 
-  // 覆盖 Naive UI upload 组件的默认边框样式
-  :deep(.n-upload-trigger) {
-    border: none !important;
+  // 超扁预览：图标与「上传」横排，避免竖排溢出
+  &--compact {
+    .image-upload__trigger {
+      flex-direction: row;
+      gap: 6px;
+    }
+
+    .image-upload__text {
+      font-size: 12px;
+    }
   }
 
-  :deep(.n-upload-file-list) {
-    .n-upload-file {
-      border: 1px solid var(--color-border) !important;
+  // 极扁预览：只保留 + 号
+  &--icon-only {
+    .image-upload__trigger {
+      gap: 0;
+    }
+  }
+
+  // image-card：按传入宽高统一控制触发器与已上传预览，只保留一层边框
+  &--image-card {
+    :deep(.n-upload-file-list) {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-2);
+
+      // 覆盖 Naive 默认 96px 网格，避免外框尺寸与内容不一致
+      grid-template-columns: none !important;
+    }
+
+    :deep(.n-upload-trigger.n-upload-trigger--image-card),
+    :deep(.n-upload-file.n-upload-file--image-card-type) {
+      width: var(--upload-w) !important;
+      height: var(--upload-h) !important;
+      max-width: 100%;
       border-radius: var(--radius-md) !important;
+      transition:
+        width var(--duration-fast) var(--easing-standard),
+        height var(--duration-fast) var(--easing-standard),
+        border-color var(--duration-fast) var(--easing-standard),
+        background-color var(--duration-fast) var(--easing-standard);
+    }
+
+    :deep(.n-upload-trigger.n-upload-trigger--image-card) {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px dashed var(--color-border) !important;
+      background-color: var(--color-surface-alt);
 
       &:hover {
         border-color: var(--color-primary) !important;
+        background-color: var(--color-primary-light);
+      }
+    }
+
+    :deep(.n-upload-file.n-upload-file--image-card-type) {
+      overflow: hidden;
+      border: 1px solid var(--color-border) !important;
+      background-color: var(--color-surface-alt);
+
+      &:hover {
+        border-color: var(--color-primary) !important;
+      }
+
+      .n-upload-file-info,
+      .n-upload-file-info__thumbnail,
+      .n-image,
+      img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover;
       }
     }
   }
