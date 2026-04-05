@@ -17,6 +17,7 @@ import { AppAvatar, AppStatusTag } from '@/components/common'
 import { UserRoleDrawer, UserPermissionDrawer } from '@/components/rbac'
 import UserEditDrawer from './components/UserEditDrawer.vue'
 import UserBanDialog from './components/UserBanDialog.vue'
+import { formatDateTime } from '@/utils'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -75,9 +76,8 @@ const { data: roles } = useQuery({
 })
 
 /** 用户列表数据 */
-const userList = computed(() => {
-  const list = userData.value?.list ?? []
-  return list as unknown as Record<string, unknown>[]
+const userList = computed<AdminUserListItem[]>(() => {
+  return userData.value?.list ?? []
 })
 const total = computed(() => userData.value?.total ?? 0)
 
@@ -117,14 +117,13 @@ function getStatusText(status: UserStatus): string {
 }
 
 /** 表格列配置 */
-const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
+const columns = computed<DataTableColumns<AdminUserListItem>>(() => [
   {
     title: t('user.list.avatar'),
     key: 'avatar',
     width: 80,
     align: 'center',
-    render: (row) =>
-      h(AppAvatar, { src: row.avatar as string, text: row.username as string, size: 40 }),
+    render: (row) => h(AppAvatar, { src: row.avatar, text: row.username, size: 40 }),
   },
   {
     title: t('user.list.username'),
@@ -144,8 +143,8 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     width: 120,
     render: (row) =>
       h(AppStatusTag, {
-        type: getStatusType(row.status as UserStatus),
-        text: getStatusText(row.status as UserStatus),
+        type: getStatusType(row.status),
+        text: getStatusText(row.status),
         dot: true,
       }),
   },
@@ -160,12 +159,18 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     key: 'coinCount',
     width: 100,
     align: 'right',
+    render: (row) => {
+      const count = Number(row.coinCount)
+      return isNaN(count)
+        ? '-'
+        : count.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+    },
   },
   {
     title: t('user.list.roles'),
     key: 'roleNames',
     width: 150,
-    render: (row) => (row.roleNames as string[])?.join(', ') || '-',
+    render: (row) => row.roleNames?.join(', ') || '-',
   },
   {
     title: t('user.list.registerSource'),
@@ -176,7 +181,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     title: t('user.list.registerTime'),
     key: 'createdAt',
     width: 180,
-    render: (row) => formatDateTime(row.createdAt as string),
+    render: (row) => formatDateTime(row.createdAt),
   },
   {
     title: t('common.table.operation'),
@@ -190,10 +195,9 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
           { key: 'roles', label: t('rbac.userRole.manage') },
           { key: 'permissions', label: t('rbac.userPermission.view') },
           {
-            key: (row.status as UserStatus) === 1 ? 'ban' : 'unban',
-            label:
-              (row.status as UserStatus) === 1 ? t('user.ban.title') : t('user.ban.unbanTitle'),
-            type: (row.status as UserStatus) === 1 ? 'warning' : 'success',
+            key: row.status === 1 ? 'ban' : 'unban',
+            label: row.status === 1 ? t('user.ban.title') : t('user.ban.unbanTitle'),
+            type: row.status === 1 ? 'warning' : 'success',
           },
         ],
         onAction: (key: string) => handleAction(key, row as unknown as AdminUserListItem),
@@ -201,17 +205,16 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   },
 ])
 
-/** 格式化日期时间 */
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+function onStatusChange(val: unknown): void {
+  searchParams.value.status = val as UserStatus | null
+}
+
+function onRoleChange(val: unknown): void {
+  searchParams.value.roleId = val as number | null
+}
+
+function onCheckedRowKeysChange(keys: DataTableRowKey[]): void {
+  checkedRowKeys.value = keys
 }
 
 /** 处理搜索 */
@@ -312,7 +315,7 @@ function handleRefresh(): void {
               :options="statusOptions"
               :placeholder="t('user.filter.statusPlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.status = val as UserStatus | null)"
+              @change="onStatusChange"
             />
           </n-form-item>
         </n-gi>
@@ -323,7 +326,7 @@ function handleRefresh(): void {
               :options="roleOptions"
               :placeholder="t('user.filter.rolePlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.roleId = val as number | null)"
+              @change="onRoleChange"
             />
           </n-form-item>
         </n-gi>
@@ -372,7 +375,7 @@ function handleRefresh(): void {
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
-        @update:checked-row-keys="(keys) => (checkedRowKeys = keys)"
+        @update:checked-row-keys="onCheckedRowKeysChange"
       />
     </n-card>
 

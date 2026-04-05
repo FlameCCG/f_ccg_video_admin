@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getUserInfo, switchRole } from '@/api/user'
 import type { AdminUserInfo, SwitchRoleParams } from '@/api/types'
+import { normalizeResourceUrl } from '@/utils'
 
 /**
  * 用户状态 Store
@@ -31,7 +32,7 @@ export const useUserStore = defineStore('user', () => {
   const username = computed(() => userInfo.value?.username ?? '')
 
   /** 用户头像 */
-  const avatar = computed(() => userInfo.value?.avatar ?? '')
+  const avatar = computed(() => normalizeResourceUrl(userInfo.value?.avatar))
 
   /** 用户邮箱 */
   const email = computed(() => userInfo.value?.email ?? '')
@@ -42,41 +43,47 @@ export const useUserStore = defineStore('user', () => {
   /** 角色名列表 */
   const roleNames = computed(() => userInfo.value?.roleNames ?? [])
 
+  /** 角色映射表（角色ID -> 角色名） */
+  const roleMap = computed(() => userInfo.value?.roleMap ?? {})
+
+  /** 角色列表（用于切换，包含 ID 和名称） */
+  const roleList = computed(() => {
+    const map = roleMap.value
+    return Object.entries(map).map(([id, name]) => ({
+      id: Number(id),
+      name,
+    }))
+  })
+
   /** 是否有多个角色（可切换） */
-  const hasMultipleRoles = computed(() => roleNames.value.length > 1)
+  const hasMultipleRoles = computed(() => roleList.value.length > 1)
 
   // ==================== Actions ====================
+
+  let activePromise: Promise<AdminUserInfo> | null = null
 
   /**
    * 获取用户信息
    */
   async function fetchUserInfo(): Promise<AdminUserInfo> {
-    if (isLoading.value) {
-      // 如果正在加载，等待加载完成
-      return new Promise((resolve, reject) => {
-        const checkLoading = setInterval(() => {
-          if (!isLoading.value) {
-            clearInterval(checkLoading)
-            if (userInfo.value) {
-              resolve(userInfo.value)
-            } else {
-              reject(new Error('Failed to load user info'))
-            }
-          }
-        }, 100)
-      })
+    if (activePromise) {
+      return activePromise
     }
 
-    isLoading.value = true
+    activePromise = (async () => {
+      isLoading.value = true
+      try {
+        const data = await getUserInfo()
+        userInfo.value = data
+        isLoaded.value = true
+        return data
+      } finally {
+        isLoading.value = false
+        activePromise = null
+      }
+    })()
 
-    try {
-      const data = await getUserInfo()
-      userInfo.value = data
-      isLoaded.value = true
-      return data
-    } finally {
-      isLoading.value = false
-    }
+    return activePromise
   }
 
   /**
@@ -109,6 +116,7 @@ export const useUserStore = defineStore('user', () => {
     userInfo.value = null
     isLoaded.value = false
     isLoading.value = false
+    activePromise = null
   }
 
   return {
@@ -124,6 +132,8 @@ export const useUserStore = defineStore('user', () => {
     email,
     currentRoleId,
     roleNames,
+    roleMap,
+    roleList,
     hasMultipleRoles,
 
     // Actions

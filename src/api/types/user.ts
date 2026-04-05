@@ -51,6 +51,8 @@ export interface AdminUserInfo {
   registerSource: string
   /** 角色名列表 */
   roleNames: string[]
+  /** 角色映射表（角色ID -> 角色名） */
+  roleMap: Record<string, string>
 }
 
 /**
