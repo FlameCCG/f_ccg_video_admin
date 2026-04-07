@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils'
 /**
  * 评论管控页
  * Comment Moderation Page
@@ -25,6 +26,7 @@ import type { CommentSortType } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -43,6 +45,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 获取评论列表 */
 const {
@@ -100,19 +103,6 @@ function formatNumber(num: number | undefined | null): string {
   return num.toString()
 }
 
-/** 格式化日期时间 */
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
-
 /** 表格列配置 */
 const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
@@ -120,15 +110,19 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     fixed: 'left',
   },
   {
-    title: t('community.comment.user'),
-    key: 'user',
-    width: 150,
+    title: t('community.comment.avatar'),
+    key: 'avatar',
+    width: 80,
+    align: 'center',
     render: (row) => {
-      return h(NSpace, { align: 'center', size: 8 }, () => [
-        h(AppAvatar, { src: row.avatar as string, text: row.username as string, size: 28 }),
-        h('span', {}, row.username as string),
-      ])
+      return h(AppAvatar, { src: row.avatar as string, text: row.username as string, size: 32 })
     },
+  },
+  {
+    title: t('community.comment.username'),
+    key: 'username',
+    width: 120,
+    ellipsis: { tooltip: true },
   },
   {
     title: t('community.comment.content'),
@@ -219,7 +213,7 @@ function handlePageSizeChange(pageSize: number): void {
 /** 处理操作 */
 function handleAction(key: string, row: Record<string, unknown>): void {
   if (key === 'delete') {
-    confirmDelete([row.id as number])
+    confirmDelete(resolveTargetIds(row.id as number))
   }
 }
 
@@ -240,7 +234,11 @@ function handleBatchAction(key: string): void {
 function confirmDelete(commentIds: number[]): void {
   dialog.warning({
     title: t('community.comment.deleteTitle'),
-    content: t('community.comment.confirmDelete', { count: commentIds.length }),
+    content: createDialogContent(
+      t('community.comment.deleteTitle'),
+      commentIds.length,
+      t('community.comment.confirmDelete', { count: commentIds.length })
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {
