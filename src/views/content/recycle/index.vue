@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils'
 /**
  * 视频回收站页
  * Video Recycle Bin Page
@@ -25,6 +26,7 @@ import type { AdminVideoItem } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
 
 const { t } = useI18n()
@@ -42,6 +44,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 详情抽屉状态 */
 const detailDrawerVisible = ref(false)
@@ -128,19 +131,6 @@ function formatNumber(num: number): string {
     return (num / 10000).toFixed(1) + 'w'
   }
   return num.toString()
-}
-
-/** 格式化日期时间 */
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
 }
 
 /** 表格列配置 */
@@ -273,9 +263,9 @@ function handleAction(key: string, row: AdminVideoItem): void {
     selectedVideoId.value = row.id
     detailDrawerVisible.value = true
   } else if (key === 'restore') {
-    confirmRestore([row.id])
+    confirmRestore(resolveTargetIds(row.id))
   } else if (key === 'delete') {
-    confirmHardDelete([row.id])
+    confirmHardDelete(resolveTargetIds(row.id))
   }
 }
 
@@ -298,7 +288,11 @@ function handleBatchAction(key: string): void {
 function confirmRestore(videoIds: number[]): void {
   dialog.info({
     title: t('video.restore.title'),
-    content: t('video.restore.confirm'),
+    content: createDialogContent(
+      t('video.restore.title'),
+      videoIds.length,
+      t('video.restore.confirm')
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {
@@ -311,7 +305,11 @@ function confirmRestore(videoIds: number[]): void {
 function confirmHardDelete(videoIds: number[]): void {
   dialog.error({
     title: t('video.delete.title'),
-    content: t('video.delete.confirmHardDelete'),
+    content: createDialogContent(
+      t('video.delete.hardDelete'),
+      videoIds.length,
+      t('video.delete.confirmHardDelete')
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {

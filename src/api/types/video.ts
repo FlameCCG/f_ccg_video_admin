@@ -12,7 +12,7 @@ export type VideoStatus = 1 | 2 | 3 | 4
 /**
  * 视频排序方式
  */
-export type VideoSortType = 'latest' | 'oldest' | 'views' | 'likes'
+export type VideoSortType = 'latest' | 'oldest' | 'views' | 'likes' | 'duration'
 
 /**
  * 举报类型
@@ -51,6 +51,52 @@ export interface VideoAuthorDetail extends VideoAuthor {
   level: number
   /** 个人简介 */
   description: string
+}
+
+/**
+ * 转码任务状态
+ */
+export type TranscodeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
+
+/** 转码 Pipeline 状态 */
+export type TranscodePipelineStatus =
+  | 'queued'
+  | 'encoding'
+  | 'uploading'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'skipped'
+
+/** 一条 MP4 或 DASH Pipeline 的实时进度（共享时间轴，无 per-output 进度） */
+export interface TranscodePipelineProgress {
+  name: string
+  status: TranscodePipelineStatus
+  percent: number
+  message?: string
+  error?: string
+  /** 目标分辨率列表，如 [360, 720, 1080] */
+  resolutions?: number[]
+  updatedAt?: string
+}
+
+/**
+ * 转码进度（Redis 热状态，管理端展示）
+ */
+export interface TranscodeProgress {
+  videoId: number
+  partId?: number
+  status: TranscodeJobStatus
+  percent: number
+  stage: string
+  stagePercent?: number
+  message?: string
+  durationSec?: number
+  outTimeSec?: number
+  error?: string
+  updatedAt?: string
+  startedAt?: string
+  pipelines?: TranscodePipelineProgress[]
 }
 
 /**
@@ -120,6 +166,30 @@ export interface VideoTag {
 }
 
 /**
+ * DASH MPD 内的一条 Representation（视频/音频档位）
+ */
+export interface DashVariant {
+  id: string
+  /** video | audio | unknown */
+  contentType: string
+  width?: number
+  height?: number
+  /** 原始 bandwidth（bps） */
+  bandwidth?: number
+  /** 码率 kbps */
+  bitrate?: number
+  codecs?: string
+  mimeType?: string
+  baseUrl?: string
+  fileName?: string
+  /** 估算体积（字节，来自 mediaRange） */
+  fileSize?: number
+  /** 展示用清晰度文案 */
+  resolution?: string
+  frameRate?: string
+}
+
+/**
  * 视频资源
  */
 export interface VideoResource {
@@ -143,6 +213,8 @@ export interface VideoResource {
   isVip: boolean
   /** 是否为源文件 */
   isSource: boolean
+  /** DASH 时由后端解析 MPD 得到的子流列表 */
+  variants?: DashVariant[]
 }
 
 /**

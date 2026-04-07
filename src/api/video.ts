@@ -26,6 +26,7 @@ import type {
   ReportListParams,
   HandleReportParams,
   HandleReportResult,
+  TranscodeProgress,
 } from './types'
 import type { PaginationParams } from './types/common'
 
@@ -37,6 +38,27 @@ import type { PaginationParams } from './types/common'
  */
 export function getVideoList(params?: VideoListParams): Promise<PaginatedData<AdminVideoItem>> {
   return request.get('/admin/video/list', { params })
+}
+
+/**
+ * 批量获取转码进度快照（首次加载与 SSE 重连同步）
+ * GET /admin/video/transcode/progress
+ */
+export function getTranscodeProgress(videoIds: number[]): Promise<{ items: TranscodeProgress[] }> {
+  return request.get('/admin/video/transcode/progress', {
+    params: { videoIds: videoIds.join(',') },
+  })
+}
+
+/**
+ * 构建转码进度 SSE URL（EventSource 用 query token）
+ * GET /admin/video/transcode/progress/stream
+ */
+export function buildTranscodeProgressStreamUrl(videoIds: number[], token: string): string {
+  const params = new URLSearchParams()
+  params.set('videoIds', videoIds.join(','))
+  params.set('token', token)
+  return `/v1/admin/video/transcode/progress/stream?${params.toString()}`
 }
 
 /**
@@ -90,6 +112,14 @@ export function deleteDanmu(params: DeleteDanmuParams): Promise<DeleteDanmuResul
 }
 
 // ============ 分区管理 ============
+
+/**
+ * 获取分区列表 (客户端可见)
+ * GET /common/video/partitions
+ */
+export function getCommonPartitions(): Promise<Partition[]> {
+  return request.get('/common/video/partitions')
+}
 
 /**
  * 获取分区列表

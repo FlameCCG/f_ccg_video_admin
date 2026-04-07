@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils'
 /**
  * 稿件审核页
  * Submission Review Page
@@ -22,10 +23,11 @@ import {
 } from 'naive-ui'
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 import { getVideoList, reviewVideo, getPartitions } from '@/api/video'
-import type { AdminVideoItem, ReviewStatus } from '@/api/types'
+import type { AdminVideoItem, ReviewStatus, VideoSortType } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
 
 const { t } = useI18n()
@@ -37,12 +39,14 @@ const queryClient = useQueryClient()
 const searchParams = ref({
   keyword: '',
   partitionId: null as number | null,
+  sort: 'latest' as VideoSortType,
   page: 1,
   pageSize: 10,
 })
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 详情抽屉状态 */
 const detailDrawerVisible = ref(false)
@@ -62,7 +66,7 @@ const {
       partitionId: searchParams.value.partitionId ?? undefined,
       page: searchParams.value.page,
       pageSize: searchParams.value.pageSize,
-      sort: 'oldest', // 按提交时间排序，先提交先审核
+      sort: searchParams.value.sort,
     }),
   staleTime: 30 * 1000,
 })
@@ -77,10 +81,17 @@ const { data: partitionsData } = useQuery({
 /** 审核视频 mutation */
 const reviewMutation = useMutation({
   mutationFn: reviewVideo,
-  onSuccess: () => {
-    message.success(t('video.review.passSuccess'))
+  onSuccess: (_, variables) => {
+    const successMap: Record<ReviewStatus, string> = {
+      1: t('video.review.passSuccess'),
+      2: t('video.review.toPrivateSuccess'),
+      3: t('video.review.rejectSuccess'),
+    }
+    message.success(successMap[variables.status])
     checkedRowKeys.value = []
     void queryClient.invalidateQueries({ queryKey: ['reviewVideoList'] })
+    void queryClient.invalidateQueries({ queryKey: ['videoList'] })
+    void queryClient.invalidateQueries({ queryKey: ['recycleVideoList'] })
   },
   onError: (error: Error) => {
     message.error(error.message || t('common.tips.operationFailed'))
@@ -102,24 +113,16 @@ const partitionOptions = computed(() => {
   }))
 })
 
+const sortOptions = computed(() => [
+  { value: 'latest', label: t('video.filter.sortOptions.newest') },
+  { value: 'duration', label: t('video.filter.sortOptions.duration') },
+])
+
 /** 格式化时长 */
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
-/** 格式化日期时间 */
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
 }
 
 /** 表格列配置 */
@@ -224,6 +227,7 @@ function handleReset(): void {
   searchParams.value = {
     keyword: '',
     partitionId: null,
+    sort: 'latest',
     page: 1,
     pageSize: 10,
   }
@@ -249,9 +253,9 @@ function handleAction(key: string, row: AdminVideoItem): void {
     selectedVideoId.value = row.id
     detailDrawerVisible.value = true
   } else if (key === 'approve') {
-    confirmReview([row.id], 1)
+    confirmReview(resolveTargetIds(row.id), 1)
   } else if (key === 'reject') {
-    confirmReview([row.id], 3)
+    confirmReview(resolveTargetIds(row.id), 3)
   }
 }
 
@@ -274,7 +278,12 @@ function handleBatchAction(key: string): void {
 
 /** 确认审核 */
 function confirmReview(videoIds: number[], status: ReviewStatus): void {
-  const statusTextMap: Record<ReviewStatus, string> = {
+  const actionLabelMap: Record<ReviewStatus, string> = {
+    1: t('video.review.pass'),
+    2: t('video.review.toPrivate'),
+    3: t('video.review.reject'),
+  }
+  const detailMap: Record<ReviewStatus, string> = {
     1: t('video.review.confirmPass'),
     2: t('video.review.confirmToPrivate'),
     3: t('video.review.confirmReject'),
@@ -282,7 +291,7 @@ function confirmReview(videoIds: number[], status: ReviewStatus): void {
 
   dialog.warning({
     title: t('video.review.title'),
-    content: statusTextMap[status],
+    content: createDialogContent(actionLabelMap[status], videoIds.length, detailMap[status]),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {
@@ -320,6 +329,18 @@ function handleRefresh(): void {
               :placeholder="t('video.filter.partitionPlaceholder')"
               :width="'100%'"
               @change="(val) => (searchParams.partitionId = val as number | null)"
+            />
+          </n-form-item>
+        </n-gi>
+        <n-gi span="6 m:3 l:2">
+          <n-form-item :label="t('video.filter.sortBy')" path="sort">
+            <filter-select
+              :value="searchParams.sort"
+              :options="sortOptions"
+              :placeholder="t('video.filter.sortBy')"
+              :clearable="false"
+              :width="'100%'"
+              @change="(val) => (searchParams.sort = (val as VideoSortType) || 'latest')"
             />
           </n-form-item>
         </n-gi>
