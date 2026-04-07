@@ -60,6 +60,7 @@ function updateField<K extends keyof EmailConfig>(field: K, value: EmailConfig[K
             :value="formData.authCode"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateField('authCode', v)"
           />
         </n-form-item>

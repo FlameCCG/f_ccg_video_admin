@@ -28,6 +28,9 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+type EditableSiteSection = 'contentReview' | 'login' | 'register'
+type EditableSiteRootField = 'defaultUserBannerID' | 'defaultUserBannerIDs'
+
 const formData = computed({
   get: () => props.modelValue,
   set: (val) => {
@@ -35,7 +38,7 @@ const formData = computed({
   },
 })
 
-function updateField<K extends keyof SiteConfig>(
+function updateField<K extends EditableSiteSection>(
   section: K,
   field: keyof SiteConfig[K],
   value: SiteConfig[K][keyof SiteConfig[K]]
@@ -49,6 +52,11 @@ function updateField<K extends keyof SiteConfig>(
     },
   }
   emit('update:modelValue', updated)
+}
+
+function updateRootField<K extends EditableSiteRootField>(field: K, value: SiteConfig[K]): void {
+  if (!formData.value) return
+  emit('update:modelValue', { ...formData.value, [field]: value })
 }
 
 function updateStorageField(subSection: 'local' | 'minio', field: string, value: unknown): void {
@@ -85,6 +93,14 @@ function handlePublicPrefixesChange(value: string): void {
     .filter(Boolean)
   updateStorageField('minio', 'publicPrefixes', prefixes)
 }
+
+function handleDefaultBannerIDsChange(value: string): void {
+  const ids = value
+    .split(',')
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isInteger(item) && item > 0)
+  updateRootField('defaultUserBannerIDs', ids)
+}
 </script>
 
 <template>
@@ -113,6 +129,38 @@ function handlePublicPrefixesChange(value: string): void {
           <n-switch
             :value="formData.login.qqLogin"
             @update:value="(v: boolean) => updateField('login', 'qqLogin', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.googleLogin')">
+          <n-switch
+            :value="formData.login.googleLogin"
+            @update:value="(v: boolean) => updateField('login', 'googleLogin', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.gitHubLogin')">
+          <n-switch
+            :value="formData.login.gitHubLogin"
+            @update:value="(v: boolean) => updateField('login', 'gitHubLogin', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.linuxdoLogin')">
+          <n-switch
+            :value="formData.login.linuxdoLogin"
+            @update:value="(v: boolean) => updateField('login', 'linuxdoLogin', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.xLogin')">
+          <n-switch
+            :value="formData.login.xLogin"
+            @update:value="(v: boolean) => updateField('login', 'xLogin', v)"
           />
         </n-form-item>
       </n-grid-item>
@@ -157,6 +205,31 @@ function handlePublicPrefixesChange(value: string): void {
             :min="0"
             :max="100"
             @update:value="(v) => updateField('login', 'textClickCaptchaPadding', v ?? 20)"
+          />
+        </n-form-item>
+      </n-grid-item>
+    </n-grid>
+
+    <!-- 用户横幅 -->
+    <n-divider title-placement="left">
+      <n-text strong>{{ t('siteConfig.site.banner.title') }}</n-text>
+    </n-divider>
+    <n-grid :cols="2" :x-gap="24">
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.banner.defaultUserBannerID')">
+          <n-input-number
+            :value="formData.defaultUserBannerID"
+            :min="1"
+            @update:value="(v) => updateRootField('defaultUserBannerID', v ?? 1)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.banner.defaultUserBannerIDs')">
+          <n-input
+            :value="formData.defaultUserBannerIDs.join(', ')"
+            :placeholder="t('siteConfig.site.banner.defaultUserBannerIDsTip')"
+            @update:value="handleDefaultBannerIDsChange"
           />
         </n-form-item>
       </n-grid-item>
@@ -265,7 +338,10 @@ function handlePublicPrefixesChange(value: string): void {
         </n-form-item>
       </n-grid-item>
       <n-grid-item :span="2">
-        <n-form-item :label="t('siteConfig.site.storage.chunkDir')">
+        <n-form-item
+          v-if="formData.storage.chunkDir !== undefined"
+          :label="t('siteConfig.site.storage.chunkDir')"
+        >
           <n-input
             :value="formData.storage.chunkDir"
             @update:value="(v) => updateStorageRootField('chunkDir', v)"
@@ -275,101 +351,106 @@ function handlePublicPrefixesChange(value: string): void {
     </n-grid>
 
     <!-- 本地存储 -->
-    <n-divider title-placement="left" dashed>
-      <n-text>{{ t('siteConfig.site.storage.local.title') }}</n-text>
-    </n-divider>
-    <n-grid :cols="2" :x-gap="24">
-      <n-grid-item>
-        <n-form-item :label="t('siteConfig.site.storage.local.enable')">
-          <n-switch
-            :value="formData.storage.local.enable"
-            @update:value="(v: boolean) => updateStorageField('local', 'enable', v)"
-          />
-        </n-form-item>
-      </n-grid-item>
-      <n-grid-item>
-        <n-form-item :label="t('siteConfig.site.storage.local.path')">
-          <n-input
-            :value="formData.storage.local.path"
-            @update:value="(v) => updateStorageField('local', 'path', v)"
-          />
-        </n-form-item>
-      </n-grid-item>
-    </n-grid>
+    <template v-if="formData.storage.local">
+      <n-divider title-placement="left" dashed>
+        <n-text>{{ t('siteConfig.site.storage.local.title') }}</n-text>
+      </n-divider>
+      <n-grid :cols="2" :x-gap="24">
+        <n-grid-item>
+          <n-form-item :label="t('siteConfig.site.storage.local.enable')">
+            <n-switch
+              :value="formData.storage.local.enable"
+              @update:value="(v: boolean) => updateStorageField('local', 'enable', v)"
+            />
+          </n-form-item>
+        </n-grid-item>
+        <n-grid-item>
+          <n-form-item :label="t('siteConfig.site.storage.local.path')">
+            <n-input
+              :value="formData.storage.local.path"
+              @update:value="(v) => updateStorageField('local', 'path', v)"
+            />
+          </n-form-item>
+        </n-grid-item>
+      </n-grid>
+    </template>
 
     <!-- MinIO存储 -->
-    <n-divider title-placement="left" dashed>
-      <n-text>{{ t('siteConfig.site.storage.minio.title') }}</n-text>
-    </n-divider>
-    <n-grid :cols="2" :x-gap="24">
-      <n-grid-item>
-        <n-form-item :label="t('siteConfig.site.storage.minio.enable')">
-          <n-switch
-            :value="formData.storage.minio.enable"
-            @update:value="(v: boolean) => updateStorageField('minio', 'enable', v)"
-          />
-        </n-form-item>
-      </n-grid-item>
-      <n-grid-item>
-        <n-form-item :label="t('siteConfig.site.storage.minio.useSSL')">
-          <n-switch
-            :value="formData.storage.minio.useSSL"
-            @update:value="(v: boolean) => updateStorageField('minio', 'useSSL', v)"
-          />
-        </n-form-item>
-      </n-grid-item>
-      <n-grid-item>
-        <n-form-item :label="t('siteConfig.site.storage.minio.endpoint')">
-          <n-input
-            :value="formData.storage.minio.endpoint"
-            @update:value="(v) => updateStorageField('minio', 'endpoint', v)"
-          />
-        </n-form-item>
-      </n-grid-item>
-      <n-grid-item>
-        <n-form-item :label="t('siteConfig.site.storage.minio.bucket')">
-          <n-input
-            :value="formData.storage.minio.bucket"
-            @update:value="(v) => updateStorageField('minio', 'bucket', v)"
-          />
-        </n-form-item>
-      </n-grid-item>
-      <n-grid-item>
-        <n-form-item :label="t('siteConfig.site.storage.minio.accessKey')">
-          <n-input
-            :value="formData.storage.minio.accessKey"
-            @update:value="(v) => updateStorageField('minio', 'accessKey', v)"
-          />
-        </n-form-item>
-      </n-grid-item>
-      <n-grid-item>
-        <n-form-item :label="t('siteConfig.site.storage.minio.secretKey')">
-          <n-input
-            :value="formData.storage.minio.secretKey"
-            type="password"
-            show-password-on="click"
-            @update:value="(v) => updateStorageField('minio', 'secretKey', v)"
-          />
-        </n-form-item>
-      </n-grid-item>
-      <n-grid-item>
-        <n-form-item :label="t('siteConfig.site.storage.minio.userUploadPrefix')">
-          <n-input
-            :value="formData.storage.minio.userUploadPrefix"
-            @update:value="(v) => updateStorageField('minio', 'userUploadPrefix', v)"
-          />
-        </n-form-item>
-      </n-grid-item>
-      <n-grid-item>
-        <n-form-item :label="t('siteConfig.site.storage.minio.publicPrefixes')">
-          <n-input
-            :value="formData.storage.minio.publicPrefixes.join(', ')"
-            :placeholder="t('siteConfig.site.storage.minio.publicPrefixesTip')"
-            @update:value="handlePublicPrefixesChange"
-          />
-        </n-form-item>
-      </n-grid-item>
-    </n-grid>
+    <template v-if="formData.storage.minio">
+      <n-divider title-placement="left" dashed>
+        <n-text>{{ t('siteConfig.site.storage.minio.title') }}</n-text>
+      </n-divider>
+      <n-grid :cols="2" :x-gap="24">
+        <n-grid-item>
+          <n-form-item :label="t('siteConfig.site.storage.minio.enable')">
+            <n-switch
+              :value="formData.storage.minio.enable"
+              @update:value="(v: boolean) => updateStorageField('minio', 'enable', v)"
+            />
+          </n-form-item>
+        </n-grid-item>
+        <n-grid-item>
+          <n-form-item :label="t('siteConfig.site.storage.minio.useSSL')">
+            <n-switch
+              :value="formData.storage.minio.useSSL"
+              @update:value="(v: boolean) => updateStorageField('minio', 'useSSL', v)"
+            />
+          </n-form-item>
+        </n-grid-item>
+        <n-grid-item>
+          <n-form-item :label="t('siteConfig.site.storage.minio.endpoint')">
+            <n-input
+              :value="formData.storage.minio.endpoint"
+              @update:value="(v) => updateStorageField('minio', 'endpoint', v)"
+            />
+          </n-form-item>
+        </n-grid-item>
+        <n-grid-item>
+          <n-form-item :label="t('siteConfig.site.storage.minio.bucket')">
+            <n-input
+              :value="formData.storage.minio.bucket"
+              @update:value="(v) => updateStorageField('minio', 'bucket', v)"
+            />
+          </n-form-item>
+        </n-grid-item>
+        <n-grid-item>
+          <n-form-item :label="t('siteConfig.site.storage.minio.accessKey')">
+            <n-input
+              :value="formData.storage.minio.accessKey"
+              @update:value="(v) => updateStorageField('minio', 'accessKey', v)"
+            />
+          </n-form-item>
+        </n-grid-item>
+        <n-grid-item>
+          <n-form-item :label="t('siteConfig.site.storage.minio.secretKey')">
+            <n-input
+              :value="formData.storage.minio.secretKey"
+              type="password"
+              show-password-on="click"
+              :input-props="{ autocomplete: 'new-password' }"
+              @update:value="(v) => updateStorageField('minio', 'secretKey', v)"
+            />
+          </n-form-item>
+        </n-grid-item>
+        <n-grid-item>
+          <n-form-item :label="t('siteConfig.site.storage.minio.userUploadPrefix')">
+            <n-input
+              :value="formData.storage.minio.userUploadPrefix"
+              @update:value="(v) => updateStorageField('minio', 'userUploadPrefix', v)"
+            />
+          </n-form-item>
+        </n-grid-item>
+        <n-grid-item>
+          <n-form-item :label="t('siteConfig.site.storage.minio.publicPrefixes')">
+            <n-input
+              :value="formData.storage.minio.publicPrefixes.join(', ')"
+              :placeholder="t('siteConfig.site.storage.minio.publicPrefixesTip')"
+              @update:value="handlePublicPrefixesChange"
+            />
+          </n-form-item>
+        </n-grid-item>
+      </n-grid>
+    </template>
   </n-form>
 </template>
 

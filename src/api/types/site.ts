@@ -5,7 +5,73 @@
 // ============ 站点配置类型 ============
 
 /** 配置名称类型 */
-export type SiteConfigName = 'site' | 'logger' | 'email' | 'transcode' | 'thirdLogin' | 'jwt'
+export type SiteConfigName =
+  | 'site'
+  | 'logger'
+  | 'email'
+  | 'ai'
+  | 'transcode'
+  | 'thirdLogin'
+  | 'jwt'
+  | 'server'
+
+/** 服务端 CORS 白名单（管理端仅暴露 corsOrigins） */
+export interface ServerCorsConfig {
+  corsOrigins: string[]
+}
+
+// ============ 公开站点配置类型（无需认证） ============
+
+/** 公开登录配置 */
+export interface PublicLoginConfig {
+  qqLogin: boolean
+  xLogin: boolean
+  googleLogin: boolean
+  gitHubLogin: boolean
+  linuxdoLogin: boolean
+  usernamePwdLogin: boolean
+  textGraphicCaptcha: boolean
+  textClickCaptcha: boolean
+  textClickCaptchaTTL: number
+  textClickCaptchaPadding: number
+}
+
+/** 公开注册配置 */
+export interface PublicRegisterConfig {
+  emailCaptcha: boolean
+  textGraphicCaptcha: boolean
+  slideCaptcha: boolean
+  slideCaptchaTTL: number
+  slideCaptchaPadding: number
+}
+
+/** 公开存储配置 */
+export interface PublicStorageConfig {
+  maxChunkSize: number
+  chunkSize: number
+  maxFileSize: number
+  maxUploadNum: number
+}
+
+/** 公开内容审核配置 */
+export interface PublicContentReviewConfig {
+  enable: boolean
+}
+
+/** 公开站点配置 */
+export interface PublicSiteConfig {
+  login: PublicLoginConfig
+  register: PublicRegisterConfig
+  storage: PublicStorageConfig
+  contentReview: PublicContentReviewConfig
+}
+
+/** 公开配置响应 */
+export interface PublicConfigResponse {
+  site: PublicSiteConfig
+}
+
+// ============ 管理后台站点配置类型 ============
 
 /** 内容审核配置 */
 export interface ContentReviewConfig {
@@ -15,6 +81,10 @@ export interface ContentReviewConfig {
 /** 登录配置 */
 export interface LoginConfig {
   qqLogin: boolean
+  xLogin: boolean
+  googleLogin: boolean
+  gitHubLogin: boolean
+  linuxdoLogin: boolean
   usernamePwdLogin: boolean
   textGraphicCaptcha: boolean
   textClickCaptcha: boolean
@@ -55,13 +125,17 @@ export interface StorageConfig {
   chunkSize: number
   maxFileSize: number
   maxUploadNum: number
-  chunkDir: string
-  local: LocalStorageConfig
-  minio: MinioStorageConfig
+  chunkDir?: string
+  local?: LocalStorageConfig
+  minio?: MinioStorageConfig
 }
 
 /** 基础站点配置 */
 export interface SiteConfig {
+  /** 用户注册时主页默认横幅 ID */
+  defaultUserBannerID: number
+  /** 系统默认提供的用户主页横幅 ID 列表 */
+  defaultUserBannerIDs: number[]
   contentReview: ContentReviewConfig
   login: LoginConfig
   register: RegisterConfig
@@ -93,25 +167,67 @@ export interface EmailConfig {
   isExpire: number
 }
 
-/** 转码配置 */
+/** AI 配置（与后端 conf.AI 对齐；豆包图/视频/Embedding 走方舟默认 BaseURL） */
+export interface AIModelOption {
+  label: string
+  value: string
+}
+
+export interface AIConfig {
+  chatModelBaseURL: string
+  chatModelAPIKey: string
+  chatModel: string
+  chatModels?: AIModelOption[]
+  /** 是否开启思考模式（开启后前台可选择思考强度） */
+  thinkingEnabled: boolean
+  /** 默认思考强度 */
+  thinkingEffort: string
+  /** 可选思考强度列表 */
+  thinkingEfforts?: AIModelOption[]
+  embeddingModel: string
+  embeddingDimensions: number
+  doubaoModelAPIKey: string
+  systemPrompt: string
+  imageModel: string
+  imageModels?: AIModelOption[]
+  videoModel: string
+  videoModels?: AIModelOption[]
+  vectorIndex: string
+  /** 向量召回 TopK，同时作为 AI 找视频注入候选上限 */
+  vectorTopK: number
+  timeoutSec: number
+}
+
+/** 转码配置（与后端 conf.Transcode 对齐） */
 export interface TranscodeConfig {
   maxWorkers: number
   transcodeResolutions: number[]
   highBitrateThreshold: number
-  highBitrateMediumTarget: number
+  /** 高码率档：4K 源片规范化 / DASH 2160 High */
+  bitrate2160HighKbpsReduceRatio: number
+  /** 高码率档：1080 High / 1080 源片规范化 */
+  bitrate1080HighKbpsReduceRatio: number
+  bitrate2160KbpsReduceRatio: number
   bitrate1080KbpsReduceRatio: number
   bitrate720KbpsReduceRatio: number
   bitrate360KbpsReduceRatio: number
   cpuMode: boolean
   crfHigh: number
   crfMedium: number
+  crf720: number
+  crf360: number
   cpuPreset: string
   gpuCQPHigh: number
   gpuCQPMedium: number
+  gpuCQP720: number
+  gpuCQP360: number
   gpuPreset: string
   gpuMode: boolean
   threads: number
   hardwareScale: boolean
+  mp4Enable: boolean
+  dashEnable: boolean
+  dashSegDuration: number
 }
 
 /** QQ 登录配置 */
@@ -121,9 +237,20 @@ export interface QQLoginConfig {
   redirect: string
 }
 
+/** 通用 OAuth 登录配置 */
+export interface OAuthLoginConfig {
+  clientID: string
+  clientSecret: string
+  redirect: string
+}
+
 /** 第三方登录配置 */
 export interface ThirdLoginConfig {
   qq: QQLoginConfig
+  google: OAuthLoginConfig
+  github: OAuthLoginConfig
+  linuxdo: OAuthLoginConfig
+  x: OAuthLoginConfig
 }
 
 /** JWT 配置 */
@@ -139,9 +266,11 @@ export interface SiteConfigMap {
   site: SiteConfig
   logger: LoggerConfig
   email: EmailConfig
+  ai: AIConfig
   transcode: TranscodeConfig
   thirdLogin: ThirdLoginConfig
   jwt: JwtConfig
+  server: ServerCorsConfig
 }
 
 // ============ 站点统计类型 ============

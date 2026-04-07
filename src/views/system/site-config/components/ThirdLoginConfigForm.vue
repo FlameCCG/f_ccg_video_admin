@@ -35,6 +35,21 @@ function updateQQField(field: 'appID' | 'appKey' | 'redirect', value: string): v
     },
   })
 }
+
+function updateOAuthField(
+  provider: 'google' | 'github' | 'linuxdo' | 'x',
+  field: 'clientID' | 'clientSecret' | 'redirect',
+  value: string
+): void {
+  if (!formData.value) return
+  emit('update:modelValue', {
+    ...formData.value,
+    [provider]: {
+      ...formData.value[provider],
+      [field]: value,
+    },
+  })
+}
 </script>
 
 <template>
@@ -55,6 +70,7 @@ function updateQQField(field: 'appID' | 'appKey' | 'redirect', value: string): v
             :value="formData.qq.appKey"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateQQField('appKey', v)"
           />
         </n-form-item>
@@ -64,6 +80,142 @@ function updateQQField(field: 'appID' | 'appKey' | 'redirect', value: string): v
           <n-input
             :value="formData.qq.redirect"
             @update:value="(v) => updateQQField('redirect', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+    </n-grid>
+
+    <!-- Google 登录 -->
+    <n-divider title-placement="left">
+      <n-text strong>{{ t('siteConfig.thirdLogin.google.title') }}</n-text>
+    </n-divider>
+    <n-grid :cols="2" :x-gap="24">
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.thirdLogin.google.clientID')">
+          <n-input
+            :value="formData.google.clientID"
+            @update:value="(v) => updateOAuthField('google', 'clientID', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.thirdLogin.google.clientSecret')">
+          <n-input
+            :value="formData.google.clientSecret"
+            type="password"
+            show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
+            @update:value="(v) => updateOAuthField('google', 'clientSecret', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item :span="2">
+        <n-form-item :label="t('siteConfig.thirdLogin.google.redirect')">
+          <n-input
+            :value="formData.google.redirect"
+            @update:value="(v) => updateOAuthField('google', 'redirect', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+    </n-grid>
+
+    <!-- GitHub 登录 -->
+    <n-divider title-placement="left">
+      <n-text strong>{{ t('siteConfig.thirdLogin.github.title') }}</n-text>
+    </n-divider>
+    <n-grid :cols="2" :x-gap="24">
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.thirdLogin.github.clientID')">
+          <n-input
+            :value="formData.github.clientID"
+            @update:value="(v) => updateOAuthField('github', 'clientID', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.thirdLogin.github.clientSecret')">
+          <n-input
+            :value="formData.github.clientSecret"
+            type="password"
+            show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
+            @update:value="(v) => updateOAuthField('github', 'clientSecret', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item :span="2">
+        <n-form-item :label="t('siteConfig.thirdLogin.github.redirect')">
+          <n-input
+            :value="formData.github.redirect"
+            @update:value="(v) => updateOAuthField('github', 'redirect', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+    </n-grid>
+
+    <!-- Linux.do 登录 -->
+    <n-divider title-placement="left">
+      <n-text strong>{{ t('siteConfig.thirdLogin.linuxdo.title') }}</n-text>
+    </n-divider>
+    <n-grid :cols="2" :x-gap="24">
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.thirdLogin.linuxdo.clientID')">
+          <n-input
+            :value="formData.linuxdo.clientID"
+            @update:value="(v) => updateOAuthField('linuxdo', 'clientID', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.thirdLogin.linuxdo.clientSecret')">
+          <n-input
+            :value="formData.linuxdo.clientSecret"
+            type="password"
+            show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
+            @update:value="(v) => updateOAuthField('linuxdo', 'clientSecret', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item :span="2">
+        <n-form-item :label="t('siteConfig.thirdLogin.linuxdo.redirect')">
+          <n-input
+            :value="formData.linuxdo.redirect"
+            @update:value="(v) => updateOAuthField('linuxdo', 'redirect', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+    </n-grid>
+
+    <!-- X 登录 -->
+    <n-divider title-placement="left">
+      <n-text strong>{{ t('siteConfig.thirdLogin.x.title') }}</n-text>
+    </n-divider>
+    <n-grid :cols="2" :x-gap="24">
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.thirdLogin.x.clientID')">
+          <n-input
+            :value="formData.x.clientID"
+            @update:value="(v) => updateOAuthField('x', 'clientID', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.thirdLogin.x.clientSecret')">
+          <n-input
+            :value="formData.x.clientSecret"
+            type="password"
+            show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
+            @update:value="(v) => updateOAuthField('x', 'clientSecret', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item :span="2">
+        <n-form-item :label="t('siteConfig.thirdLogin.x.redirect')">
+          <n-input
+            :value="formData.x.redirect"
+            @update:value="(v) => updateOAuthField('x', 'redirect', v)"
           />
         </n-form-item>
       </n-grid-item>
