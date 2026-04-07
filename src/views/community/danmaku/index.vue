@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils'
 /**
  * 弹幕列表页
  * Danmaku List Page
@@ -27,6 +28,7 @@ import type { DanmuPosition } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm } from '@/components/form'
 import { AppAvatar } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -44,6 +46,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 获取弹幕列表 */
 const {
@@ -99,19 +102,6 @@ function formatNumber(num: number | undefined | null): string {
   return num.toString()
 }
 
-/** 格式化日期时间 */
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
-
 /** 获取位置标签 */
 function getPositionLabel(position: DanmuPosition): string {
   const labels: Record<DanmuPosition, string> = {
@@ -129,15 +119,19 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     fixed: 'left',
   },
   {
-    title: t('community.danmaku.user'),
-    key: 'user',
-    width: 140,
+    title: t('community.danmaku.avatar'),
+    key: 'avatar',
+    width: 80,
+    align: 'center',
     render: (row) => {
-      return h(NSpace, { align: 'center', size: 8 }, () => [
-        h(AppAvatar, { src: row.avatar as string, text: row.username as string, size: 28 }),
-        h('span', { class: 'truncate max-w-[80px]' }, row.username as string),
-      ])
+      return h(AppAvatar, { src: row.avatar as string, text: row.username as string, size: 32 })
     },
+  },
+  {
+    title: t('community.danmaku.username'),
+    key: 'username',
+    width: 120,
+    ellipsis: { tooltip: true },
   },
   {
     title: t('community.danmaku.content'),
@@ -164,30 +158,26 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     },
   },
   {
-    title: t('community.danmaku.video'),
-    key: 'video',
-    width: 200,
+    title: t('community.danmaku.videoCover'),
+    key: 'videoCover',
+    width: 100,
     render: (row) => {
-      return h(NSpace, { align: 'center', size: 8 }, () => [
-        h(NImage, {
-          src: row.videoCover as string,
-          width: 48,
-          height: 32,
-          objectFit: 'cover',
-          lazy: true,
-          previewDisabled: true,
-          style: { borderRadius: '4px', flexShrink: 0 },
-        }),
-        h(
-          NTooltip,
-          { trigger: 'hover' },
-          {
-            trigger: () => h('span', { class: 'truncate max-w-[120px]' }, row.videoTitle as string),
-            default: () => row.videoTitle as string,
-          }
-        ),
-      ])
+      return h(NImage, {
+        src: row.videoCover as string,
+        width: 80,
+        height: 48,
+        objectFit: 'cover',
+        lazy: true,
+        previewDisabled: false,
+        style: { borderRadius: '4px' },
+      })
     },
+  },
+  {
+    title: t('community.danmaku.videoTitle'),
+    key: 'videoTitle',
+    width: 180,
+    ellipsis: { tooltip: true },
   },
   {
     title: t('community.danmaku.timeOffset'),
@@ -276,7 +266,7 @@ function handlePageSizeChange(pageSize: number): void {
 /** 处理操作 */
 function handleAction(key: string, row: Record<string, unknown>): void {
   if (key === 'delete') {
-    confirmDelete([row.id as number])
+    confirmDelete(resolveTargetIds(row.id as number))
   }
 }
 
@@ -297,7 +287,11 @@ function handleBatchAction(key: string): void {
 function confirmDelete(danmuIds: number[]): void {
   dialog.warning({
     title: t('community.danmaku.deleteTitle'),
-    content: t('community.danmaku.confirmDelete', { count: danmuIds.length }),
+    content: createDialogContent(
+      t('community.danmaku.deleteTitle'),
+      danmuIds.length,
+      t('community.danmaku.confirmDelete', { count: danmuIds.length })
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {

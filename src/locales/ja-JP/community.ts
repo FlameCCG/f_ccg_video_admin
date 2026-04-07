@@ -37,6 +37,7 @@ export default {
   comment: {
     title: 'コメント管理',
     user: 'ユーザー',
+    avatar: 'アバター',
     username: 'ユーザー名',
     usernamePlaceholder: 'ユーザー名で検索',
     content: '内容',
@@ -65,6 +66,7 @@ export default {
     description:
       'プラットフォーム上のすべての弾幕コンテンツを管理し、ユーザー、キーワードでフィルタリングして一括削除できます。',
     user: 'ユーザー',
+    avatar: 'アバター',
     username: 'ユーザー名',
     usernamePlaceholder: 'ユーザー名で検索',
     userId: 'ユーザーID',
@@ -73,6 +75,8 @@ export default {
     keywordPlaceholder: '弾幕内容を検索',
     content: '内容',
     video: '動画',
+    videoCover: '動画サムネイル',
+    videoTitle: '動画タイトル',
     timeOffset: '時間',
     color: '色',
     fontSize: 'フォントサイズ',
