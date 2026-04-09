@@ -1,40 +1,17 @@
 <script setup lang="ts">
 /**
  * 菜单组件
- * 从后端动态获取菜单，递归渲染菜单树，支持 SVG 图标
+ * 从后端动态获取菜单，递归渲染菜单树
+ * 图标完全由后端返回的 SVG 字符串渲染，无兜底逻辑
  */
-import { computed, h, type Component, type VNode } from 'vue'
+import { computed, h, type VNode } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NMenu, NIcon, type MenuOption } from 'naive-ui'
+import { NMenu, type MenuOption } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import type { Menu } from '@/api/types/rbac'
 import type { LocaleType } from '@/locales'
 import { usePermissionStore } from '@/stores/permission'
 import { SvgIcon } from '@/components/common'
-
-// 图标映射（使用内联 SVG）- 作为后备方案
-import MenuIconDashboard from '@/components/icons/MenuIconDashboard.vue'
-import MenuIconUser from '@/components/icons/MenuIconUser.vue'
-import MenuIconVideo from '@/components/icons/MenuIconVideo.vue'
-import MenuIconComment from '@/components/icons/MenuIconComment.vue'
-import MenuIconDynamic from '@/components/icons/MenuIconDynamic.vue'
-import MenuIconBanner from '@/components/icons/MenuIconBanner.vue'
-import MenuIconNotification from '@/components/icons/MenuIconNotification.vue'
-import MenuIconRbac from '@/components/icons/MenuIconRbac.vue'
-import MenuIconSettings from '@/components/icons/MenuIconSettings.vue'
-import MenuIconContent from '@/components/icons/MenuIconContent.vue'
-import MenuIconCommunity from '@/components/icons/MenuIconCommunity.vue'
-import MenuIconMarketing from '@/components/icons/MenuIconMarketing.vue'
-import MenuIconAudit from '@/components/icons/MenuIconAudit.vue'
-import MenuIconVideoList from '@/components/icons/MenuIconVideoList.vue'
-import MenuIconRecycle from '@/components/icons/MenuIconRecycle.vue'
-import MenuIconCategory from '@/components/icons/MenuIconCategory.vue'
-import MenuIconReport from '@/components/icons/MenuIconReport.vue'
-import MenuIconDanmaku from '@/components/icons/MenuIconDanmaku.vue'
-import MenuIconBan from '@/components/icons/MenuIconBan.vue'
-import MenuIconRole from '@/components/icons/MenuIconRole.vue'
-import MenuIconMenu from '@/components/icons/MenuIconMenu.vue'
-import MenuIconApi from '@/components/icons/MenuIconApi.vue'
 
 defineProps<{
   /** 是否折叠状态 */
@@ -45,47 +22,6 @@ const route = useRoute()
 const router = useRouter()
 const { locale } = useI18n()
 const permissionStore = usePermissionStore()
-
-/**
- * 图标组件映射（后备方案）
- * 当后端 icon 字段不是 SVG 字符串时使用
- */
-const iconMap: Record<string, Component> = {
-  // 一级菜单
-  dashboard: MenuIconDashboard, // 仪表盘
-  content: MenuIconContent, // 内容管理
-  community: MenuIconCommunity, // 社区治理
-  marketing: MenuIconMarketing, // 营销推广
-  user: MenuIconUser, // 用户管理
-  settings: MenuIconSettings, // 系统设置
-  rbac: MenuIconRbac, // 权限管理（备用）
-
-  // 内容管理子菜单
-  audit: MenuIconAudit, // 稿件审核
-  'video-list': MenuIconVideoList, // 视频列表
-  video: MenuIconVideo, // 视频（通用）
-  recycle: MenuIconRecycle, // 视频回收站
-  category: MenuIconCategory, // 分区配置
-
-  // 社区治理子菜单
-  report: MenuIconReport, // 举报处理
-  comment: MenuIconComment, // 评论管控
-  danmaku: MenuIconDanmaku, // 弹幕管控
-  dynamic: MenuIconDynamic, // 动态管理
-
-  // 营销推广子菜单
-  banner: MenuIconBanner, // 轮播图管理
-  notification: MenuIconNotification, // 全站通知
-
-  // 用户管理子菜单
-  'user-list': MenuIconUser, // 用户列表
-  ban: MenuIconBan, // 封禁管理/记录
-
-  // 系统权限子菜单
-  role: MenuIconRole, // 角色管理
-  menu: MenuIconMenu, // 菜单权限
-  api: MenuIconApi, // 接口资源
-}
 
 /** 获取菜单标题（根据当前语言） */
 function getMenuTitle(menu: Menu): string {
@@ -100,21 +36,21 @@ function getMenuTitle(menu: Menu): string {
   }
 }
 
-/** 渲染图标 - 支持 SVG 字符串和组件映射 */
+/**
+ * 渲染图标 - 仅支持后端返回的 SVG 字符串
+ * 如果后端返回的不是 SVG 字符串，则不渲染图标
+ */
 function renderIcon(iconValue: string): (() => VNode) | undefined {
   if (!iconValue) return undefined
 
   // 检查是否是 SVG 字符串
   const trimmedIcon = iconValue.trim()
   if (trimmedIcon.startsWith('<svg')) {
-    // SVG 字符串直接用 SvgIcon 渲染，不需要 NIcon 包装
     return () => h(SvgIcon, { svg: trimmedIcon, size: 18 })
   }
 
-  // 后备：使用组件映射
-  const IconComponent = iconMap[iconValue]
-  if (!IconComponent) return undefined
-  return () => h(NIcon, null, { default: () => h(IconComponent) })
+  // 非 SVG 字符串不渲染图标
+  return undefined
 }
 
 /** 将菜单数据转换为 Naive UI MenuOption */
@@ -138,22 +74,28 @@ function convertToMenuOptions(menus: Menu[]): MenuOption[] {
 const menuOptions = computed(() => convertToMenuOptions(permissionStore.menus))
 
 /** 根据路由路径查找菜单 ID */
-function findMenuIdByPath(menus: Menu[], path: string): string {
+function findMenuIdByPath(menus: Menu[], path: string, parentPath = ''): string {
   for (const menu of menus) {
-    // 检查当前菜单的路径是否匹配
+    // 计算当前菜单的完整路径
+    let currentPath: string
     if (menu.path) {
-      // 完整路径匹配
-      if (menu.path === path) {
-        return String(menu.id)
+      if (menu.path.startsWith('/')) {
+        currentPath = menu.path
+      } else {
+        currentPath = parentPath ? `${parentPath}/${menu.path}` : `/${menu.path}`
       }
-      // 子路径匹配（如 /overview/dashboard 匹配 dashboard）
-      if (path.endsWith('/' + menu.path) || path === '/' + menu.path) {
-        return String(menu.id)
-      }
+    } else {
+      currentPath = parentPath
     }
+
+    // 检查当前菜单的路径是否匹配
+    if (currentPath && currentPath === path) {
+      return String(menu.id)
+    }
+
     // 递归检查子菜单
     if (menu.children && menu.children.length > 0) {
-      const childId = findMenuIdByPath(menu.children, path)
+      const childId = findMenuIdByPath(menu.children, path, currentPath)
       if (childId) return childId
     }
   }
@@ -164,23 +106,43 @@ function findMenuIdByPath(menus: Menu[], path: string): string {
 function findExpandedKeys(menus: Menu[], path: string): string[] {
   const keys: string[] = []
 
-  function findParent(items: Menu[], _parentId?: string): boolean {
+  function findParent(items: Menu[], parentPath = ''): boolean {
     for (const menu of items) {
       const currentId = String(menu.id)
+
+      // 计算当前菜单的完整路径
+      let currentPath: string
+      if (menu.path) {
+        if (menu.path.startsWith('/')) {
+          currentPath = menu.path
+        } else {
+          currentPath = parentPath ? `${parentPath}/${menu.path}` : `/${menu.path}`
+        }
+      } else {
+        currentPath = parentPath
+      }
 
       if (menu.children && menu.children.length > 0) {
         // 检查子菜单是否匹配
         for (const child of menu.children) {
+          let childPath: string
           if (child.path) {
-            const fullPath = menu.path ? `${menu.path}/${child.path}` : child.path
-            if (path === fullPath || path.endsWith('/' + child.path)) {
-              keys.push(currentId)
-              return true
+            if (child.path.startsWith('/')) {
+              childPath = child.path
+            } else {
+              childPath = currentPath ? `${currentPath}/${child.path}` : `/${child.path}`
             }
+          } else {
+            childPath = currentPath
+          }
+
+          if (path === childPath) {
+            keys.push(currentId)
+            return true
           }
         }
         // 递归检查更深层级
-        if (findParent(menu.children, currentId)) {
+        if (findParent(menu.children, currentPath)) {
           keys.push(currentId)
           return true
         }
@@ -206,11 +168,18 @@ const expandedKeys = computed(() => {
 /** 根据菜单 ID 查找菜单路径 */
 function findMenuPath(menus: Menu[], menuId: string, parentPath = ''): string | null {
   for (const menu of menus) {
-    const currentPath = menu.path
-      ? parentPath
-        ? `${parentPath}/${menu.path}`
-        : menu.path
-      : parentPath
+    // 如果菜单路径是绝对路径（以 / 开头），直接使用
+    // 否则拼接父路径
+    let currentPath: string
+    if (menu.path) {
+      if (menu.path.startsWith('/')) {
+        currentPath = menu.path
+      } else {
+        currentPath = parentPath ? `${parentPath}/${menu.path}` : `/${menu.path}`
+      }
+    } else {
+      currentPath = parentPath
+    }
 
     if (String(menu.id) === menuId) {
       return currentPath || null
