@@ -26,3 +26,6 @@ export {
   clearTokens,
   hasToken,
 } from './storage'
+
+// URL 相关
+export { normalizeResourceUrl } from './url'

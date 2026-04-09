@@ -6,6 +6,7 @@
  */
 import { computed } from 'vue'
 import { NAvatar } from 'naive-ui'
+import { normalizeResourceUrl } from '@/utils'
 
 interface Props {
   /** 头像图片地址 */
@@ -40,16 +41,19 @@ const displayText = computed(() => {
   return props.text.charAt(0).toUpperCase()
 })
 
+/** 规范化后的头像地址 */
+const normalizedSrc = computed(() => normalizeResourceUrl(props.src))
+
 /** 是否显示文字模式 */
-const showText = computed(() => !props.src && props.text)
+const showText = computed(() => !normalizedSrc.value && props.text)
 
 /** 是否显示默认图标 */
-const showFallback = computed(() => !props.src && !props.text && props.fallbackIcon)
+const showFallback = computed(() => !normalizedSrc.value && !props.text && props.fallbackIcon)
 </script>
 
 <template>
   <n-avatar
-    :src="src"
+    :src="normalizedSrc"
     :size="size"
     :round="round"
     :bordered="bordered"

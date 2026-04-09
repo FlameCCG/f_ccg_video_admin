@@ -7,6 +7,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getUserInfo, switchRole } from '@/api/user'
 import type { AdminUserInfo, SwitchRoleParams } from '@/api/types'
+import { normalizeResourceUrl } from '@/utils'
 
 /**
  * 用户状态 Store
@@ -32,7 +33,7 @@ export const useUserStore = defineStore('user', () => {
   const username = computed(() => userInfo.value?.username ?? '')
 
   /** 用户头像 */
-  const avatar = computed(() => userInfo.value?.avatar ?? '')
+  const avatar = computed(() => normalizeResourceUrl(userInfo.value?.avatar))
 
   /** 用户邮箱 */
   const email = computed(() => userInfo.value?.email ?? '')
