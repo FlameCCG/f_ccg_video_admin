@@ -64,13 +64,14 @@ export interface ContentReviewConfig {
 /** 登录配置 */
 export interface LoginConfig {
   qqLogin: boolean
+  xLogin: boolean
+  googleLogin: boolean
+  gitHubLogin: boolean
   usernamePwdLogin: boolean
   textGraphicCaptcha: boolean
   textClickCaptcha: boolean
   textClickCaptchaTTL: number
   textClickCaptchaPadding: number
-  /** 滑块验证码开关 */
-  slideCaptcha: boolean
 }
 
 /** 注册配置 */
@@ -113,6 +114,10 @@ export interface StorageConfig {
 
 /** 基础站点配置 */
 export interface SiteConfig {
+  /** 用户注册时主页默认横幅 ID */
+  defaultUserBannerID: number
+  /** 系统默认提供的用户主页横幅 ID 列表 */
+  defaultUserBannerIDs: number[]
   contentReview: ContentReviewConfig
   login: LoginConfig
   register: RegisterConfig
@@ -172,9 +177,19 @@ export interface QQLoginConfig {
   redirect: string
 }
 
+/** 通用 OAuth 登录配置 */
+export interface OAuthLoginConfig {
+  clientID: string
+  clientSecret: string
+  redirect: string
+}
+
 /** 第三方登录配置 */
 export interface ThirdLoginConfig {
   qq: QQLoginConfig
+  google: OAuthLoginConfig
+  github: OAuthLoginConfig
+  x: OAuthLoginConfig
 }
 
 /** JWT 配置 */

@@ -28,6 +28,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+type EditableSiteSection = 'contentReview' | 'login' | 'register'
+
 const formData = computed({
   get: () => props.modelValue,
   set: (val) => {
@@ -35,7 +37,7 @@ const formData = computed({
   },
 })
 
-function updateField<K extends keyof SiteConfig>(
+function updateField<K extends EditableSiteSection>(
   section: K,
   field: keyof SiteConfig[K],
   value: SiteConfig[K][keyof SiteConfig[K]]
@@ -113,6 +115,30 @@ function handlePublicPrefixesChange(value: string): void {
           <n-switch
             :value="formData.login.qqLogin"
             @update:value="(v: boolean) => updateField('login', 'qqLogin', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.googleLogin')">
+          <n-switch
+            :value="formData.login.googleLogin"
+            @update:value="(v: boolean) => updateField('login', 'googleLogin', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.gitHubLogin')">
+          <n-switch
+            :value="formData.login.gitHubLogin"
+            @update:value="(v: boolean) => updateField('login', 'gitHubLogin', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.xLogin')">
+          <n-switch
+            :value="formData.login.xLogin"
+            @update:value="(v: boolean) => updateField('login', 'xLogin', v)"
           />
         </n-form-item>
       </n-grid-item>

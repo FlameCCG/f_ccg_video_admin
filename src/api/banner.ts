@@ -10,6 +10,9 @@ import type {
   CreateBannerParams,
   UpdateBannerParams,
   DeleteBannerParams,
+  SetRegisterDefaultBannerParams,
+  UpdateDefaultUserBannerListParams,
+  UpdateDefaultUserBannerListResult,
 } from './types'
 
 /**
@@ -42,4 +45,24 @@ export function updateBanner(params: UpdateBannerParams): Promise<EmptyData> {
  */
 export function deleteBanner(params: DeleteBannerParams): Promise<EmptyData> {
   return request.delete('/admin/banner', { data: params })
+}
+
+/**
+ * 设置用户注册时主页默认横幅
+ * PUT /admin/user/banner
+ */
+export function setRegisterDefaultBanner(
+  params: SetRegisterDefaultBannerParams
+): Promise<EmptyData> {
+  return request.put('/admin/user/banner', params)
+}
+
+/**
+ * 维护系统默认用户主页横幅列表
+ * PUT /admin/user/banner/defaults
+ */
+export function updateDefaultUserBannerList(
+  params: UpdateDefaultUserBannerListParams
+): Promise<UpdateDefaultUserBannerListResult> {
+  return request.put('/admin/user/banner/defaults', params)
 }

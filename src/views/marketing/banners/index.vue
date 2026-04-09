@@ -20,22 +20,40 @@ import {
   useDialog,
 } from 'naive-ui'
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
-import { getBannerList, createBanner, updateBanner, deleteBanner } from '@/api/banner'
-import type { BannerItem, BannerType } from '@/api/types'
+import {
+  getBannerList,
+  createBanner,
+  updateBanner,
+  deleteBanner,
+  setRegisterDefaultBanner,
+  updateDefaultUserBannerList,
+} from '@/api/banner'
+import { getSiteConfig } from '@/api/site'
+import { getCommonPartitions } from '@/api/video'
+import type {
+  BannerItem,
+  BannerType,
+  SiteConfig,
+  UpdateDefaultUserBannerListAction,
+} from '@/api/types'
+import { usePermission } from '@/composables'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppStatusTag } from '@/components/common'
 import BannerFormModal from './components/BannerFormModal.vue'
+import UserBannerDefaultsDialog from './components/UserBannerDefaultsDialog.vue'
 
 const { t } = useI18n()
 const message = useMessage()
 const dialog = useDialog()
 const queryClient = useQueryClient()
+const { hasPermission } = usePermission()
 
 /** 搜索参数 */
 const searchParams = ref({
   type: null as BannerType | null,
   show: null as number | null,
+  partitionId: null as number | null,
   page: 1,
   pageSize: 10,
 })
@@ -46,6 +64,8 @@ const checkedRowKeys = ref<DataTableRowKey[]>([])
 /** 表单弹窗状态 */
 const formModalVisible = ref(false)
 const editingBanner = ref<BannerItem | null>(null)
+const defaultBannerDialogVisible = ref(false)
+const selectedDefaultBannerIds = ref<number[]>([])
 
 /** 获取轮播图列表 */
 const {
@@ -58,10 +78,19 @@ const {
     getBannerList({
       type: searchParams.value.type ?? undefined,
       show: searchParams.value.show === null ? undefined : searchParams.value.show === 1,
+      partitionId: searchParams.value.partitionId ?? undefined,
       page: searchParams.value.page,
       pageSize: searchParams.value.pageSize,
     }),
   staleTime: 30 * 1000,
+})
+
+/** 获取站点配置中的默认用户主页横幅信息 */
+const { data: siteConfigData } = useQuery({
+  queryKey: ['siteConfig', 'site', 'banner-defaults'],
+  queryFn: () => getSiteConfig('site'),
+  staleTime: 30 * 1000,
+  retry: false,
 })
 
 /** 创建轮播图 mutation */
@@ -105,17 +134,80 @@ const deleteMutation = useMutation({
   },
 })
 
-/** 轮播图列表数据 */
-const bannerList = computed(() => {
-  const list = bannerData.value?.list ?? []
-  return list as unknown as Record<string, unknown>[]
+/** 设置注册时主页默认横幅 mutation */
+const setRegisterDefaultBannerMutation = useMutation({
+  mutationFn: setRegisterDefaultBanner,
+  onSuccess: () => {
+    message.success(t('banner.tips.setRegisterDefaultBannerSuccess'))
+    void queryClient.invalidateQueries({ queryKey: ['siteConfig', 'site', 'banner-defaults'] })
+  },
+  onError: (error: Error) => {
+    message.error(error.message || t('common.tips.operationFailed'))
+  },
 })
+
+/** 维护系统默认用户主页横幅列表 mutation */
+const updateDefaultUserBannerListMutation = useMutation({
+  mutationFn: updateDefaultUserBannerList,
+  onSuccess: (_, variables) => {
+    message.success(
+      variables.action === 1
+        ? t('banner.tips.addDefaultUserBannerSuccess')
+        : t('banner.tips.removeDefaultUserBannerSuccess')
+    )
+    defaultBannerDialogVisible.value = false
+    selectedDefaultBannerIds.value = []
+    checkedRowKeys.value = []
+    void queryClient.invalidateQueries({ queryKey: ['siteConfig', 'site', 'banner-defaults'] })
+  },
+  onError: (error: Error) => {
+    message.error(error.message || t('common.tips.operationFailed'))
+  },
+})
+
+/** 轮播图列表数据 */
+const bannerItems = computed(() => bannerData.value?.list ?? [])
+const bannerList = computed(() => bannerItems.value as unknown as Record<string, unknown>[])
 const total = computed(() => bannerData.value?.total ?? 0)
+const currentSiteConfig = computed<SiteConfig | null>(() => siteConfigData.value ?? null)
+const registerDefaultBannerId = computed(() => currentSiteConfig.value?.defaultUserBannerID ?? null)
+const defaultUserBannerIds = computed(() => currentSiteConfig.value?.defaultUserBannerIDs ?? [])
+const checkedBannerIds = computed(() => checkedRowKeys.value.map((key) => Number(key)))
+
+/** 获取分区列表 */
+const { data: partitionData } = useQuery({
+  queryKey: ['commonPartitionList'],
+  queryFn: () => getCommonPartitions(),
+  staleTime: 5 * 60 * 1000,
+})
+
+/** 分区选项 */
+const partitionOptions = computed(() => {
+  const options = [{ value: 0, label: '首页' }]
+  if (partitionData.value) {
+    options.push(
+      ...partitionData.value.map((p) => ({
+        value: p.id,
+        label: p.name,
+      }))
+    )
+  }
+  return options
+})
+
+/** 获取分区名称 */
+function getPartitionName(partitionId: number | undefined): string {
+  if (partitionId === undefined) return '-'
+  if (partitionId === 0) return '首页'
+  const partition = partitionData.value?.find((p) => p.id === partitionId)
+  return partition ? partition.name : String(partitionId)
+}
 
 /** 类型选项 */
 const typeOptions = computed(() => [
   { value: 1, label: t('banner.type.carousel') },
   { value: 2, label: t('banner.type.header') },
+  { value: 3, label: t('banner.type.profile') },
 ])
 
 /** 显示状态选项 */
@@ -129,13 +221,24 @@ function getTypeText(type: BannerType): string {
   const textMap: Record<BannerType, string> = {
     1: t('banner.type.carousel'),
     2: t('banner.type.header'),
+    3: t('banner.type.profile'),
   }
   return textMap[type]
 }
 
 /** 获取类型标签类型 */
-function getTypeTagType(type: BannerType): 'info' | 'warning' {
-  return type === 1 ? 'info' : 'warning'
+function getTypeTagType(type: BannerType): 'info' | 'warning' | 'success' {
+  if (type === 1) return 'info'
+  if (type === 2) return 'warning'
+  return 'success'
+}
+
+function isDefaultUserBanner(row: BannerItem): boolean {
+  return row.type === 3 && defaultUserBannerIds.value.includes(row.id)
+}
+
+function isRegisterDefaultBanner(row: BannerItem): boolean {
+  return row.type === 3 && registerDefaultBannerId.value === row.id
 }
 
 /** 表格列配置 */
@@ -143,6 +246,12 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     type: 'selection',
     fixed: 'left',
+  },
+  {
+    title: 'ID',
+    key: 'id',
+    width: 90,
+    align: 'center',
   },
   {
     title: t('banner.list.cover'),
@@ -187,12 +296,52 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     title: t('banner.list.type'),
     key: 'type',
+    width: 220,
+    align: 'center',
+    render: (row) => {
+      const banner = row as unknown as BannerItem
+      const tags = [
+        h(NTag, { type: getTypeTagType(banner.type), size: 'small' }, () =>
+          getTypeText(banner.type)
+        ),
+      ]
+
+      if (isDefaultUserBanner(banner)) {
+        tags.push(
+          h(NTag, { type: 'warning', size: 'small', bordered: false }, () =>
+            t('banner.statusBadge.defaultUserBanner')
+          )
+        )
+      }
+
+      if (isRegisterDefaultBanner(banner)) {
+        tags.push(
+          h(NTag, { type: 'error', size: 'small', bordered: false }, () =>
+            t('banner.statusBadge.registerDefaultBanner')
+          )
+        )
+      }
+
+      return h(
+        NSpace,
+        {
+          size: 6,
+          justify: 'center',
+          wrapItem: true,
+        },
+        () => tags
+      )
+    },
+  },
+  {
+    title: t('banner.list.partition'),
+    key: 'partitionId',
     width: 120,
     align: 'center',
-    render: (row) =>
-      h(NTag, { type: getTypeTagType(row.type as BannerType), size: 'small' }, () =>
-        getTypeText(row.type as BannerType)
-      ),
+    render: (row) => {
+      if (row.type !== 1) return '-'
+      return getPartitionName(row.partitionId as number)
+    },
   },
   {
     title: t('banner.list.showStatus'),
@@ -209,16 +358,25 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     title: t('common.table.operation'),
     key: 'actions',
-    width: 150,
+    width: 240,
     fixed: 'right',
-    render: (row) =>
-      h(TableActions, {
+    render: (row) => {
+      const banner = row as unknown as BannerItem
+      return h(TableActions, {
         actions: [
+          {
+            key: 'setRegisterDefaultBanner',
+            label: t('banner.actions.setRegisterDefaultBanner'),
+            type: 'success',
+            show: banner.type === 3 && hasPermission('/admin/user/banner', 'PUT'),
+            disabled: !banner.show,
+          },
           { key: 'edit', label: t('common.edit') },
           { key: 'delete', label: t('common.delete'), type: 'error' },
         ],
-        onAction: (key: string) => handleAction(key, row as unknown as BannerItem),
-      }),
+        onAction: (key: string) => handleAction(key, banner),
+      })
+    },
   },
 ])
 
@@ -238,6 +396,7 @@ function handleReset(): void {
   searchParams.value = {
     type: null,
     show: null,
+    partitionId: null,
     page: 1,
     pageSize: 10,
   }
@@ -265,12 +424,74 @@ function handleCreate(): void {
 
 /** 处理操作 */
 function handleAction(key: string, row: BannerItem): void {
-  if (key === 'edit') {
+  if (key === 'setRegisterDefaultBanner') {
+    handleSetRegisterDefaultBanner(row)
+  } else if (key === 'edit') {
     editingBanner.value = row
     formModalVisible.value = true
   } else if (key === 'delete') {
     confirmDelete([row.id])
   }
+}
+
+/** 处理设置注册时主页默认横幅 */
+function handleSetRegisterDefaultBanner(row: BannerItem): void {
+  if (!row.show) {
+    message.warning(t('banner.status.hide'))
+    return
+  }
+
+  dialog.warning({
+    title: t('banner.setRegisterDefaultBanner.title'),
+    content: t('banner.setRegisterDefaultBanner.confirm'),
+    positiveText: t('common.confirm'),
+    negativeText: t('common.cancel'),
+    onPositiveClick: () => {
+      setRegisterDefaultBannerMutation.mutate({ bannerId: row.id })
+    },
+  })
+}
+
+function getBannerById(bannerId: number): BannerItem | undefined {
+  return bannerItems.value.find((item) => item.id === bannerId)
+}
+
+function isDefaultBannerCandidate(banner: BannerItem | undefined): banner is BannerItem {
+  return !!banner && banner.type === 3 && banner.show
+}
+
+function validateDefaultBannerSelection(bannerIds: number[]): boolean {
+  if (bannerIds.length === 0) {
+    message.warning(t('common.tips.selectAtLeastOne'))
+    return false
+  }
+
+  const hasInvalidBanner = bannerIds.some(
+    (bannerId) => !isDefaultBannerCandidate(getBannerById(bannerId))
+  )
+  if (hasInvalidBanner) {
+    message.warning(t('banner.tips.invalidDefaultBannerSelection'))
+    return false
+  }
+
+  return true
+}
+
+function handleOpenDefaultBannerDialog(): void {
+  const bannerIds = checkedBannerIds.value
+  if (!validateDefaultBannerSelection(bannerIds)) {
+    return
+  }
+
+  selectedDefaultBannerIds.value = bannerIds
+  defaultBannerDialogVisible.value = true
+}
+
+function handleSubmitDefaultBannerDialog(payload: {
+  bannerIds: number[]
+  action: UpdateDefaultUserBannerListAction
+}): void {
+  updateDefaultUserBannerListMutation.mutate(payload)
 }
 
 /** 处理批量操作 */
@@ -305,6 +526,7 @@ function handleFormSubmit(data: {
   href?: string
   show?: boolean
   type?: BannerType
+  partitionId?: number
 }): void {
   if (editingBanner.value) {
     // 更新
@@ -351,6 +573,17 @@ function handleRefresh(): void {
             />
           </n-form-item>
         </n-gi>
+        <n-gi v-if="searchParams.type === 1" span="6 m:3 l:2">
+          <n-form-item :label="t('banner.filter.partition')" path="partitionId">
+            <filter-select
+              :value="searchParams.partitionId"
+              :options="partitionOptions"
+              :placeholder="t('banner.filter.partitionPlaceholder')"
+              :width="'100%'"
+              @change="(val) => (searchParams.partitionId = val as number | null)"
+            />
+          </n-form-item>
+        </n-gi>
       </search-form>
     </n-card>
 
@@ -381,6 +614,15 @@ function handleRefresh(): void {
               </template>
               {{ t('banner.actions.create') }}
             </n-button>
+            <n-button
+              v-if="hasPermission('/admin/user/banner/defaults', 'PUT')"
+              size="small"
+              secondary
+              :disabled="checkedRowKeys.length === 0"
+              @click="handleOpenDefaultBannerDialog"
+            >
+              {{ t('banner.actions.manageDefaultUserBanners') }}
+            </n-button>
             <n-button size="small" secondary @click="handleRefresh">
               <template #icon>
                 <n-icon>
@@ -409,6 +651,35 @@ function handleRefresh(): void {
         </n-space>
       </template>
 
+      <div class="banner-summary">
+        <div class="banner-summary__item">
+          <span class="banner-summary__label">
+            {{ t('banner.summary.registerDefaultBanner') }}
+          </span>
+          <n-tag v-if="registerDefaultBannerId !== null" size="small" type="success">
+            #{{ registerDefaultBannerId }}
+          </n-tag>
+          <span v-else class="banner-summary__empty">{{ t('banner.summary.empty') }}</span>
+        </div>
+
+        <div class="banner-summary__item">
+          <span class="banner-summary__label">
+            {{ t('banner.summary.defaultBannerList') }}
+          </span>
+          <n-space v-if="defaultUserBannerIds.length > 0" :size="6" wrap>
+            <n-tag
+              v-for="bannerId in defaultUserBannerIds"
+              :key="bannerId"
+              size="small"
+              type="info"
+            >
+              #{{ bannerId }}
+            </n-tag>
+          </n-space>
+          <span v-else class="banner-summary__empty">{{ t('banner.summary.empty') }}</span>
+        </div>
+      </div>
+
       <!-- 批量操作栏 -->
       <BatchActions
         v-if="checkedRowKeys.length > 0"
@@ -421,7 +692,12 @@ function handleRefresh(): void {
       <data-table
         :columns="columns"
         :data="bannerList"
-        :loading="isLoading || deleteMutation.isPending.value"
+        :loading="
+          isLoading ||
+          deleteMutation.isPending.value ||
+          setRegisterDefaultBannerMutation.isPending.value ||
+          updateDefaultUserBannerListMutation.isPending.value
+        "
         :selectable="true"
         :checked-row-keys="checkedRowKeys"
         :page="searchParams.page"
@@ -441,11 +717,45 @@ function handleRefresh(): void {
       :loading="createMutation.isPending.value || updateMutation.isPending.value"
       @submit="handleFormSubmit"
     />
+
+    <user-banner-defaults-dialog
+      v-model:visible="defaultBannerDialogVisible"
+      :banner-ids="selectedDefaultBannerIds"
+      :loading="updateDefaultUserBannerListMutation.isPending.value"
+      @submit="handleSubmitDefaultBannerDialog"
+    />
   </div>
 </template>
 
 <style scoped lang="scss">
 // 使用全局 page-list 样式
+
+.banner-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+  padding: 0 0 var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+  border-bottom: 1px solid var(--color-border);
+
+  &__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-2);
+  }
+
+  &__label {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  &__empty {
+    font-size: var(--text-sm);
+    color: var(--color-text-tertiary);
+  }
+}
 
 :deep(.banner-link) {
   color: var(--color-primary);
