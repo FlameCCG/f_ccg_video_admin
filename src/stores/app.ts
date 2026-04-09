@@ -36,7 +36,7 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '珍珠白',
     labelJa: 'パール',
     isDark: false,
-    accent: '#5c7cfa',
+    accent: 'var(--theme-accent-pearl)',
   },
   {
     name: 'obsidian',
@@ -44,7 +44,7 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '黑曜石',
     labelJa: 'オブシディアン',
     isDark: true,
-    accent: '#7c8aff',
+    accent: 'var(--theme-accent-obsidian)',
   },
   {
     name: 'cyberpunk',
@@ -52,7 +52,7 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '赛博朋克',
     labelJa: 'サイバーパンク',
     isDark: true,
-    accent: '#00f3ff',
+    accent: 'var(--theme-accent-cyberpunk)',
   },
   {
     name: 'sakura',
@@ -60,7 +60,7 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '樱',
     labelJa: 'サクラ',
     isDark: false,
-    accent: '#ff6b9d',
+    accent: 'var(--theme-accent-sakura)',
   },
 ]
 

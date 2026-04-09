@@ -176,6 +176,7 @@ export default {
   },
 
   // 空状态
+  image: { loadFailed: '图片加载失败', empty: '暂无图片' },
   empty: {
     default: '暂无数据',
     search: '未找到匹配结果',

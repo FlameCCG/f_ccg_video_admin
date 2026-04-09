@@ -177,6 +177,7 @@ export default {
   },
 
   // Empty states
+  image: { loadFailed: 'Image failed to load', empty: 'No image' },
   empty: {
     default: 'No data',
     search: 'No matching results',

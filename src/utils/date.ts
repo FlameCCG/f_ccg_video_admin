@@ -1,5 +1,28 @@
 import { useAppStore } from '@/stores/app'
 
+// Intl 的初始化远比 format 昂贵。表格按语言复用，避免每个日期单元格重复构造。
+const formatters = new Map<string, Intl.DateTimeFormat>()
+const MAX_CACHED_LOCALES = 8
+
+function getDateTimeFormatter(locale: string): Intl.DateTimeFormat {
+  const cached = formatters.get(locale)
+  if (cached) return cached
+
+  const formatter = new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  if (formatters.size >= MAX_CACHED_LOCALES) {
+    const oldestLocale = formatters.keys().next().value
+    if (oldestLocale !== undefined) formatters.delete(oldestLocale)
+  }
+  formatters.set(locale, formatter)
+  return formatter
+}
+
 /**
  * 格式化日期时间，支持动态多语言 locale
  * 默认从 Pinia store 读取当前语言，如果在外部（如测试环境）则可手动传入或默认 'zh-CN'
@@ -21,11 +44,5 @@ export function formatDateTime(dateStr: string | Date | null | undefined, locale
     activeLocale = locale || 'zh-CN'
   }
 
-  return new Intl.DateTimeFormat(activeLocale, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+  return getDateTimeFormatter(activeLocale).format(date)
 }
