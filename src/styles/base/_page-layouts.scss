@@ -1,71 +1,54 @@
 // Page Layout Utilities
-// 页面布局工具类 - 用于列表页等需要 flex 自适应高度的场景
+// 页面布局原语：页面外壳 / 头部区 / 筛选区 / 自适应表格区
 
-// 列表页面布局 - 搜索区固定，表格区自适应填充
+// 页面内缩由 DefaultLayout 的 .content-wrapper 统一提供：padding 使用 --spacing-page-y 与 --spacing-page-x。
+// 页面根节点及本文件布局原语不叠加 padding，只负责纵向节奏与高度分配。
+
+// —— 块间节奏 ——
+// 统一为 --spacing-section（24px），与页面内缩同值：页面外缘留白与块间留白
+// 相等，视觉上才是同一套栅格，而不是「外面 24、里面 16」的两套。
+
+// 列表页外壳：头部与筛选区固定，表格区吃掉剩余高度
 .page-list {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  gap: var(--spacing-4);
+  gap: var(--spacing-section);
 
-  // 搜索/筛选区域 - 固定高度
-  &__search {
-    flex-shrink: 0;
-  }
-
-  // 表格区域 - 自适应填充剩余空间
-  &__table {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-
-    // 确保 NCard 内容区也是 flex 布局
-    :deep(.n-card__content) {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-    }
-  }
-
-  // 页面标题
-  &__title {
-    font-size: var(--text-lg);
-    font-weight: 500;
-    color: var(--color-text);
-  }
-
-  // 工具栏
-  &__toolbar {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-3);
-  }
-}
-
-// 详情页面布局
-.page-detail {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  gap: var(--spacing-4);
-
+  // 页面头部区：放 AppPageHeader（页面唯一的 <h1>）
   &__header {
     flex-shrink: 0;
   }
 
-  &__content {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
+  // 固定高度的搜索与筛选区。__filters 和 __search 为等价选择器，供不同视图使用。
+  &__search,
+  &__filters {
+    flex-shrink: 0;
   }
 
-  &__footer {
-    flex-shrink: 0;
+  // 表格区：自适应填充剩余空间
+  &__table {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+
+    // NCard 的 .n-card-content 必须为 flex 容器，表格才能撑满卡片高度。
+    // 此文件是全局样式，使用普通后代或子选择器，不使用 SFC 的 :deep() 语法。
+    > .n-card-content {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
+    }
+  }
+
+  // 卡片头标题文字的兼容选择器。
+  // 页面主标题由 AppPageHeader 渲染为唯一的 h1；仍使用卡片内 span 标题的视图由此规则提供样式。
+  &__title {
+    font-size: var(--text-lg);
+    font-weight: var(--font-medium);
+    color: var(--color-text);
   }
 }

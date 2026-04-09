@@ -1,5 +1,5 @@
 // Transitions Index
-// 过渡动画样式统一导出
-
-@forward 'page-transitions';
-@forward 'micro-interactions';
+// 交互动效 mixin 统一入口
+// 只转发 mixin 模块：page-transitions 会产出全局 CSS，由 main.scss 单独引入，
+// 不能从组件侧 @use（每个组件的 <style> 都是独立编译单元，会各自复制一份）。
+@forward 'interaction';

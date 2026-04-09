@@ -2,6 +2,30 @@
 // 字体系统
 
 @use 'sass:map';
+@use 'sass:string';
+
+// 生成可直接赋给 font-family 的字体栈。
+// sans-serif、serif、monospace 与 -apple-system 作为关键字输出，不能加引号。
+// 含空格的家族名必须加引号，其余关键字与单词家族名原样输出。
+@function font-stack($families) {
+  $stack: '';
+
+  @each $family in $families {
+    $token: '#{$family}';
+
+    @if string.index('#{$family}', ' ') {
+      $token: '"#{$family}"';
+    }
+
+    @if $stack == '' {
+      $stack: $token;
+    } @else {
+      $stack: '#{$stack}, #{$token}';
+    }
+  }
+
+  @return string.unquote($stack);
+}
 
 // 字体族
 $font-family-sans: (
@@ -53,6 +77,7 @@ $font-size: (
   '3xl': 24px,
   '4xl': 30px,
   '5xl': 36px,
+  '6xl': 48px,
 );
 
 // 行高
