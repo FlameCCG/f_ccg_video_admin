@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { createI18n } from 'vue-i18n'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -42,6 +42,17 @@ interface CaptchaExposed {
   fail: () => void
 }
 
+async function loadCaptchaImages(wrapper: Pick<VueWrapper, 'get'>): Promise<void> {
+  const master = wrapper.get<HTMLImageElement>('.slide-captcha__master-image')
+  Object.defineProperties(master.element, {
+    naturalWidth: { configurable: true, value: 320 },
+    naturalHeight: { configurable: true, value: 160 },
+    clientWidth: { configurable: true, value: 320 },
+  })
+  await master.trigger('load')
+  await wrapper.get('.slide-captcha__tile-image').trigger('load')
+}
+
 const componentStubs = {
   NSpin: {
     template: '<div><slot /></div>',
@@ -57,6 +68,9 @@ const componentStubs = {
 
 describe('SlideCaptcha', () => {
   beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame'],
+    })
     vi.mocked(getSlideCaptcha).mockResolvedValue(captchaFixture)
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
       this: HTMLElement
@@ -67,6 +81,7 @@ describe('SlideCaptcha', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -96,11 +111,13 @@ describe('SlideCaptcha', () => {
 
     await flushPromises()
 
+    await loadCaptchaImages(wrapper)
     const slider = wrapper.get('[role="slider"]')
-    await slider.trigger('pointerdown', { clientX: 0, pointerId: 1 })
+    await slider.trigger('pointerdown', { clientX: 0, pointerId: 1, button: 0, isPrimary: true })
     await slider.trigger('pointermove', { clientX: 156, pointerId: 1 })
+    vi.advanceTimersToNextFrame()
 
-    expect(slider.attributes('style')).toContain('translate3d(156px, 0, 0)')
+    expect(wrapper.get('.slide-captcha').attributes('style')).toContain('--captcha-x: 156px')
 
     await slider.trigger('pointerup', { clientX: 156, pointerId: 1 })
 
@@ -114,7 +131,7 @@ describe('SlideCaptcha', () => {
     wrapper.unmount()
   })
 
-  it('验证成功后展示扫描完成状态并保留真实坐标', async () => {
+  it('核验期间扫描，成功后展示徽标并保留真实坐标', async () => {
     const wrapper = mount(SlideCaptcha, {
       props: { visible: true },
       global: { plugins: [i18n], stubs: componentStubs },
@@ -122,17 +139,19 @@ describe('SlideCaptcha', () => {
 
     await flushPromises()
 
+    await loadCaptchaImages(wrapper)
     const slider = wrapper.get('[role="slider"]')
-    await slider.trigger('pointerdown', { clientX: 0, pointerId: 2 })
+    await slider.trigger('pointerdown', { clientX: 0, pointerId: 2, button: 0, isPrimary: true })
     await slider.trigger('pointermove', { clientX: 120, pointerId: 2 })
     await slider.trigger('pointerup', { clientX: 120, pointerId: 2 })
+    expect(wrapper.find('.slide-captcha__scan').exists()).toBe(true)
 
     const exposed = wrapper.vm as unknown as CaptchaExposed
     exposed.success()
     await nextTick()
 
     expect(wrapper.find('.slide-captcha__result--success').exists()).toBe(true)
-    expect(wrapper.find('.slide-captcha__result-scan').exists()).toBe(true)
+    expect(wrapper.find('.slide-captcha__result-scan').exists()).toBe(false)
     expect(wrapper.emitted('success')?.[0]?.[0]).toEqual({
       token: captchaFixture.token,
       x: 120,
@@ -142,7 +161,7 @@ describe('SlideCaptcha', () => {
     wrapper.unmount()
   })
 
-  it('验证失败时只保留一次滑轨反馈并同步归位', async () => {
+  it('验证失败先保留落点反馈，再让滑块和拼图同步归位', async () => {
     const wrapper = mount(SlideCaptcha, {
       props: { visible: true },
       global: { plugins: [i18n], stubs: componentStubs },
@@ -150,8 +169,9 @@ describe('SlideCaptcha', () => {
 
     await flushPromises()
 
+    await loadCaptchaImages(wrapper)
     const slider = wrapper.get('[role="slider"]')
-    await slider.trigger('pointerdown', { clientX: 0, pointerId: 3 })
+    await slider.trigger('pointerdown', { clientX: 0, pointerId: 3, button: 0, isPrimary: true })
     await slider.trigger('pointermove', { clientX: 132, pointerId: 3 })
     await slider.trigger('pointerup', { clientX: 132, pointerId: 3 })
 
@@ -161,8 +181,13 @@ describe('SlideCaptcha', () => {
 
     expect(wrapper.find('.slide-captcha__track--fail').exists()).toBe(true)
     expect(wrapper.find('.slide-captcha__result').exists()).toBe(false)
-    expect(slider.attributes('style')).toContain('translate3d(0px, 0, 0)')
+    expect(wrapper.get('.slide-captcha').attributes('style')).toContain('--captcha-x: 132px')
     expect(wrapper.text()).toContain('验证失败，请重试')
+
+    await vi.advanceTimersByTimeAsync(200)
+    await nextTick()
+    expect(wrapper.find('.slide-captcha--returning').exists()).toBe(true)
+    expect(wrapper.get('.slide-captcha').attributes('style')).toContain('--captcha-x: 0px')
 
     wrapper.unmount()
   })

@@ -19,6 +19,8 @@ export default {
   },
   captcha: {
     title: '安全验证',
+    subtitle: '拖动滑块，将拼图移至缺口',
+    successHint: '安全校验完成，即将进入',
     tip: '请拖动滑块完成验证',
     verifying: '正在核验安全凭证',
     loading: '加载中...',
