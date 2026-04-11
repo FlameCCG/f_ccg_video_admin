@@ -4,349 +4,11 @@
 
 Base URL：/v1
 
-## [GET] 站点配置
-
-- 接口路径: GET /admin/site/config/{name}
-- 认证: 需要登录（客户端全局自动携带 Token）
-- 权限: 需要 RBAC 权限
-- 依赖接口: 无
-- 接口说明: 获取单项站点配置（需管理员权限）
-- 说明: 不支持/不返回 mysql/redis/es/mongo/kafka/river
-- HTTP 状态码: 200（业务码 code 判断成功/失败）
-- 响应结构: code=0 成功，code=1 失败；msg 为提示信息
-
-请求参数:
-| 名称 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| name | path | string | 是 | 配置名称（site/logger/email/transcode/thirdLogin/jwt） |
-
-响应字段:
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| data | object | 单项配置对象 |
-
-响应示例（按 name 分类）:
-
-name=site
-```json
-{
-  "code": 0,
-  "data": {
-    "contentReview": {
-      "enable": false
-    },
-    "login": {
-      "qqLogin": true,
-      "usernamePwdLogin": true,
-      "textGraphicCaptcha": false,
-      "textClickCaptcha": false,
-      "textClickCaptchaTTL": 300,
-      "textClickCaptchaPadding": 20
-    },
-    "register": {
-      "emailCaptcha": false,
-      "textGraphicCaptcha": false,
-      "slideCaptcha": false,
-      "slideCaptchaTTL": 300,
-      "slideCaptchaPadding": 10
-    },
-    "storage": {
-      "maxChunkSize": 10,
-      "chunkSize": 10,
-      "maxFileSize": 100,
-      "maxUploadNum": 10,
-      "chunkDir": "./runtime/chunks",
-      "local": {
-        "enable": false,
-        "path": "uploads"
-      },
-      "minio": {
-        "userUploadPrefix": "user_files",
-        "enable": true,
-        "endpoint": "172.17.209.73:9000",
-        "accessKey": "minioadmin",
-        "secretKey": "******",
-        "bucket": "videos",
-        "useSSL": false,
-        "publicPrefixes": [
-          "user_files",
-          "covers",
-          "images"
-        ]
-      }
-    }
-  },
-  "msg": "ok"
-}
-```
-
-name=logger
-```json
-{
-  "code": 0,
-  "data": {
-    "debugFileName": "./runtime/debug/f_ccg_video-debug.log",
-    "infoFileName": "./runtime/info/f_ccg_video-info.log",
-    "warnFileName": "./runtime/warn/f_ccg_video-warn.log",
-    "errorFileName": "./runtime/error/f_ccg_video-error.log",
-    "enableConsole": true,
-    "maxSize": 500,
-    "maxAge": 28,
-    "maxBackups": 3,
-    "development": true
-  },
-  "msg": "ok"
-}
-```
-
-name=email
-```json
-{
-  "code": 0,
-  "data": {
-    "domain": "smtp.qq.com",
-    "port": 587,
-    "sendEmail": "2740451290@qq.com",
-    "authCode": "******",
-    "sendNickName": "柳冠一的视频网站",
-    "ssl": true,
-    "tls": true,
-    "isExpire": 10
-  },
-  "msg": "ok"
-}
-```
-
-name=transcode
-```json
-{
-  "code": 0,
-  "data": {
-    "maxWorkers": 2,
-    "transcodeResolutions": [
-      360,
-      720,
-      1080,
-      2160
-    ],
-    "highBitrateThreshold": 4000,
-    "highBitrateMediumTarget": 5000,
-    "bitrate1080KbpsReduceRatio": 30,
-    "bitrate720KbpsReduceRatio": 50,
-    "bitrate360KbpsReduceRatio": 90,
-    "cpuMode": true,
-    "crfHigh": 18,
-    "crfMedium": 23,
-    "cpuPreset": "medium",
-    "gpuCQPHigh": 18,
-    "gpuCQPMedium": 22,
-    "gpuPreset": "p4",
-    "gpuMode": true,
-    "threads": 8,
-    "hardwareScale": false
-  },
-  "msg": "ok"
-}
-```
-
-name=thirdLogin
-```json
-{
-  "code": 0,
-  "data": {
-    "qq": {
-      "appID": "102799890",
-      "appKey": "******",
-      "redirect": "http://blog.flameccg.space/oauth"
-    }
-  },
-  "msg": "ok"
-}
-```
-
-name=jwt
-```json
-{
-  "code": 0,
-  "data": {
-    "accessExp": 7,
-    "refreshExp": 30,
-    "accessSecret": "******",
-    "refreshSecret": "******"
-  },
-  "msg": "ok"
-}
-```
-
-## [PUT] 更新站点配置
-
-- 接口路径: PUT /admin/site/config/{name}
-- 认证: 需要登录（客户端全局自动携带 Token）
-- 权限: 需要 RBAC 权限
-- 依赖接口: 无
-- 接口说明: 更新单项站点配置（需管理员权限）
-- 说明: 不支持 mysql/redis/es/mongo/kafka/river
-- HTTP 状态码: 200（业务码 code 判断成功/失败）
-- 响应结构: code=0 成功，code=1 失败；msg 为提示信息
-
-请求参数:
-| 名称 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| name | path | string | 是 | 配置名称（site/logger/email/transcode/thirdLogin/jwt） |
-
-请求体:
-
-- 直接提交该配置对应的 JSON 对象（字段同配置）
-
-请求体示例（按 name 分类）:
-
-name=site
-```json
-{
-  "contentReview": {
-    "enable": false
-  },
-  "login": {
-    "qqLogin": true,
-    "usernamePwdLogin": true,
-    "textGraphicCaptcha": false,
-    "textClickCaptcha": false,
-    "textClickCaptchaTTL": 300,
-    "textClickCaptchaPadding": 20
-  },
-  "register": {
-    "emailCaptcha": false,
-    "textGraphicCaptcha": false,
-    "slideCaptcha": false,
-    "slideCaptchaTTL": 300,
-    "slideCaptchaPadding": 10
-  },
-  "storage": {
-    "maxChunkSize": 10,
-    "chunkSize": 10,
-    "maxFileSize": 100,
-    "maxUploadNum": 10,
-    "chunkDir": "./runtime/chunks",
-    "local": {
-      "enable": false,
-      "path": "uploads"
-    },
-    "minio": {
-      "userUploadPrefix": "user_files",
-      "enable": true,
-      "endpoint": "172.17.209.73:9000",
-      "accessKey": "minioadmin",
-      "secretKey": "******",
-      "bucket": "videos",
-      "useSSL": false,
-      "publicPrefixes": [
-        "user_files",
-        "covers",
-        "images"
-      ]
-    }
-  }
-}
-```
-
-name=logger
-```json
-{
-  "debugFileName": "./runtime/debug/f_ccg_video-debug.log",
-  "infoFileName": "./runtime/info/f_ccg_video-info.log",
-  "warnFileName": "./runtime/warn/f_ccg_video-warn.log",
-  "errorFileName": "./runtime/error/f_ccg_video-error.log",
-  "enableConsole": true,
-  "maxSize": 500,
-  "maxAge": 28,
-  "maxBackups": 3,
-  "development": true
-}
-```
-
-name=email
-```json
-{
-  "domain": "smtp.qq.com",
-  "port": 587,
-  "sendEmail": "2740451290@qq.com",
-  "authCode": "******",
-  "sendNickName": "柳冠一的视频网站",
-  "ssl": true,
-  "tls": true,
-  "isExpire": 10
-}
-```
-
-name=transcode
-```json
-{
-  "maxWorkers": 2,
-  "transcodeResolutions": [
-    360,
-    720,
-    1080,
-    2160
-  ],
-  "highBitrateThreshold": 4000,
-  "highBitrateMediumTarget": 5000,
-  "bitrate1080KbpsReduceRatio": 30,
-  "bitrate720KbpsReduceRatio": 50,
-  "bitrate360KbpsReduceRatio": 90,
-  "cpuMode": true,
-  "crfHigh": 18,
-  "crfMedium": 23,
-  "cpuPreset": "medium",
-  "gpuCQPHigh": 18,
-  "gpuCQPMedium": 22,
-  "gpuPreset": "p4",
-  "gpuMode": true,
-  "threads": 8,
-  "hardwareScale": false
-}
-```
-
-name=thirdLogin
-```json
-{
-  "qq": {
-    "appID": "102799890",
-    "appKey": "******",
-    "redirect": "http://blog.flameccg.space/oauth"
-  }
-}
-```
-
-name=jwt
-```json
-{
-  "accessExp": 7,
-  "refreshExp": 30,
-  "accessSecret": "******",
-  "refreshSecret": "******"
-}
-```
-
-响应字段:
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| data | object | 空对象 |
-
-响应示例:
-
-```json
-{
-  "code": 0,
-  "data": {},
-  "msg": "更新成功"
-}
-```
-
 ## [GET] 站点统计
 
 - 接口路径: GET /admin/site/stats
 - 认证: 需要登录（客户端全局自动携带 Token）
-- 权限: 需要 RBAC 权限
+- 权限: 需要RBAC权限
 - 依赖接口: 无
 - 接口说明: 管理后台站点统计（需管理员权限）
 - HTTP 状态码: 200（业务码 code 判断成功/失败）
@@ -426,5 +88,421 @@ name=jwt
     }
   },
   "msg": "获取成功"
+}
+```
+
+## [GET] 站点配置（按名称）
+
+- 接口路径: GET /admin/site/config/{name}
+- 认证: 需要登录（客户端全局自动携带 Token）
+- 权限: 需要 RBAC 权限
+- 依赖接口: 无
+- 接口说明: 获取单项站点配置（需管理员权限）
+- 说明: 不支持/不返回 mysql/redis/es/mongo/kafka/river
+- HTTP 状态码: 200（业务码 code 判断成功/失败）
+- 响应结构: code=0 成功，code=1 失败；msg 为提示信息
+
+请求参数:
+| 名称 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| name | path | string | 是 | 配置名称（site/logger/email/xai/transcode/thirdLogin/jwt） |
+
+响应字段:
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| data | object | 单项配置对象 |
+
+响应示例（按 name 分类）:
+
+name=site
+
+```json
+{
+  "code": 0,
+  "data": {
+    "defaultUserBannerID": 19,
+    "defaultUserBannerIDs": [19, 21],
+    "contentReview": {
+      "enable": false
+    },
+    "login": {
+      "qqLogin": true,
+      "googleLogin": true,
+      "githubLogin": true,
+      "linuxdoLogin": true,
+      "xLogin": true,
+      "usernamePwdLogin": true,
+      "textGraphicCaptcha": false,
+      "textClickCaptcha": false,
+      "textClickCaptchaTTL": 300,
+      "textClickCaptchaPadding": 20
+    },
+    "register": {
+      "emailCaptcha": false,
+      "textGraphicCaptcha": false,
+      "slideCaptcha": false,
+      "slideCaptchaTTL": 300,
+      "slideCaptchaPadding": 10
+    },
+    "storage": {
+      "maxChunkSize": 10,
+      "chunkSize": 10,
+      "maxFileSize": 100,
+      "maxUploadNum": 10,
+      "chunkDir": "./runtime/chunks",
+      "local": {
+        "enable": false,
+        "path": "uploads"
+      },
+      "minio": {
+        "userUploadPrefix": "user_files",
+        "enable": true,
+        "endpoint": "172.17.209.73:9000",
+        "accessKey": "minioadmin",
+        "secretKey": "******",
+        "bucket": "videos",
+        "useSSL": false,
+        "publicPrefixes": ["user_files", "covers", "images"]
+      }
+    }
+  },
+  "msg": "ok"
+}
+```
+
+name=logger
+
+```json
+{
+  "code": 0,
+  "data": {
+    "debugFileName": "./runtime/debug/f_ccg_video-debug.log",
+    "infoFileName": "./runtime/info/f_ccg_video-info.log",
+    "warnFileName": "./runtime/warn/f_ccg_video-warn.log",
+    "errorFileName": "./runtime/error/f_ccg_video-error.log",
+    "enableConsole": true,
+    "maxSize": 500,
+    "maxAge": 28,
+    "maxBackups": 3,
+    "development": true
+  },
+  "msg": "ok"
+}
+```
+
+name=email
+
+```json
+{
+  "code": 0,
+  "data": {
+    "domain": "smtp.qq.com",
+    "port": 587,
+    "sendEmail": "2740451290@qq.com",
+    "authCode": "******",
+    "sendNickName": "柳冠一的视频网站",
+    "ssl": true,
+    "tls": true,
+    "isExpire": 10
+  },
+  "msg": "ok"
+}
+```
+
+name=xai
+
+```json
+{
+  "code": 0,
+  "data": {
+    "baseURL": "https://api.x.ai",
+    "apiKey": "xai-******",
+    "systemPrompt": "你是一个严谨的多模态助手。",
+    "textModel": "grok-4.20",
+    "imageModel": "grok-imagine-image",
+    "videoModel": "grok-imagine-video",
+    "timeoutSec": 60
+  },
+  "msg": "ok"
+}
+```
+
+name=transcode
+
+```json
+{
+  "code": 0,
+  "data": {
+    "maxWorkers": 2,
+    "transcodeResolutions": [360, 720, 1080, 2160],
+    "highBitrateThreshold": 4000,
+    "highBitrateMediumTarget": 5000,
+    "bitrate1080KbpsReduceRatio": 30,
+    "bitrate720KbpsReduceRatio": 50,
+    "bitrate360KbpsReduceRatio": 90,
+    "cpuMode": true,
+    "crfHigh": 18,
+    "crfMedium": 23,
+    "cpuPreset": "medium",
+    "gpuCQPHigh": 18,
+    "gpuCQPMedium": 22,
+    "gpuPreset": "p4",
+    "gpuMode": true,
+    "threads": 8,
+    "hardwareScale": false
+  },
+  "msg": "ok"
+}
+```
+
+name=thirdLogin
+
+```json
+{
+  "code": 0,
+  "data": {
+    "qq": {
+      "appID": "102799890",
+      "appKey": "******",
+      "redirect": "http://blog.flameccg.space/oauth"
+    },
+    "google": {
+      "clientID": "381890901654-8ult37ugk4sgu5qo7r1m36b6ger9dqk9.apps.googleusercontent.com",
+      "clientSecret": "******",
+      "redirect": "http://localhost:3000/oauth/google"
+    },
+    "github": {
+      "clientID": "Iv1.examplegithubclient",
+      "clientSecret": "******",
+      "redirect": "http://localhost:3000/oauth/github"
+    },
+    "x": {
+      "clientID": "example-x-client-id",
+      "clientSecret": "******",
+      "redirect": "http://localhost:3000/oauth/x"
+    },
+    "linuxdo": {
+      "clientID": "example-linuxdo-client-id",
+      "clientSecret": "******",
+      "redirect": "http://localhost:3000/oauth/linuxdo"
+    }
+  },
+  "msg": "ok"
+}
+```
+
+name=jwt
+
+```json
+{
+  "code": 0,
+  "data": {
+    "accessExp": 7,
+    "refreshExp": 30,
+    "accessSecret": "******",
+    "refreshSecret": "******"
+  },
+  "msg": "ok"
+}
+```
+
+## [PUT] 更新站点配置（按名称）
+
+- 接口路径: PUT /admin/site/config/{name}
+- 认证: 需要登录（客户端全局自动携带 Token）
+- 权限: 需要 RBAC 权限
+- 依赖接口: 无
+- 接口说明: 更新单项站点配置（需管理员权限）
+- 说明: 不支持 mysql/redis/es/mongo/kafka/river
+- HTTP 状态码: 200（业务码 code 判断成功/失败）
+- 响应结构: code=0 成功，code=1 失败；msg 为提示信息
+
+请求参数:
+| 名称 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| name | path | string | 是 | 配置名称（site/logger/email/xai/transcode/thirdLogin/jwt） |
+
+请求体:
+
+- 直接提交该配置对应的 JSON 对象（字段同配置）
+
+请求体示例（按 name 分类）:
+
+name=site
+
+```json
+{
+  "defaultUserBannerID": 19,
+  "defaultUserBannerIDs": [19, 21],
+  "contentReview": {
+    "enable": false
+  },
+  "login": {
+    "qqLogin": true,
+    "googleLogin": true,
+    "githubLogin": true,
+    "linuxdoLogin": true,
+    "xLogin": true,
+    "usernamePwdLogin": true,
+    "textGraphicCaptcha": false,
+    "textClickCaptcha": false,
+    "textClickCaptchaTTL": 300,
+    "textClickCaptchaPadding": 20
+  },
+  "register": {
+    "emailCaptcha": false,
+    "textGraphicCaptcha": false,
+    "slideCaptcha": false,
+    "slideCaptchaTTL": 300,
+    "slideCaptchaPadding": 10
+  },
+  "storage": {
+    "maxChunkSize": 10,
+    "chunkSize": 10,
+    "maxFileSize": 100,
+    "maxUploadNum": 10,
+    "chunkDir": "./runtime/chunks",
+    "local": {
+      "enable": false,
+      "path": "uploads"
+    },
+    "minio": {
+      "userUploadPrefix": "user_files",
+      "enable": true,
+      "endpoint": "172.17.209.73:9000",
+      "accessKey": "minioadmin",
+      "secretKey": "******",
+      "bucket": "videos",
+      "useSSL": false,
+      "publicPrefixes": ["user_files", "covers", "images"]
+    }
+  }
+}
+```
+
+name=logger
+
+```json
+{
+  "debugFileName": "./runtime/debug/f_ccg_video-debug.log",
+  "infoFileName": "./runtime/info/f_ccg_video-info.log",
+  "warnFileName": "./runtime/warn/f_ccg_video-warn.log",
+  "errorFileName": "./runtime/error/f_ccg_video-error.log",
+  "enableConsole": true,
+  "maxSize": 500,
+  "maxAge": 28,
+  "maxBackups": 3,
+  "development": true
+}
+```
+
+name=email
+
+```json
+{
+  "domain": "smtp.qq.com",
+  "port": 587,
+  "sendEmail": "2740451290@qq.com",
+  "authCode": "******",
+  "sendNickName": "柳冠一的视频网站",
+  "ssl": true,
+  "tls": true,
+  "isExpire": 10
+}
+```
+
+name=xai
+
+```json
+{
+  "baseURL": "https://api.x.ai",
+  "apiKey": "xai-your-api-key",
+  "systemPrompt": "你是一个严谨的多模态助手。",
+  "textModel": "grok-4.20",
+  "imageModel": "grok-imagine-image",
+  "videoModel": "grok-imagine-video",
+  "timeoutSec": 60
+}
+```
+
+name=transcode
+
+```json
+{
+  "maxWorkers": 2,
+  "transcodeResolutions": [360, 720, 1080, 2160],
+  "highBitrateThreshold": 4000,
+  "highBitrateMediumTarget": 5000,
+  "bitrate1080KbpsReduceRatio": 30,
+  "bitrate720KbpsReduceRatio": 50,
+  "bitrate360KbpsReduceRatio": 90,
+  "cpuMode": true,
+  "crfHigh": 18,
+  "crfMedium": 23,
+  "cpuPreset": "medium",
+  "gpuCQPHigh": 18,
+  "gpuCQPMedium": 22,
+  "gpuPreset": "p4",
+  "gpuMode": true,
+  "threads": 8,
+  "hardwareScale": false
+}
+```
+
+name=thirdLogin
+
+```json
+{
+  "qq": {
+    "appID": "102799890",
+    "appKey": "******",
+    "redirect": "http://blog.flameccg.space/oauth"
+  },
+  "google": {
+    "clientID": "381890901654-8ult37ugk4sgu5qo7r1m36b6ger9dqk9.apps.googleusercontent.com",
+    "clientSecret": "******",
+    "redirect": "http://localhost:3000/oauth/google"
+  },
+  "github": {
+    "clientID": "Iv1.examplegithubclient",
+    "clientSecret": "******",
+    "redirect": "http://localhost:3000/oauth/github"
+  },
+  "x": {
+    "clientID": "example-x-client-id",
+    "clientSecret": "******",
+    "redirect": "http://localhost:3000/oauth/x"
+  },
+  "linuxdo": {
+    "clientID": "example-linuxdo-client-id",
+    "clientSecret": "******",
+    "redirect": "http://localhost:3000/oauth/linuxdo"
+  }
+}
+```
+
+name=jwt
+
+```json
+{
+  "accessExp": 7,
+  "refreshExp": 30,
+  "accessSecret": "******",
+  "refreshSecret": "******"
+}
+```
+
+响应字段:
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| data | object | 空对象 |
+
+响应示例:
+
+```json
+{
+  "code": 0,
+  "data": {},
+  "msg": "更新成功"
 }
 ```

@@ -5,7 +5,14 @@
 // ============ 站点配置类型 ============
 
 /** 配置名称类型 */
-export type SiteConfigName = 'site' | 'logger' | 'email' | 'transcode' | 'thirdLogin' | 'jwt'
+export type SiteConfigName =
+  | 'site'
+  | 'logger'
+  | 'email'
+  | 'xai'
+  | 'transcode'
+  | 'thirdLogin'
+  | 'jwt'
 
 // ============ 公开站点配置类型（无需认证） ============
 
@@ -149,6 +156,17 @@ export interface EmailConfig {
   isExpire: number
 }
 
+/** xAI 配置 */
+export interface XAIConfig {
+  baseURL: string
+  apiKey: string
+  systemPrompt: string
+  textModel: string
+  imageModel: string
+  videoModel: string
+  timeoutSec: number
+}
+
 /** 转码配置 */
 export interface TranscodeConfig {
   maxWorkers: number
@@ -205,6 +223,7 @@ export interface SiteConfigMap {
   site: SiteConfig
   logger: LoggerConfig
   email: EmailConfig
+  xai: XAIConfig
   transcode: TranscodeConfig
   thirdLogin: ThirdLoginConfig
   jwt: JwtConfig

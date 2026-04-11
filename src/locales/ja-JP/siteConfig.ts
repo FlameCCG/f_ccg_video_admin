@@ -7,6 +7,7 @@ export default {
     site: '基本設定',
     logger: 'ログ設定',
     email: 'メール設定',
+    xai: 'xAI設定',
     transcode: 'トランスコード設定',
     thirdLogin: 'サードパーティログイン',
     jwt: 'JWT設定',
@@ -92,6 +93,18 @@ export default {
     tls: 'TLSを有効化',
     isExpire: '認証コード有効期限',
     expireTip: '単位：分',
+  },
+  // xAI設定
+  xai: {
+    title: 'xAI設定',
+    baseURL: 'API Base URL',
+    apiKey: 'API Key',
+    systemPrompt: 'システムプロンプト',
+    textModel: 'テキストモデル',
+    imageModel: '画像モデル',
+    videoModel: '動画モデル',
+    timeoutSec: 'リクエストタイムアウト',
+    secondsTip: '単位：秒',
   },
   // トランスコード設定
   transcode: {

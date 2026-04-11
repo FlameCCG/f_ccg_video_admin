@@ -7,6 +7,7 @@ export default {
     site: '基础配置',
     logger: '日志配置',
     email: '邮件配置',
+    xai: 'xAI配置',
     transcode: '转码配置',
     thirdLogin: '第三方登录',
     jwt: 'JWT配置',
@@ -92,6 +93,18 @@ export default {
     tls: '启用TLS',
     isExpire: '验证码有效期',
     expireTip: '单位：分钟',
+  },
+  // xAI 配置
+  xai: {
+    title: 'xAI配置',
+    baseURL: 'API Base URL',
+    apiKey: 'API Key',
+    systemPrompt: '系统提示词',
+    textModel: '文本模型',
+    imageModel: '图像模型',
+    videoModel: '视频模型',
+    timeoutSec: '请求超时',
+    secondsTip: '单位：秒',
   },
   // 转码配置
   transcode: {

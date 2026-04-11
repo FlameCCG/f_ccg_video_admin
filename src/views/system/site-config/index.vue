@@ -14,6 +14,7 @@ import type {
   SiteConfig,
   LoggerConfig,
   EmailConfig,
+  XAIConfig,
   TranscodeConfig,
   ThirdLoginConfig,
   JwtConfig,
@@ -22,6 +23,7 @@ import {
   SiteConfigForm,
   LoggerConfigForm,
   EmailConfigForm,
+  XAIConfigForm,
   TranscodeConfigForm,
   ThirdLoginConfigForm,
   JwtConfigForm,
@@ -35,21 +37,27 @@ const queryClient = useQueryClient()
 
 // 当前配置类型，从路由路径或 query 参数获取
 const currentTab = computed(() => {
-  // 优先从路由路径获取（支持 /system-config/email 这种格式）
-  const pathSegments = route.path.split('/')
-  const lastSegment = pathSegments[pathSegments.length - 1]
+  const validNames: SiteConfigName[] = [
+    'site',
+    'logger',
+    'email',
+    'xai',
+    'transcode',
+    'thirdLogin',
+    'jwt',
+  ]
 
-  const validNames: SiteConfigName[] = ['site', 'logger', 'email', 'transcode', 'thirdLogin', 'jwt']
-
-  // 检查路径最后一段是否是有效的配置名
-  if (validNames.includes(lastSegment as SiteConfigName)) {
-    return lastSegment as SiteConfigName
-  }
-
-  // 其次从 query 参数获取
+  // 优先从 query 参数获取（用于未注册子路由的配置项）
   const tab = route.query.tab as string | undefined
   if (tab && validNames.includes(tab as SiteConfigName)) {
     return tab as SiteConfigName
+  }
+
+  // 其次从路由路径获取（支持 /system-config/email 这种格式）
+  const pathSegments = route.path.split('/')
+  const lastSegment = pathSegments[pathSegments.length - 1]
+  if (validNames.includes(lastSegment as SiteConfigName)) {
+    return lastSegment as SiteConfigName
   }
 
   // 默认返回 site
@@ -61,6 +69,7 @@ const configTabs = computed(() => [
   { key: 'site' as const, label: t('siteConfig.tabs.site') },
   { key: 'logger' as const, label: t('siteConfig.tabs.logger') },
   { key: 'email' as const, label: t('siteConfig.tabs.email') },
+  { key: 'xai' as const, label: t('siteConfig.tabs.xai') },
   { key: 'transcode' as const, label: t('siteConfig.tabs.transcode') },
   { key: 'thirdLogin' as const, label: t('siteConfig.tabs.thirdLogin') },
   { key: 'jwt' as const, label: t('siteConfig.tabs.jwt') },
@@ -70,6 +79,7 @@ const configTabs = computed(() => [
 const siteFormData = ref<SiteConfig | null>(null)
 const loggerFormData = ref<LoggerConfig | null>(null)
 const emailFormData = ref<EmailConfig | null>(null)
+const xaiFormData = ref<XAIConfig | null>(null)
 const transcodeFormData = ref<TranscodeConfig | null>(null)
 const thirdLoginFormData = ref<ThirdLoginConfig | null>(null)
 const jwtFormData = ref<JwtConfig | null>(null)
@@ -90,6 +100,9 @@ const { isLoading, refetch } = useQuery({
         break
       case 'email':
         emailFormData.value = data as EmailConfig
+        break
+      case 'xai':
+        xaiFormData.value = data as XAIConfig
         break
       case 'transcode':
         transcodeFormData.value = data as TranscodeConfig
@@ -121,6 +134,9 @@ const updateMutation = useMutation({
       case 'email':
         data = emailFormData.value
         break
+      case 'xai':
+        data = xaiFormData.value
+        break
       case 'transcode':
         data = transcodeFormData.value
         break
@@ -146,9 +162,14 @@ const updateMutation = useMutation({
 // 切换 tab - 跳转到对应的路由路径
 function handleTabChange(name: string): void {
   const tabName = name as SiteConfigName
-  // 构建目标路径：/system-config/{tabName}
-  // 如果是 site，跳转到 /system-config/site
-  void router.push(`/system-config/${tabName}`)
+  // 保持当前已注册路由，使用 query 驱动 tab，避免未注册子路由导致 404
+  void router.push({
+    path: route.path,
+    query: {
+      ...route.query,
+      tab: tabName,
+    },
+  })
 }
 
 // 保存配置
@@ -221,6 +242,12 @@ watch(currentTab, () => {
               <email-config-form
                 v-else-if="tab.key === 'email' && emailFormData"
                 v-model="emailFormData"
+                :loading="updateMutation.isPending.value"
+              />
+              <!-- xAI配置 -->
+              <XAIConfigForm
+                v-else-if="tab.key === 'xai' && xaiFormData"
+                v-model="xaiFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 转码配置 -->

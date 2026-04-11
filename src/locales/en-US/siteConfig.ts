@@ -7,6 +7,7 @@ export default {
     site: 'Basic Settings',
     logger: 'Logger Settings',
     email: 'Email Settings',
+    xai: 'xAI Settings',
     transcode: 'Transcode Settings',
     thirdLogin: 'Third-party Login',
     jwt: 'JWT Settings',
@@ -92,6 +93,18 @@ export default {
     tls: 'Enable TLS',
     isExpire: 'Captcha Expiry',
     expireTip: 'Unit: minutes',
+  },
+  // xAI Settings
+  xai: {
+    title: 'xAI Settings',
+    baseURL: 'API Base URL',
+    apiKey: 'API Key',
+    systemPrompt: 'System Prompt',
+    textModel: 'Text Model',
+    imageModel: 'Image Model',
+    videoModel: 'Video Model',
+    timeoutSec: 'Request Timeout',
+    secondsTip: 'Unit: seconds',
   },
   // Transcode Settings
   transcode: {
