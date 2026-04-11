@@ -6,6 +6,7 @@
  */
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useQuery } from '@tanstack/vue-query'
 import {
   NModal,
   NCard,
@@ -20,6 +21,7 @@ import {
 } from 'naive-ui'
 import type { FormInst, FormRules } from 'naive-ui'
 import type { BannerItem, BannerType } from '@/api/types'
+import { getCommonPartitions } from '@/api/video'
 import { ImageUpload } from '@/components/form'
 
 interface Props {
@@ -38,7 +40,9 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:visible': [value: boolean]
-  submit: [data: { cover: string; href?: string; show?: boolean; type?: BannerType }]
+  submit: [
+    data: { cover: string; href?: string; show?: boolean; type?: BannerType; partitionId?: number },
+  ]
 }>()
 
 const { t } = useI18n()
@@ -53,6 +57,7 @@ const formData = ref({
   href: '',
   show: true,
   type: 1 as BannerType,
+  partitionId: 0,
 })
 
 /** 图片列表（用于 ImageUpload 组件） */
@@ -70,7 +75,29 @@ const modalTitle = computed(() =>
 const typeOptions = computed(() => [
   { value: 1, label: t('banner.type.carousel') },
   { value: 2, label: t('banner.type.header') },
+  { value: 3, label: t('banner.type.profile') },
 ])
+
+/** 获取分区列表 */
+const { data: partitionData } = useQuery({
+  queryKey: ['commonPartitionList'],
+  queryFn: () => getCommonPartitions(),
+  staleTime: 5 * 60 * 1000,
+})
+
+/** 分区选项 */
+const partitionOptions = computed(() => {
+  const options = [{ value: 0, label: '首页' }]
+  if (partitionData.value) {
+    options.push(
+      ...partitionData.value.map((p) => ({
+        value: p.id,
+        label: p.name,
+      }))
+    )
+  }
+  return options
+})
 
 /** 表单验证规则 */
 const rules: FormRules = {
@@ -93,6 +120,7 @@ watch(
         href: banner.href || '',
         show: banner.show,
         type: banner.type,
+        partitionId: banner.partitionId ?? 0,
       }
       coverList.value = banner.cover ? [banner.cover] : []
     } else {
@@ -120,6 +148,7 @@ function resetForm(): void {
     href: '',
     show: true,
     type: 1,
+    partitionId: 0,
   }
   coverList.value = []
   formRef.value?.restoreValidation()
@@ -150,6 +179,7 @@ async function handleSubmit(): Promise<void> {
       href: formData.value.href || undefined,
       show: formData.value.show,
       type: formData.value.type,
+      partitionId: formData.value.type === 1 ? formData.value.partitionId : 0,
     })
   } catch {
     // 验证失败
@@ -209,6 +239,18 @@ async function handleSubmit(): Promise<void> {
             v-model:value="formData.type"
             :options="typeOptions"
             :placeholder="t('banner.form.typePlaceholder')"
+          />
+        </n-form-item>
+
+        <n-form-item
+          v-if="formData.type === 1"
+          :label="t('banner.form.partition')"
+          path="partitionId"
+        >
+          <n-select
+            v-model:value="formData.partitionId"
+            :options="partitionOptions"
+            :placeholder="t('banner.form.partitionPlaceholder')"
           />
         </n-form-item>
 

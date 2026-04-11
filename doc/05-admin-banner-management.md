@@ -14,12 +14,15 @@ Base URL：/v1
 - HTTP 状态码: 200（业务码 code 判断成功/失败）
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
+说明：`type=1` 表示首页/分区轮播图，`partitionId=0` 代表首页，`partitionId>0` 代表对应分区。
+
 请求参数:
 | 名称 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | page | query | integer | 否 | 页码 |
 | pageSize | query | integer | 否 | 每页数量 |
-| type | query | integer | 否 | 轮播图类型（1首页轮播 2顶部横幅） 可选: 1/2 |
+| type | query | integer | 否 | 轮播图类型（1首页/分区轮播图 2顶部横幅 3用户主页横幅） 可选: 1/2/3 |
+| partitionId | query | integer(uint) | 否 | 分区ID，仅 `type=1` 时生效；`0` 代表首页，`>0` 代表对应分区 |
 | show | query | boolean | 否 | 是否显示 |
 
 响应字段:
@@ -31,10 +34,10 @@ Base URL：/v1
 | data.list[].cover | string | 图片链接 |
 | data.list[].href | string | 跳转链接 |
 | data.list[].show | boolean | 是否显示 |
-| data.list[].type | integer | 轮播图类型（1首页轮播 2顶部横幅） |
+| data.list[].type | integer | 轮播图类型（1首页/分区轮播图 2顶部横幅 3用户主页横幅） |
+| data.list[].partitionId | integer(uint) | 分区ID，`0` 代表首页 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -45,7 +48,8 @@ Base URL：/v1
         "cover": "https://cdn.example.com/cover/2001.jpg",
         "href": "https://example.com/page",
         "show": true,
-        "type": 1
+        "type": 1,
+        "partitionId": 0
       }
     ],
     "total": 1
@@ -64,13 +68,16 @@ Base URL：/v1
 - HTTP 状态码: 200（业务码 code 判断成功/失败）
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
+说明：当 `type=1` 时可创建首页/分区轮播图，`partitionId=0` 代表首页，`partitionId>0` 代表对应分区；其他类型会忽略分区并落库为 `0`。
+
 请求参数:
 | 名称 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
 | cover | body | string | 是 | 图片链接 |
 | href | body | string | 否 | 跳转链接 |
 | show | body | boolean | 否 | 是否显示 |
-| type | body | integer | 否 | 轮播图类型（1首页轮播 2顶部横幅） |
+| type | body | integer | 否 | 轮播图类型（1首页/分区轮播图 2顶部横幅 3用户主页横幅） |
+| partitionId | body | integer(uint) | 否 | 分区ID，仅 `type=1` 时生效；`0` 代表首页，`>0` 代表对应分区 |
 
 响应字段:
 | 字段 | 类型 | 说明 |
@@ -80,10 +87,10 @@ Base URL：/v1
 | data.cover | string | 图片链接 |
 | data.href | string | 跳转链接 |
 | data.show | boolean | 是否显示 |
-| data.type | integer | 轮播图类型（1首页轮播 2顶部横幅） |
+| data.type | integer | 轮播图类型（1首页/分区轮播图 2顶部横幅 3用户主页横幅） |
+| data.partitionId | integer(uint) | 分区ID，`0` 代表首页 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -92,7 +99,8 @@ Base URL：/v1
     "cover": "https://cdn.example.com/cover/2001.jpg",
     "href": "https://example.com/page",
     "show": true,
-    "type": 1
+    "type": 1,
+    "partitionId": 12
   },
   "msg": "创建成功"
 }
@@ -108,6 +116,8 @@ Base URL：/v1
 - HTTP 状态码: 200（业务码 code 判断成功/失败）
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
+说明：当修改为 `type=1` 时可同时设置 `partitionId`；若修改为其他类型，系统会自动将 `partitionId` 重置为 `0`。
+
 请求参数:
 | 名称 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -115,7 +125,8 @@ Base URL：/v1
 | cover | body | string | 否 | 图片链接（可选） |
 | href | body | string | 否 | 跳转链接（可选） |
 | show | body | boolean | 否 | 是否显示（可选） |
-| type | body | integer | 否 | 轮播图类型（可选） |
+| type | body | integer | 否 | 轮播图类型（可选，1首页/分区轮播图 2顶部横幅 3用户主页横幅） |
+| partitionId | body | integer(uint) | 否 | 分区ID（可选，仅 `type=1` 时生效；`0` 代表首页，`>0` 代表对应分区） |
 
 响应字段:
 | 字段 | 类型 | 说明 |
@@ -123,7 +134,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
@@ -153,7 +163,6 @@ Base URL：/v1
 | data | object | 响应数据 |
 
 响应示例:
-
 ```json
 {
   "code": 0,
