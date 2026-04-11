@@ -76,13 +76,39 @@ const tooltip = ref({
   rate: 0,
 })
 
-/** 计算 Y 轴范围 */
+// 计算 Y 轴范围
 const yRange = computed(() => {
   const values = props.data.values
   if (values.length === 0) return { min: 0, max: 100 }
 
-  const min = props.yMin ?? Math.min(...values) * 0.9
-  const max = props.yMax ?? Math.max(...values) * 1.1
+  const dataMin = Math.min(...values)
+  const dataMax = Math.max(...values)
+
+  // 如果所有值都相同（比如都是0）
+  if (dataMin === dataMax) {
+    return {
+      min: 0,
+      max: dataMax === 0 ? 5 : dataMax * 2,
+    }
+  }
+
+  const min = props.yMin ?? 0 // 默认 Y 轴从 0 开始，除非指定
+
+  // 动态计算最大值，确保它是合适的整数（如 5, 10, 20, 50, 100 等）
+  let max = props.yMax
+  if (max === undefined) {
+    const rawMax = dataMax * 1.2 // 顶部留出 20% 空间
+    if (rawMax <= 5) max = 5
+    else if (rawMax <= 10) max = 10
+    else if (rawMax <= 20) max = 20
+    else if (rawMax <= 50) max = 50
+    else if (rawMax <= 100) max = 100
+    else {
+      // 对于更大的数，向上取整到最接近的 10, 100, 1000 等的倍数
+      const magnitude = Math.pow(10, Math.floor(Math.log10(rawMax)))
+      max = Math.ceil(rawMax / magnitude) * magnitude
+    }
+  }
 
   return {
     min: Math.floor(min),
@@ -167,27 +193,96 @@ function drawChart(): void {
   const yLines = 5
   for (let i = 0; i <= yLines; i++) {
     const y = padding.top + (chartHeight / yLines) * i
-    const value = yRange.value.max - ((yRange.value.max - yRange.value.min) / yLines) * i
+    // 确保 Y 轴标签是整数
+    const value = Math.round(
+      yRange.value.max - ((yRange.value.max - yRange.value.min) / yLines) * i
+    )
     ctx.fillText(formatNumber(value), padding.left - 8, y)
   }
 
   // 绘制 X 轴标签
-  ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
 
-  const xLabelStep = Math.ceil(x.length / 7) // 最多显示 7 个标签
-  x.forEach((label, i) => {
-    if (i % xLabelStep === 0 || i === x.length - 1) {
-      const xPos = padding.left + i * xStep
-      ctx.fillText(label, xPos, height - padding.bottom + 8)
+  let lastDrawnRight = -1000
+  const minGap = 20 // 标签之间的最小间距
+  const maxLabels = Math.max(2, Math.floor(chartWidth / 80)) // 预估最大标签数
+  const xLabelStep = Math.max(1, Math.ceil(x.length / maxLabels))
+
+  // 预处理标签，简化日期显示
+  const displayLabels = x.map((label) => {
+    if (label.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return label.substring(5) // "2026-03-01" -> "03-01"
     }
+    if (label.match(/^\d{4}-\d{2}$/)) {
+      return label // 保持原样 "2026-01"
+    }
+    return label
   })
 
+  for (let i = 0; i < x.length; i++) {
+    const isFirst = i === 0
+    const isLast = i === x.length - 1
+    const isStep = i % xLabelStep === 0
+
+    if (isFirst || isLast || isStep) {
+      const label = displayLabels[i]!
+      const xPos = padding.left + i * xStep
+      const textWidth = ctx.measureText(label).width
+
+      let align: CanvasTextAlign = 'center'
+      let left = xPos - textWidth / 2
+      let right = xPos + textWidth / 2
+      let drawX = xPos
+
+      if (isFirst) {
+        align = 'left'
+        left = xPos
+        right = xPos + textWidth
+        drawX = xPos
+      } else if (isLast) {
+        align = 'right'
+        left = xPos - textWidth
+        right = xPos
+        drawX = xPos
+      }
+
+      // 检查是否与前一个绘制的标签重叠
+      if (left > lastDrawnRight + minGap || isFirst) {
+        // 如果不是最后一个，检查是否会与最后一个标签重叠
+        if (!isLast && x.length > 1) {
+          const lastLabel = displayLabels[x.length - 1]!
+          const lastTextWidth = ctx.measureText(lastLabel).width
+          const lastXPos = padding.left + (x.length - 1) * xStep
+          const lastLeft = lastXPos - lastTextWidth
+          if (right > lastLeft - minGap) {
+            continue // 跳过当前标签，为最后一个标签留出空间
+          }
+        }
+
+        ctx.textAlign = align
+        ctx.fillText(label, drawX, height - padding.bottom + 8)
+        lastDrawnRight = right
+      } else if (isLast) {
+        // 如果是最后一个且重叠了，清除背景并强制绘制
+        ctx.clearRect(left - 5, height - padding.bottom, textWidth + 10, 20)
+        ctx.textAlign = align
+        ctx.fillText(label, drawX, height - padding.bottom + 8)
+      }
+    }
+  }
+
   // 计算点坐标
-  const points = values.map((value, i) => ({
-    x: padding.left + i * xStep,
-    y: padding.top + chartHeight - (value - yRange.value.min) * yScale,
-  }))
+  const points = values.map((value, i) => {
+    // 处理所有值都相同且为0的情况
+    let y = padding.top + chartHeight
+    if (yRange.value.max > yRange.value.min) {
+      y = padding.top + chartHeight - (value - yRange.value.min) * yScale
+    }
+    return {
+      x: padding.left + i * xStep,
+      y,
+    }
+  })
 
   // 绘制面积图
   if (props.type === 'area') {
@@ -203,18 +298,49 @@ function drawChart(): void {
     if (!firstPoint || !lastPoint) return
 
     ctx.moveTo(firstPoint.x, height - padding.bottom)
+    ctx.lineTo(firstPoint.x, firstPoint.y)
 
-    if (props.smooth && points.length > 2) {
-      ctx.lineTo(firstPoint.x, firstPoint.y)
+    // 检查是否所有点都在同一条水平线上（例如所有值都是0）
+    const isFlat = points.every((p) => Math.abs(p.y - points[0]!.y) < 0.1)
+
+    if (props.smooth && points.length > 2 && !isFlat) {
       for (let i = 0; i < points.length - 1; i++) {
-        const curr = points[i]
-        const next = points[i + 1]
-        if (!curr || !next) continue
-        const xc = (curr.x + next.x) / 2
-        const yc = (curr.y + next.y) / 2
-        ctx.quadraticCurveTo(curr.x, curr.y, xc, yc)
+        const p0 = (i === 0 ? points[0] : points[i - 1])!
+        const p1 = points[i]!
+        const p2 = points[i + 1]!
+        const p3 = (i === points.length - 2 ? points[i + 1] : points[i + 2])!
+
+        const tension = 0.2
+        const cp1x = p1.x + (p2.x - p0.x) * tension
+        let cp1y = p1.y + (p2.y - p0.y) * tension
+        const cp2x = p2.x - (p3.x - p1.x) * tension
+        let cp2y = p2.y - (p3.y - p1.y) * tension
+
+        // 限制控制点 Y 坐标在图表区域内，防止过度弯曲
+        const minY = padding.top
+        const maxY = height - padding.bottom
+        cp1y = Math.max(minY, Math.min(maxY, cp1y))
+        cp2y = Math.max(minY, Math.min(maxY, cp2y))
+
+        // 进一步限制控制点，防止在极值点出现波浪
+        // 如果 p1 是极值点，或者 p1 和 p2 处于同一水平线，压平控制点
+        if (
+          (p1.y <= p0.y && p1.y <= p2.y) ||
+          (p1.y >= p0.y && p1.y >= p2.y) ||
+          Math.abs(p1.y - p2.y) < 0.1
+        ) {
+          cp1y = p1.y
+        }
+        if (
+          (p2.y <= p1.y && p2.y <= p3.y) ||
+          (p2.y >= p1.y && p2.y >= p3.y) ||
+          Math.abs(p1.y - p2.y) < 0.1
+        ) {
+          cp2y = p2.y
+        }
+
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
       }
-      ctx.lineTo(lastPoint.x, lastPoint.y)
     } else {
       points.forEach((point) => ctx.lineTo(point.x, point.y))
     }
@@ -232,27 +358,60 @@ function drawChart(): void {
   ctx.beginPath()
 
   const lineFirstPoint = points[0]
-  const lineLastPoint = points[points.length - 1]
 
-  if (props.smooth && points.length > 2 && lineFirstPoint && lineLastPoint) {
+  if (lineFirstPoint) {
     ctx.moveTo(lineFirstPoint.x, lineFirstPoint.y)
-    for (let i = 0; i < points.length - 1; i++) {
-      const curr = points[i]
-      const next = points[i + 1]
-      if (!curr || !next) continue
-      const xc = (curr.x + next.x) / 2
-      const yc = (curr.y + next.y) / 2
-      ctx.quadraticCurveTo(curr.x, curr.y, xc, yc)
-    }
-    ctx.lineTo(lineLastPoint.x, lineLastPoint.y)
-  } else {
-    points.forEach((point, i) => {
-      if (i === 0) ctx.moveTo(point.x, point.y)
-      else ctx.lineTo(point.x, point.y)
-    })
-  }
 
-  ctx.stroke()
+    // 检查是否所有点都在同一条水平线上（例如所有值都是0）
+    const isFlat = points.every((p) => Math.abs(p.y - points[0]!.y) < 0.1)
+
+    if (props.smooth && points.length > 2 && !isFlat) {
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = (i === 0 ? points[0] : points[i - 1])!
+        const p1 = points[i]!
+        const p2 = points[i + 1]!
+        const p3 = (i === points.length - 2 ? points[i + 1] : points[i + 2])!
+
+        const tension = 0.2
+        const cp1x = p1.x + (p2.x - p0.x) * tension
+        let cp1y = p1.y + (p2.y - p0.y) * tension
+        const cp2x = p2.x - (p3.x - p1.x) * tension
+        let cp2y = p2.y - (p3.y - p1.y) * tension
+
+        // 限制控制点 Y 坐标在图表区域内，防止过度弯曲
+        const minY = padding.top
+        const maxY = height - padding.bottom
+        cp1y = Math.max(minY, Math.min(maxY, cp1y))
+        cp2y = Math.max(minY, Math.min(maxY, cp2y))
+
+        // 进一步限制控制点，防止在极值点出现波浪
+        // 关键修复：当当前点和下一个点在同一水平线，或者当前点是峰值/谷值时，压平控制点
+        if (
+          (p1.y <= p0.y && p1.y <= p2.y) ||
+          (p1.y >= p0.y && p1.y >= p2.y) ||
+          Math.abs(p1.y - p2.y) < 0.1
+        ) {
+          cp1y = p1.y
+        }
+        if (
+          (p2.y <= p1.y && p2.y <= p3.y) ||
+          (p2.y >= p1.y && p2.y >= p3.y) ||
+          Math.abs(p1.y - p2.y) < 0.1
+        ) {
+          cp2y = p2.y
+        }
+
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+      }
+    } else {
+      points.forEach((point, i) => {
+        if (i === 0) ctx.moveTo(point.x, point.y)
+        else ctx.lineTo(point.x, point.y)
+      })
+    }
+
+    ctx.stroke()
+  }
 
   // 绘制数据点
   if (props.showDots) {
@@ -413,6 +572,7 @@ onUnmounted(() => {
     pointer-events: none;
     transform: translateX(-50%);
     z-index: 10;
+    white-space: nowrap;
   }
 
   &__tooltip-label {
