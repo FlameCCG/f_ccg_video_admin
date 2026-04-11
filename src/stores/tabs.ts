@@ -30,7 +30,7 @@ const ACTIVE_TAB_KEY = 'admin-console-active-tab'
 
 /** 默认首页标签 */
 const HOME_TAB: TabItem = {
-  path: '/overview/dashboard',
+  path: '/overview',
   title: '仪表盘',
   titleEn: 'Dashboard',
   titleJa: 'ダッシュボード',
@@ -66,7 +66,7 @@ export const useTabsStore = defineStore('tabs', () => {
     const meta = route.meta || {}
     const newTab: TabItem = {
       path,
-      title: (meta.title as string) || route.name?.toString() || path,
+      title: (meta.titleZh as string) || (meta.title as string) || route.name?.toString() || path,
       titleEn: meta.titleEn as string,
       titleJa: meta.titleJa as string,
       icon: meta.icon as string,
@@ -160,6 +160,77 @@ export const useTabsStore = defineStore('tabs', () => {
     }
   }
 
+  /** 批量同步标签的多语言标题（语言切换时调用） */
+  function syncTabI18n(
+    titleMap: Array<{ path: string; title: string; titleEn?: string; titleJa?: string }>
+  ): void {
+    const lookup = new Map(titleMap.map((m) => [m.path, m]))
+    let changed = false
+    for (const tab of tabs.value) {
+      const entry = lookup.get(tab.path)
+      if (entry) {
+        tab.title = entry.title
+        tab.titleEn = entry.titleEn
+        tab.titleJa = entry.titleJa
+        changed = true
+      }
+    }
+    if (changed) {
+      storedTabs.value = tabs.value
+    }
+  }
+
+  /** 修正首页标签路径（用于迁移旧版 localStorage 数据） */
+  function fixHomeTabPath(): void {
+    const staleHome = tabs.value.find(
+      (t) => t.affix && t.path !== HOME_TAB.path && t.title === HOME_TAB.title
+    )
+    if (staleHome) {
+      staleHome.path = HOME_TAB.path
+      staleHome.titleEn = HOME_TAB.titleEn
+      staleHome.titleJa = HOME_TAB.titleJa
+      storedTabs.value = tabs.value
+    }
+  }
+
+  /** 去除同路径的重复标签，每个路径只保留一个（优先保留 affix） */
+  function deduplicateTabs(): void {
+    const seen = new Map<string, TabItem>()
+    const kept: TabItem[] = []
+
+    for (const tab of tabs.value) {
+      const existing = seen.get(tab.path)
+      if (!existing) {
+        seen.set(tab.path, tab)
+        kept.push(tab)
+      } else {
+        // 同路径已存在：若当前是 affix 而已有不是，则替换
+        if (tab.affix && !existing.affix) {
+          const idx = kept.indexOf(existing)
+          kept[idx] = tab
+          seen.set(tab.path, tab)
+        }
+        // 否则丢弃当前（保留已有的）
+      }
+    }
+
+    if (kept.length !== tabs.value.length) {
+      tabs.value = kept
+      storedTabs.value = tabs.value
+      if (!tabs.value.some((t) => t.path === activeTab.value)) {
+        const first = tabs.value[0]
+        if (first) {
+          activeTab.value = first.path
+          storedActiveTab.value = first.path
+        }
+      }
+    }
+  }
+
+  // 初始化时修正旧路径并去重
+  fixHomeTabPath()
+  deduplicateTabs()
+
   return {
     tabs: computed(() => tabs.value),
     activeTab: computed(() => activeTab.value),
@@ -171,5 +242,6 @@ export const useTabsStore = defineStore('tabs', () => {
     closeAllTabs,
     setActiveTab,
     updateTabTitle,
+    syncTabI18n,
   }
 })

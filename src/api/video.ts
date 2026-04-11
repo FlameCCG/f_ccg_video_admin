@@ -93,6 +93,14 @@ export function deleteDanmu(params: DeleteDanmuParams): Promise<DeleteDanmuResul
 // ============ 分区管理 ============
 
 /**
+ * 获取分区列表 (客户端可见)
+ * GET /common/video/partitions
+ */
+export function getCommonPartitions(): Promise<Partition[]> {
+  return request.get('/common/video/partitions')
+}
+
+/**
  * 获取分区列表
  * GET /admin/video/partitions
  */
