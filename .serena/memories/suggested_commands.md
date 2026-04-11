@@ -1,0 +1,11 @@
+# 常用命令
+- 安装依赖：`pnpm install`
+- 启动开发：`pnpm dev`
+- 构建：`pnpm build`
+- 类型检查：`pnpm typecheck` 或 `pnpm exec vue-tsc --noEmit --project tsconfig.app.json`
+- Lint：`pnpm lint`
+- Stylelint：`pnpm stylelint`
+- 单测：`pnpm test:unit`
+- 提交前检查：`pnpm check:commit`
+- CI 检查：`pnpm check:ci`
+- Windows 常用：`Get-ChildItem` 列目录，`Get-Content` 看文件，`rg` 搜索文本，`git status --short` 看改动。

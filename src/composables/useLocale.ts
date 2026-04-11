@@ -18,6 +18,7 @@ import {
 import type { LocaleType } from '@/locales'
 import { localeConfigs, DEFAULT_LOCALE, LOCALE_STORAGE_KEY, setI18nLanguage, i18n } from '@/locales'
 import { usePermissionStore } from '@/stores/permission'
+import { useTabsStore } from '@/stores/tabs'
 
 /**
  * Naive UI locale 映射
@@ -117,6 +118,65 @@ export function useLocale() {
     // 同步更新 permission store 的语言（用于路由标题）
     const permissionStore = usePermissionStore()
     permissionStore.setLocale(locale)
+
+    // 同步更新已打开标签的多语言标题
+    syncTabTitlesFromMenus(permissionStore)
+  }
+
+  /**
+   * 从权限菜单同步标签标题
+   */
+  function syncTabTitlesFromMenus(permissionStore: ReturnType<typeof usePermissionStore>): void {
+    const tabsStore = useTabsStore()
+    const titleMap: Array<{ path: string; title: string; titleEn?: string; titleJa?: string }> = []
+
+    for (const tab of tabsStore.tabs) {
+      const menu = findMenuByFullPath(permissionStore.menus, tab.path)
+      if (menu) {
+        titleMap.push({
+          path: tab.path,
+          title: menu.title,
+          titleEn: menu.titleEn,
+          titleJa: menu.titleJa,
+        })
+      }
+    }
+
+    if (titleMap.length > 0) {
+      tabsStore.syncTabI18n(titleMap)
+    }
+  }
+
+  /**
+   * 在菜单树中按完整路径查找菜单
+   */
+  function findMenuByFullPath(
+    menus: ReturnType<typeof usePermissionStore>['menus'],
+    targetPath: string,
+    parentPath = ''
+  ): { title: string; titleEn?: string; titleJa?: string } | undefined {
+    for (const menu of menus) {
+      if (!menu.path) continue
+
+      let fullPath: string
+      if (menu.path.startsWith('/')) {
+        fullPath = menu.path
+      } else if (parentPath) {
+        fullPath = `${parentPath}/${menu.path}`
+      } else {
+        fullPath = menu.path
+      }
+
+      if (fullPath === targetPath) {
+        return menu
+      }
+
+      if (menu.children && menu.children.length > 0) {
+        const found = findMenuByFullPath(menu.children, targetPath, fullPath)
+        if (found) return found
+      }
+    }
+    return undefined
   }
 
   /**
