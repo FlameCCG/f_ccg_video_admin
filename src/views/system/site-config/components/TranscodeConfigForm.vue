@@ -56,10 +56,28 @@ function handleResolutionsChange(values: (string | number)[]): void {
     values.filter((v): v is number => typeof v === 'number')
   )
 }
+
+function handleLocalConsumerChange(enabled: boolean): void {
+  updateField('localConsumerDisabled', !enabled)
+}
+
+function handleCheckpointEnabledChange(enabled: boolean): void {
+  updateField('checkpointDisable', !enabled)
+}
 </script>
 
 <template>
   <n-form v-if="formData" label-placement="left" label-width="200" :disabled="loading">
+    <n-form-item :label="t('siteConfig.transcode.localConsumerEnabled')">
+      <n-space vertical>
+        <n-switch
+          :value="!formData.localConsumerDisabled"
+          :aria-label="t('siteConfig.transcode.localConsumerEnabled')"
+          @update:value="handleLocalConsumerChange"
+        />
+        <n-text depth="3">{{ t('siteConfig.transcode.localConsumerTip') }}</n-text>
+      </n-space>
+    </n-form-item>
     <!-- 基础设置 -->
     <n-grid :cols="2" :x-gap="24">
       <n-grid-item>
@@ -359,6 +377,46 @@ function handleResolutionsChange(values: (string | number)[]): void {
             <template #suffix>{{ t('siteConfig.transcode.secondsTip') }}</template>
           </n-input-number>
         </n-form-item>
+      </n-grid-item>
+    </n-grid>
+
+    <n-divider title-placement="left">
+      <n-text>{{ t('siteConfig.transcode.checkpointTitle') }}</n-text>
+    </n-divider>
+    <n-form-item :label="t('siteConfig.transcode.checkpointEnabled')">
+      <n-space vertical>
+        <n-switch
+          :value="!formData.checkpointDisable"
+          :aria-label="t('siteConfig.transcode.checkpointEnabled')"
+          @update:value="handleCheckpointEnabledChange"
+        />
+        <n-text depth="3">{{ t('siteConfig.transcode.checkpointEnabledTip') }}</n-text>
+      </n-space>
+    </n-form-item>
+    <n-grid :cols="2" :x-gap="24">
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.checkpointDir')">
+          <n-input
+            :value="formData.checkpointDir"
+            :placeholder="t('siteConfig.transcode.checkpointDirPlaceholder')"
+            @update:value="(v) => updateField('checkpointDir', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.chunkDurationSec')">
+          <n-input-number
+            :value="formData.chunkDurationSec"
+            :min="-1"
+            :max="3600"
+            @update:value="(v) => updateField('chunkDurationSec', v ?? 0)"
+          >
+            <template #suffix>{{ t('siteConfig.transcode.secondsTip') }}</template>
+          </n-input-number>
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item :span="2">
+        <n-text depth="3">{{ t('siteConfig.transcode.checkpointTip') }}</n-text>
       </n-grid-item>
     </n-grid>
   </n-form>

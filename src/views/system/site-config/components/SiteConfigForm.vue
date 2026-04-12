@@ -29,7 +29,10 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 type EditableSiteSection = 'contentReview' | 'login' | 'register'
-type EditableSiteRootField = 'defaultUserBannerID' | 'defaultUserBannerIDs'
+type EditableSiteRootField =
+  | 'defaultUserBannerID'
+  | 'defaultUserBannerIDs'
+  | 'disableUserSubmission'
 
 const formData = computed({
   get: () => props.modelValue,
@@ -101,10 +104,27 @@ function handleDefaultBannerIDsChange(value: string): void {
     .filter((item) => Number.isInteger(item) && item > 0)
   updateRootField('defaultUserBannerIDs', ids)
 }
+function handleSubmissionPolicyChange(value: boolean): void {
+  updateRootField('disableUserSubmission', value)
+}
 </script>
 
 <template>
   <n-form v-if="formData" label-placement="left" label-width="180" :disabled="loading">
+    <n-divider title-placement="left">
+      <n-text strong>{{ t('siteConfig.site.submission.title') }}</n-text>
+    </n-divider>
+    <n-form-item :label="t('siteConfig.site.submission.disableUserSubmission')">
+      <n-switch
+        :value="formData.disableUserSubmission ?? false"
+        :aria-label="t('siteConfig.site.submission.disableUserSubmission')"
+        @update:value="handleSubmissionPolicyChange"
+      />
+      <n-text class="ml-3 text-muted" depth="3">
+        {{ t('siteConfig.site.submission.tip') }}
+      </n-text>
+    </n-form-item>
+
     <!-- 内容审核 -->
     <n-divider title-placement="left">
       <n-text strong>{{ t('siteConfig.site.contentReview.title') }}</n-text>
@@ -189,6 +209,34 @@ function handleDefaultBannerIDsChange(value: string): void {
         </n-form-item>
       </n-grid-item>
       <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.slideCaptcha')">
+          <n-switch
+            :value="formData.login.slideCaptcha"
+            @update:value="(v: boolean) => updateField('login', 'slideCaptcha', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.slideCaptchaTTL')">
+          <n-input-number
+            :value="formData.login.slideCaptchaTTL"
+            :min="60"
+            :max="3600"
+            @update:value="(v) => updateField('login', 'slideCaptchaTTL', v ?? 300)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.slideCaptchaPadding')">
+          <n-input-number
+            :value="formData.login.slideCaptchaPadding"
+            :min="0"
+            :max="100"
+            @update:value="(v) => updateField('login', 'slideCaptchaPadding', v ?? 10)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
         <n-form-item :label="t('siteConfig.site.login.textClickCaptchaTTL')">
           <n-input-number
             :value="formData.login.textClickCaptchaTTL"
@@ -209,6 +257,8 @@ function handleDefaultBannerIDsChange(value: string): void {
         </n-form-item>
       </n-grid-item>
     </n-grid>
+
+    <n-text depth="3">{{ t('siteConfig.site.interactiveCaptchaTip') }}</n-text>
 
     <!-- 用户横幅 -->
     <n-divider title-placement="left">
@@ -265,6 +315,34 @@ function handleDefaultBannerIDsChange(value: string): void {
         </n-form-item>
       </n-grid-item>
       <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.register.textClickCaptcha')">
+          <n-switch
+            :value="formData.register.textClickCaptcha"
+            @update:value="(v: boolean) => updateField('register', 'textClickCaptcha', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.register.textClickCaptchaTTL')">
+          <n-input-number
+            :value="formData.register.textClickCaptchaTTL"
+            :min="60"
+            :max="3600"
+            @update:value="(v) => updateField('register', 'textClickCaptchaTTL', v ?? 300)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.register.textClickCaptchaPadding')">
+          <n-input-number
+            :value="formData.register.textClickCaptchaPadding"
+            :min="0"
+            :max="100"
+            @update:value="(v) => updateField('register', 'textClickCaptchaPadding', v ?? 20)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
         <n-form-item :label="t('siteConfig.site.register.slideCaptchaTTL')">
           <n-input-number
             :value="formData.register.slideCaptchaTTL"
@@ -285,6 +363,8 @@ function handleDefaultBannerIDsChange(value: string): void {
         </n-form-item>
       </n-grid-item>
     </n-grid>
+
+    <n-text depth="3">{{ t('siteConfig.site.interactiveCaptchaTip') }}</n-text>
 
     <!-- 存储设置 -->
     <n-divider title-placement="left">
@@ -327,6 +407,9 @@ function handleDefaultBannerIDsChange(value: string): void {
           </n-input-number>
         </n-form-item>
       </n-grid-item>
+      <n-grid-item :span="2">
+        <n-text depth="3">{{ t('siteConfig.site.storage.sizeTip') }}</n-text>
+      </n-grid-item>
       <n-grid-item>
         <n-form-item :label="t('siteConfig.site.storage.maxUploadNum')">
           <n-input-number
@@ -335,6 +418,40 @@ function handleDefaultBannerIDsChange(value: string): void {
             :max="100"
             @update:value="(v) => updateStorageRootField('maxUploadNum', v ?? 10)"
           />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.storage.dailyUploadLimit')">
+          <n-input-number
+            :value="formData.storage.dailyUploadLimit"
+            :min="1"
+            :max="10000"
+            @update:value="(v) => updateStorageRootField('dailyUploadLimit', v ?? 10)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.storage.unmergedChunkRetentionHours')">
+          <n-input-number
+            :value="formData.storage.unmergedChunkRetentionHours"
+            :min="1"
+            :max="720"
+            @update:value="(v) => updateStorageRootField('unmergedChunkRetentionHours', v ?? 2)"
+          >
+            <template #suffix>h</template>
+          </n-input-number>
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.storage.unpublishedSourceRetentionHours')">
+          <n-input-number
+            :value="formData.storage.unpublishedSourceRetentionHours"
+            :min="1"
+            :max="720"
+            @update:value="(v) => updateStorageRootField('unpublishedSourceRetentionHours', v ?? 1)"
+          >
+            <template #suffix>h</template>
+          </n-input-number>
         </n-form-item>
       </n-grid-item>
       <n-grid-item :span="2">

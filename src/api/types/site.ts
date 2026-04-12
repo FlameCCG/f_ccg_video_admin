@@ -32,6 +32,9 @@ export interface PublicLoginConfig {
   usernamePwdLogin: boolean
   textGraphicCaptcha: boolean
   textClickCaptcha: boolean
+  slideCaptcha: boolean
+  slideCaptchaTTL: number
+  slideCaptchaPadding: number
   textClickCaptchaTTL: number
   textClickCaptchaPadding: number
 }
@@ -41,6 +44,9 @@ export interface PublicRegisterConfig {
   emailCaptcha: boolean
   textGraphicCaptcha: boolean
   slideCaptcha: boolean
+  textClickCaptcha: boolean
+  textClickCaptchaTTL: number
+  textClickCaptchaPadding: number
   slideCaptchaTTL: number
   slideCaptchaPadding: number
 }
@@ -60,6 +66,8 @@ export interface PublicContentReviewConfig {
 
 /** 公开站点配置 */
 export interface PublicSiteConfig {
+  /** 开启后仅管理员可上传、投稿和改稿 */
+  disableUserSubmission?: boolean
   login: PublicLoginConfig
   register: PublicRegisterConfig
   storage: PublicStorageConfig
@@ -88,6 +96,9 @@ export interface LoginConfig {
   usernamePwdLogin: boolean
   textGraphicCaptcha: boolean
   textClickCaptcha: boolean
+  slideCaptcha: boolean
+  slideCaptchaTTL: number
+  slideCaptchaPadding: number
   textClickCaptchaTTL: number
   textClickCaptchaPadding: number
 }
@@ -97,6 +108,9 @@ export interface RegisterConfig {
   emailCaptcha: boolean
   textGraphicCaptcha: boolean
   slideCaptcha: boolean
+  textClickCaptcha: boolean
+  textClickCaptchaTTL: number
+  textClickCaptchaPadding: number
   slideCaptchaTTL: number
   slideCaptchaPadding: number
 }
@@ -125,6 +139,9 @@ export interface StorageConfig {
   chunkSize: number
   maxFileSize: number
   maxUploadNum: number
+  dailyUploadLimit: number
+  unmergedChunkRetentionHours: number
+  unpublishedSourceRetentionHours: number
   chunkDir?: string
   local?: LocalStorageConfig
   minio?: MinioStorageConfig
@@ -132,6 +149,8 @@ export interface StorageConfig {
 
 /** 基础站点配置 */
 export interface SiteConfig {
+  /** 开启后仅管理员可上传、投稿和改稿 */
+  disableUserSubmission?: boolean
   /** 用户注册时主页默认横幅 ID */
   defaultUserBannerID: number
   /** 系统默认提供的用户主页横幅 ID 列表 */
@@ -188,6 +207,8 @@ export interface AIConfig {
   embeddingDimensions: number
   doubaoModelAPIKey: string
   systemPrompt: string
+  /** 管理端创建菜单时生成字段所使用的独立系统提示词 */
+  menuGenerationSystemPrompt: string
   imageModel: string
   imageModels?: AIModelOption[]
   videoModel: string
@@ -200,6 +221,8 @@ export interface AIConfig {
 
 /** 转码配置（与后端 conf.Transcode 对齐） */
 export interface TranscodeConfig {
+  /** 本机不参与转码消费，保存后重启当前后端实例生效 */
+  localConsumerDisabled: boolean
   maxWorkers: number
   transcodeResolutions: number[]
   highBitrateThreshold: number
@@ -228,6 +251,12 @@ export interface TranscodeConfig {
   mp4Enable: boolean
   dashEnable: boolean
   dashSegDuration: number
+  /** 断点目录。空字符串表示使用系统临时目录 */
+  checkpointDir: string
+  /** 为 true 时关闭断点续传，重试整段重编码 */
+  checkpointDisable: boolean
+  /** 分段转码块长（秒）。0 表示默认 180；小于 0 表示关闭分段 */
+  chunkDurationSec: number
 }
 
 /** QQ 登录配置 */
@@ -309,8 +338,10 @@ export interface SiteOverview {
  * 每日趋势数据
  */
 export interface DailyTrends {
-  /** 访问用户趋势 */
+  /** 访问用户趋势（站点打点日 UV，含未登录访客） */
   visitUsers: TrendSeries
+  /** 登录用户趋势（每日去重登录用户数，与 overview.todayLoginUsers 同口径） */
+  loginUsers: TrendSeries
   /** 发布视频趋势 */
   publishVideos: TrendSeries
   /** 新增用户趋势 */

@@ -15,7 +15,14 @@ export default {
   },
   // 基本設定
   site: {
+    interactiveCaptchaTip:
+      'クリック認証とスライド認証を両方有効にすると、毎回いずれかがランダムに表示されます。',
     title: '基本設定',
+    submission: {
+      title: '動画投稿',
+      disableUserSubmission: '一般ユーザーの投稿を禁止',
+      tip: '有効にすると、動画・カバーのアップロード、公開、編集は管理者のみ可能になります。保存後に反映されます。',
+    },
     contentReview: {
       title: 'コンテンツ審査',
       enable: 'コンテンツ審査を有効化',
@@ -31,6 +38,9 @@ export default {
       usernamePwdLogin: 'ユーザー名/パスワードログイン',
       textGraphicCaptcha: '画像認証',
       textClickCaptcha: 'クリック認証',
+      slideCaptcha: 'スライド認証',
+      slideCaptchaTTL: 'スライド認証有効期限',
+      slideCaptchaPadding: 'スライド認証パディング',
       textClickCaptchaTTL: 'クリック認証有効期限',
       textClickCaptchaPadding: 'クリック認証パディング',
     },
@@ -45,7 +55,10 @@ export default {
       emailCaptcha: 'メール認証',
       textGraphicCaptcha: '画像認証',
       slideCaptcha: 'スライド認証',
+      textClickCaptcha: 'クリック認証',
       slideCaptchaTTL: 'スライド認証有効期限',
+      textClickCaptchaTTL: 'クリック認証有効期限',
+      textClickCaptchaPadding: 'クリック認証パディング',
       slideCaptchaPadding: 'スライド認証パディング',
     },
     storage: {
@@ -53,7 +66,12 @@ export default {
       maxChunkSize: '最大チャンクサイズ',
       chunkSize: 'チャンクサイズ',
       maxFileSize: '最大ファイルサイズ',
-      maxUploadNum: '最大アップロード数',
+      sizeTip:
+        'フロントはチャンクサイズで分割します。1チャンクの上限は最大チャンクサイズで、未設定のときだけチャンクサイズを使います。チャンクサイズの方が大きい場合、公開設定では最大チャンクサイズまで下げます。最大ファイルサイズはアップロードと結合時に、保存済みチャンクの合計で検証します。',
+      maxUploadNum: '作品ごとの分P上限',
+      dailyUploadLimit: '一般ユーザーの1日あたりのファイル上限',
+      unmergedChunkRetentionHours: '未結合チャンクの保持期間',
+      unpublishedSourceRetentionHours: '未公開元動画の保持期間',
       chunkDir: 'チャンクディレクトリ',
       local: {
         title: 'ローカルストレージ',
@@ -117,6 +135,9 @@ export default {
     embeddingDimensions: 'Embedding次元',
     doubaoModelAPIKey: 'Doubaoモデル API Key',
     systemPrompt: 'システムプロンプト',
+    menuGenerationSystemPrompt: 'メニュー生成システムプロンプト',
+    menuGenerationSystemPromptTip:
+      '空欄の場合はバックエンド既定値を使用し、メニュー項目の生成時だけ利用します',
     imageModel: 'デフォルト画像モデル',
     videoModel: 'デフォルト動画モデル',
     imageModels: '画像モデル一覧',
@@ -133,6 +154,9 @@ export default {
   },
   // トランスコード設定
   transcode: {
+    localConsumerEnabled: 'このノードで変換タスクを処理',
+    localConsumerTip:
+      '無効にすると、このバックエンドは変換タスクを処理しません。投稿のタスク送信は継続し、他の有効なノードが処理します。処理ノードがない場合は待機します。保存後、このバックエンドを再起動すると反映されます。',
     title: 'トランスコード設定',
     maxWorkers: '最大ワーカー数',
     transcodeResolutions: 'トランスコード解像度',
@@ -164,6 +188,14 @@ export default {
     dashEnable: 'DASH有効化',
     dashSegDuration: 'DASHセグメント長',
     dashTitle: 'DASH設定',
+    checkpointTitle: 'チェックポイント',
+    checkpointEnabled: 'チェックポイントを有効化',
+    checkpointEnabledTip: '無効にすると、再試行時に全体を再エンコードします。既定では有効です。',
+    checkpointDir: 'チェックポイントディレクトリ',
+    checkpointDirPlaceholder: '空欄の場合はシステムの一時ディレクトリを使用',
+    chunkDurationSec: '分割エンコード長',
+    checkpointTip:
+      'ディレクトリが空のときは、システムの一時ディレクトリ配下の transcode-checkpoints を使います。0 は既定の 180 秒です。負の値は分割を無効にし、ユニット単位のチェックポイントだけ残します。',
     kbpsTip: '単位：Kbps',
     percentTip: '単位：%',
     secondsTip: '秒',

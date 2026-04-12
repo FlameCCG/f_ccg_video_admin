@@ -17,6 +17,7 @@ describe('site-config normalize', () => {
       embeddingDimensions: 2048,
       doubaoModelAPIKey: 'dk',
       systemPrompt: 'hi',
+      menuGenerationSystemPrompt: 'generate menu fields',
       imageModel: 'img',
       videoModel: 'vid',
       vectorIndex: 'idx',
@@ -51,6 +52,7 @@ describe('site-config normalize', () => {
     expect(next.thinkingEffort).toBe('')
     expect(next.thinkingEfforts).toEqual([])
     expect(next.chatModelBaseURL).toBe('https://chat.example')
+    expect(next.menuGenerationSystemPrompt).toBe('generate menu fields')
   })
 
   it('fills missing high-tier transcode ratios', () => {
@@ -85,6 +87,31 @@ describe('site-config normalize', () => {
     expect(next.bitrate2160HighKbpsReduceRatio).toBe(0)
     expect(next.bitrate1080HighKbpsReduceRatio).toBe(0)
     expect(next.mp4Enable).toBe(true)
+    expect(next.localConsumerDisabled).toBe(false)
+  })
+
+  it('preserves the local consumer switch when loading and saving transcode config', () => {
+    const next = normalizeTranscodeConfig({ localConsumerDisabled: true } as TranscodeConfig)
+    expect(next.localConsumerDisabled).toBe(true)
+    expect(
+      normalizeTranscodeConfig({ ...next, localConsumerDisabled: false }).localConsumerDisabled
+    ).toBe(false)
+  })
+
+  it('preserves transcode checkpoint settings and fills their defaults', () => {
+    const next = normalizeTranscodeConfig({
+      checkpointDir: '/data/checkpoints',
+      checkpointDisable: true,
+      chunkDurationSec: -1,
+    } as TranscodeConfig)
+    expect(next.checkpointDir).toBe('/data/checkpoints')
+    expect(next.checkpointDisable).toBe(true)
+    expect(next.chunkDurationSec).toBe(-1)
+
+    const defaults = normalizeTranscodeConfig({} as TranscodeConfig)
+    expect(defaults.checkpointDir).toBe('')
+    expect(defaults.checkpointDisable).toBe(false)
+    expect(defaults.chunkDurationSec).toBe(0)
   })
 
   it('fills empty third-login providers', () => {
@@ -94,11 +121,59 @@ describe('site-config normalize', () => {
     expect(next.x.redirect).toBe('')
   })
 
+  it('preserves the submission restriction when loading and saving site config', () => {
+    const next = normalizeSiteConfig({ disableUserSubmission: true } as SiteConfig)
+    expect(next.disableUserSubmission).toBe(true)
+    expect(
+      normalizeSiteConfig({ ...next, disableUserSubmission: false }).disableUserSubmission
+    ).toBe(false)
+  })
+
   it('fills site nested defaults', () => {
     const next = normalizeSiteConfig({} as SiteConfig)
+    expect(next.disableUserSubmission).toBe(false)
     expect(next.contentReview.enable).toBe(false)
     expect(next.login.gitHubLogin).toBe(false)
+    expect(next.login.slideCaptcha).toBe(false)
+    expect(next.register.textClickCaptcha).toBe(false)
     expect(next.register.slideCaptchaTTL).toBe(300)
     expect(next.defaultUserBannerIDs).toEqual([])
+    expect(next.storage.dailyUploadLimit).toBe(10)
+    expect(next.storage.unmergedChunkRetentionHours).toBe(2)
+    expect(next.storage.unpublishedSourceRetentionHours).toBe(1)
+  })
+
+  it('preserves both interactive captcha switches for login and email sending', () => {
+    const raw = {
+      login: { textClickCaptcha: true, slideCaptcha: true },
+      register: { textClickCaptcha: true, slideCaptcha: true },
+    } as SiteConfig
+    const next = normalizeSiteConfig(raw)
+    expect(next.login.textClickCaptcha).toBe(true)
+    expect(next.login.slideCaptcha).toBe(true)
+    expect(next.register.textClickCaptcha).toBe(true)
+    expect(next.register.slideCaptcha).toBe(true)
+    const saved = normalizeSiteConfig({
+      ...next,
+      login: { ...next.login, slideCaptcha: false },
+      register: { ...next.register, textClickCaptcha: false },
+    })
+    expect(saved.login.slideCaptcha).toBe(false)
+    expect(saved.register.textClickCaptcha).toBe(false)
+  })
+
+  it('keeps the daily limit separate from the per-work part limit', () => {
+    const next = normalizeSiteConfig({
+      storage: {
+        maxUploadNum: 6,
+        dailyUploadLimit: 15,
+        unmergedChunkRetentionHours: 3,
+        unpublishedSourceRetentionHours: 4,
+      },
+    } as SiteConfig)
+    expect(next.storage.maxUploadNum).toBe(6)
+    expect(next.storage.dailyUploadLimit).toBe(15)
+    expect(next.storage.unmergedChunkRetentionHours).toBe(3)
+    expect(next.storage.unpublishedSourceRetentionHours).toBe(4)
   })
 })

@@ -15,7 +15,14 @@ export default {
   },
   // Basic Settings
   site: {
+    interactiveCaptchaTip:
+      'When click and slide captchas are both enabled, one is chosen at random each time.',
     title: 'Basic Settings',
+    submission: {
+      title: 'Video submissions',
+      disableUserSubmission: 'Disable user submissions',
+      tip: 'When enabled, only administrators can upload videos and covers, publish, or edit videos. Takes effect after saving.',
+    },
     contentReview: {
       title: 'Content Review',
       enable: 'Enable Content Review',
@@ -31,6 +38,9 @@ export default {
       usernamePwdLogin: 'Username/Password Login',
       textGraphicCaptcha: 'Graphic Captcha',
       textClickCaptcha: 'Click Captcha',
+      slideCaptcha: 'Slide Captcha',
+      slideCaptchaTTL: 'Slide Captcha TTL',
+      slideCaptchaPadding: 'Slide Captcha Padding',
       textClickCaptchaTTL: 'Click Captcha TTL',
       textClickCaptchaPadding: 'Click Captcha Padding',
     },
@@ -45,7 +55,10 @@ export default {
       emailCaptcha: 'Email Captcha',
       textGraphicCaptcha: 'Graphic Captcha',
       slideCaptcha: 'Slide Captcha',
+      textClickCaptcha: 'Click Captcha',
       slideCaptchaTTL: 'Slide Captcha TTL',
+      textClickCaptchaTTL: 'Click Captcha TTL',
+      textClickCaptchaPadding: 'Click Captcha Padding',
       slideCaptchaPadding: 'Slide Captcha Padding',
     },
     storage: {
@@ -53,7 +66,12 @@ export default {
       maxChunkSize: 'Max Chunk Size',
       chunkSize: 'Chunk Size',
       maxFileSize: 'Max File Size',
-      maxUploadNum: 'Max Upload Count',
+      sizeTip:
+        'Clients slice uploads by chunk size. The per-chunk cap is max chunk size, or chunk size when max chunk size is unset. The public config lowers chunk size so it does not exceed max chunk size. Max file size is checked against the sum of stored chunks on upload and merge.',
+      maxUploadNum: 'Parts per Work Limit',
+      dailyUploadLimit: 'Daily File Limit for Users',
+      unmergedChunkRetentionHours: 'Unmerged Chunk Retention',
+      unpublishedSourceRetentionHours: 'Unpublished Source Retention',
       chunkDir: 'Chunk Directory',
       local: {
         title: 'Local Storage',
@@ -118,6 +136,9 @@ export default {
     embeddingDimensions: 'Embedding Dimensions',
     doubaoModelAPIKey: 'Doubao Model API Key',
     systemPrompt: 'System Prompt',
+    menuGenerationSystemPrompt: 'Menu Generation System Prompt',
+    menuGenerationSystemPromptTip:
+      'Leave blank to use the backend default; this is only used to generate menu fields',
     imageModel: 'Default Image Model',
     videoModel: 'Default Video Model',
     imageModels: 'Image Model List',
@@ -134,6 +155,9 @@ export default {
   },
   // Transcode Settings
   transcode: {
+    localConsumerEnabled: 'Local Transcode Consumer',
+    localConsumerTip:
+      'When disabled, this backend instance stops consuming transcode tasks. Uploads still enqueue tasks for other enabled nodes; tasks wait if no consumers are available. Restart this backend instance after saving to apply.',
     title: 'Transcode Settings',
     maxWorkers: 'Max Workers',
     transcodeResolutions: 'Transcode Resolutions',
@@ -165,6 +189,14 @@ export default {
     dashEnable: 'Enable DASH',
     dashSegDuration: 'DASH Segment Duration',
     dashTitle: 'DASH Settings',
+    checkpointTitle: 'Checkpoints',
+    checkpointEnabled: 'Enable Resume Checkpoints',
+    checkpointEnabledTip: 'When disabled, a retry re-encodes the whole file. Enabled by default.',
+    checkpointDir: 'Checkpoint Directory',
+    checkpointDirPlaceholder: 'Leave empty to use the system temp directory',
+    chunkDurationSec: 'Segment Length',
+    checkpointTip:
+      'An empty directory uses transcode-checkpoints under the system temp directory. 0 uses the default 180 seconds. A negative value disables segmented encoding and keeps whole-unit checkpoints.',
     kbpsTip: 'Unit: Kbps',
     percentTip: 'Unit: %',
     secondsTip: 'sec',

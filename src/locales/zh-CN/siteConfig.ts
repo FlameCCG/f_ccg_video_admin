@@ -16,6 +16,12 @@ export default {
   // 基础配置
   site: {
     title: '基础配置',
+    interactiveCaptchaTip: '点选和滑块验证码同时开启时，每次随机弹出一种。',
+    submission: {
+      title: '视频投稿',
+      disableUserSubmission: '禁止普通用户投稿',
+      tip: '开启后，仅管理员可上传视频、上传封面、发布及修改视频。保存后生效。',
+    },
     contentReview: {
       title: '内容审核',
       enable: '启用内容审核',
@@ -31,6 +37,9 @@ export default {
       usernamePwdLogin: '账号密码登录',
       textGraphicCaptcha: '图形验证码',
       textClickCaptcha: '点击验证码',
+      slideCaptcha: '滑块验证码',
+      slideCaptchaTTL: '滑块验证码有效期',
+      slideCaptchaPadding: '滑块验证码边距',
       textClickCaptchaTTL: '点击验证码有效期',
       textClickCaptchaPadding: '点击验证码边距',
     },
@@ -45,7 +54,10 @@ export default {
       emailCaptcha: '邮箱验证码',
       textGraphicCaptcha: '图形验证码',
       slideCaptcha: '滑块验证码',
+      textClickCaptcha: '点击验证码',
       slideCaptchaTTL: '滑块验证码有效期',
+      textClickCaptchaTTL: '点击验证码有效期',
+      textClickCaptchaPadding: '点击验证码边距',
       slideCaptchaPadding: '滑块验证码边距',
     },
     storage: {
@@ -53,7 +65,12 @@ export default {
       maxChunkSize: '最大分片大小',
       chunkSize: '分片大小',
       maxFileSize: '最大文件大小',
-      maxUploadNum: '最大上传数量',
+      sizeTip:
+        '前台按分片大小切分。单片上限优先用最大分片大小；未配置时才用分片大小。分片大小更大时，公开配置会把它压到最大分片大小。最大文件大小在上传和合并时按已落盘分片合计校验。',
+      maxUploadNum: '单个作品分P上限',
+      dailyUploadLimit: '普通用户每日上传文件上限',
+      unmergedChunkRetentionHours: '未合并分片保留时间',
+      unpublishedSourceRetentionHours: '未发布源视频保留时间',
       chunkDir: '分片目录',
       local: {
         title: '本地存储',
@@ -117,6 +134,8 @@ export default {
     embeddingDimensions: 'Embedding 维度',
     doubaoModelAPIKey: '豆包模型 API Key',
     systemPrompt: '系统提示词',
+    menuGenerationSystemPrompt: '菜单生成系统提示词',
+    menuGenerationSystemPromptTip: '留空时使用后端内置提示词，仅用于创建菜单时生成字段',
     imageModel: '默认图像模型',
     videoModel: '默认视频模型',
     imageModels: '图像模型列表',
@@ -132,6 +151,9 @@ export default {
   },
   // 转码配置
   transcode: {
+    localConsumerEnabled: '本机参与转码消费',
+    localConsumerTip:
+      '关闭后，当前后端实例不再消费转码任务，投稿仍正常投递任务，由其他已启用的节点处理；没有其他消费者时任务会排队。保存后需重启当前后端实例生效。',
     title: '转码配置',
     maxWorkers: '最大工作线程',
     transcodeResolutions: '转码分辨率',
@@ -163,6 +185,14 @@ export default {
     dashEnable: '启用DASH',
     dashSegDuration: 'DASH切片时长',
     dashTitle: 'DASH设置',
+    checkpointTitle: '断点续传',
+    checkpointEnabled: '启用断点续传',
+    checkpointEnabledTip: '关闭后，转码重试会整段重新编码。默认开启。',
+    checkpointDir: '断点目录',
+    checkpointDirPlaceholder: '留空则使用系统临时目录',
+    chunkDurationSec: '分段转码块长',
+    checkpointTip:
+      '目录留空时使用系统临时目录下的 transcode-checkpoints。块长为 0 时默认 180 秒；小于 0 时关闭分段，只保留整段断点。',
     kbpsTip: '单位：Kbps',
     percentTip: '单位：%',
     secondsTip: '秒',

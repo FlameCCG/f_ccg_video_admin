@@ -5,12 +5,13 @@
  */
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NCard, NTabs, NTabPane, NButton, NSpace, NSpin, useMessage } from 'naive-ui'
+import { NCard, NTabs, NTab, NButton, NSpace, NSpin, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { getSiteConfig, updateSiteConfig } from '@/api/site'
 import type {
   SiteConfigName,
+  SiteConfigMap,
   SiteConfig,
   LoggerConfig,
   EmailConfig,
@@ -42,6 +43,11 @@ const router = useRouter()
 const { t } = useI18n()
 const message = useMessage()
 const queryClient = useQueryClient()
+
+type SiteConfigQueryResult = {
+  name: SiteConfigName
+  value: SiteConfigMap[SiteConfigName]
+}
 
 // 当前配置类型，从路由路径或 query 参数获取
 const currentTab = computed(() => {
@@ -95,51 +101,90 @@ const thirdLoginFormData = ref<ThirdLoginConfig | null>(null)
 const jwtFormData = ref<JwtConfig | null>(null)
 const serverFormData = ref<ServerCorsConfig | null>(null)
 
+const activeFormData = computed(
+  () =>
+    ({
+      site: siteFormData.value,
+      logger: loggerFormData.value,
+      email: emailFormData.value,
+      ai: aiFormData.value,
+      transcode: transcodeFormData.value,
+      thirdLogin: thirdLoginFormData.value,
+      jwt: jwtFormData.value,
+      server: serverFormData.value,
+    })[currentTab.value]
+)
+
+/**
+ * 把查询结果复制到可编辑表单。
+ *
+ * 这里不能在 queryFn 内赋值：TanStack Query 命中 staleTime 内的缓存时不会再次
+ * 执行 queryFn，新挂载的同类路由（例如 site -> logger）就会一直拿到 null 表单。
+ * 监听 query data 后，无论数据来自网络还是缓存，都会走同一条回填路径。
+ */
+function hydrateFormData(result: SiteConfigQueryResult): void {
+  const { name, value } = result
+
+  switch (name) {
+    case 'site':
+      siteFormData.value = normalizeSiteConfig(value as SiteConfig)
+      break
+    case 'logger':
+      loggerFormData.value = { ...(value as LoggerConfig) }
+      break
+    case 'email':
+      emailFormData.value = { ...(value as EmailConfig) }
+      break
+    case 'ai':
+      aiFormData.value = normalizeAIConfig(value as AIConfig)
+      break
+    case 'transcode':
+      transcodeFormData.value = normalizeTranscodeConfig(value as TranscodeConfig)
+      break
+    case 'thirdLogin':
+      thirdLoginFormData.value = normalizeThirdLoginConfig(value as ThirdLoginConfig)
+      break
+    case 'jwt':
+      jwtFormData.value = { ...(value as JwtConfig) }
+      break
+    case 'server':
+      serverFormData.value = {
+        corsOrigins: Array.isArray((value as ServerCorsConfig)?.corsOrigins)
+          ? [...(value as ServerCorsConfig).corsOrigins]
+          : [],
+      }
+      break
+  }
+}
+
 // 获取配置数据
-const { isLoading, refetch } = useQuery({
+const {
+  data: configQueryData,
+  isFetching,
+  refetch,
+} = useQuery({
   queryKey: ['siteConfig', currentTab],
-  queryFn: async () => {
+  queryFn: async (): Promise<SiteConfigQueryResult> => {
     const name = currentTab.value
-    const data = await getSiteConfig(name)
-    // 根据类型设置对应的表单数据（归一化后写入，避免缺字段 / 已删字段）
-    switch (name) {
-      case 'site':
-        siteFormData.value = normalizeSiteConfig(data as SiteConfig)
-        break
-      case 'logger':
-        loggerFormData.value = data as LoggerConfig
-        break
-      case 'email':
-        emailFormData.value = data as EmailConfig
-        break
-      case 'ai':
-        aiFormData.value = normalizeAIConfig(data as AIConfig)
-        break
-      case 'transcode':
-        transcodeFormData.value = normalizeTranscodeConfig(data as TranscodeConfig)
-        break
-      case 'thirdLogin':
-        thirdLoginFormData.value = normalizeThirdLoginConfig(data as ThirdLoginConfig)
-        break
-      case 'jwt':
-        jwtFormData.value = data as JwtConfig
-        break
-      case 'server':
-        serverFormData.value = {
-          corsOrigins: Array.isArray((data as ServerCorsConfig)?.corsOrigins)
-            ? [...(data as ServerCorsConfig).corsOrigins]
-            : [],
-        }
-        break
-    }
-    return data
+    const value = await getSiteConfig(name)
+    return { name, value }
   },
   staleTime: 30 * 1000,
 })
 
+watch(
+  configQueryData,
+  (result) => {
+    if (result) {
+      hydrateFormData(result)
+    }
+  },
+  { immediate: true }
+)
+
 // 更新配置 mutation
 const updateMutation = useMutation({
-  mutationFn: async () => {
+  mutationFn: async (): Promise<SiteConfigName> => {
     const name = currentTab.value
     let data: unknown
     switch (name) {
@@ -170,10 +215,11 @@ const updateMutation = useMutation({
     }
     if (!data) throw new Error('No data to save')
     await updateSiteConfig(name, data as never)
+    return name
   },
-  onSuccess: () => {
+  onSuccess: (name) => {
     message.success(t('siteConfig.actions.saveSuccess'))
-    void queryClient.invalidateQueries({ queryKey: ['siteConfig', currentTab.value] })
+    void queryClient.invalidateQueries({ queryKey: ['siteConfig', name] })
   },
   onError: (error: Error) => {
     message.error(error.message || t('siteConfig.actions.saveFailed'))
@@ -183,11 +229,27 @@ const updateMutation = useMutation({
 // 切换 tab - 跳转到对应的路由路径
 function handleTabChange(name: string): void {
   const tabName = name as SiteConfigName
-  // 保持当前已注册路由，使用 query 驱动 tab，避免未注册子路由导致 404
+  if (tabName === currentTab.value) return
+
+  // 后端已经注册的配置子路由优先走真实路径，让侧边菜单、页面标题和顶部标签
+  // 保持同一个导航身份；AI / Server 等未注册项再安全回退到 query 驱动。
+  const parentPath = route.path.replace(/\/[^/]+$/, '')
+  const targetPath = `${parentPath}/${tabName}`
+  const hasRegisteredRoute = router
+    .resolve({ path: targetPath })
+    .matched.some((record) => record.path === targetPath)
+  const query = { ...route.query }
+  delete query.tab
+
+  if (hasRegisteredRoute) {
+    void router.push({ path: targetPath, query })
+    return
+  }
+
   void router.push({
     path: route.path,
     query: {
-      ...route.query,
+      ...query,
       tab: tabName,
     },
   })
@@ -199,19 +261,17 @@ function handleSave(): void {
 }
 
 // 重置配置
-function handleReset(): void {
-  void refetch()
+async function handleReset(): Promise<void> {
+  const result = await refetch()
+  if (result.data) {
+    hydrateFormData(result.data)
+  }
 }
-
-// 监听 tab 变化，重新加载数据
-watch(currentTab, () => {
-  void refetch()
-})
 </script>
 
 <template>
   <div class="site-config-page">
-    <n-card :bordered="false">
+    <n-card :bordered="false" class="config-card">
       <template #header>
         <n-space justify="space-between" align="center">
           <span class="page-title">{{ t('siteConfig.title') }}</span>
@@ -219,7 +279,7 @@ watch(currentTab, () => {
             <n-button
               size="small"
               secondary
-              :disabled="isLoading || updateMutation.isPending.value"
+              :disabled="isFetching || updateMutation.isPending.value"
               @click="handleReset"
             >
               {{ t('siteConfig.actions.reset') }}
@@ -228,7 +288,7 @@ watch(currentTab, () => {
               type="primary"
               size="small"
               :loading="updateMutation.isPending.value"
-              :disabled="isLoading"
+              :disabled="isFetching || !activeFormData"
               @click="handleSave"
             >
               {{ t('siteConfig.actions.save') }}
@@ -237,68 +297,67 @@ watch(currentTab, () => {
         </n-space>
       </template>
 
-      <n-tabs :value="currentTab" type="line" @update:value="handleTabChange">
-        <n-tab-pane
-          v-for="tab in configTabs"
-          :key="tab.key"
-          :name="tab.key"
-          :tab="tab.label"
-          :disabled="isLoading"
-        >
-          <n-spin :show="isLoading" class="config-spin">
-            <div class="config-content">
+      <n-tabs :value="currentTab" type="line" class="config-tabs" @update:value="handleTabChange">
+        <n-tab v-for="tab in configTabs" :key="tab.key" :name="tab.key">
+          {{ tab.label }}
+        </n-tab>
+      </n-tabs>
+      <n-spin :show="isFetching" class="config-spin">
+        <div class="config-scroll">
+          <Transition name="config-fade" mode="out-in">
+            <div v-if="activeFormData" :key="currentTab" class="config-content">
               <!-- 基础配置 -->
               <site-config-form
-                v-if="tab.key === 'site' && siteFormData"
+                v-if="currentTab === 'site' && siteFormData"
                 v-model="siteFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 日志配置 -->
               <logger-config-form
-                v-else-if="tab.key === 'logger' && loggerFormData"
+                v-else-if="currentTab === 'logger' && loggerFormData"
                 v-model="loggerFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 邮件配置 -->
               <email-config-form
-                v-else-if="tab.key === 'email' && emailFormData"
+                v-else-if="currentTab === 'email' && emailFormData"
                 v-model="emailFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- AI配置 -->
               <AIConfigForm
-                v-else-if="tab.key === 'ai' && aiFormData"
+                v-else-if="currentTab === 'ai' && aiFormData"
                 v-model="aiFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 转码配置 -->
               <transcode-config-form
-                v-else-if="tab.key === 'transcode' && transcodeFormData"
+                v-else-if="currentTab === 'transcode' && transcodeFormData"
                 v-model="transcodeFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 第三方登录 -->
               <third-login-config-form
-                v-else-if="tab.key === 'thirdLogin' && thirdLoginFormData"
+                v-else-if="currentTab === 'thirdLogin' && thirdLoginFormData"
                 v-model="thirdLoginFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- JWT配置 -->
               <jwt-config-form
-                v-else-if="tab.key === 'jwt' && jwtFormData"
+                v-else-if="currentTab === 'jwt' && jwtFormData"
                 v-model="jwtFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- CORS 白名单 -->
               <server-cors-config-form
-                v-else-if="tab.key === 'server' && serverFormData"
+                v-else-if="currentTab === 'server' && serverFormData"
                 v-model="serverFormData"
                 :loading="updateMutation.isPending.value"
               />
             </div>
-          </n-spin>
-        </n-tab-pane>
-      </n-tabs>
+          </Transition>
+        </div>
+      </n-spin>
     </n-card>
   </div>
 </template>
@@ -306,18 +365,69 @@ watch(currentTab, () => {
 <style scoped lang="scss">
 .site-config-page {
   height: 100%;
+  min-height: 0;
+}
+
+.config-card {
+  height: 100%;
+  min-height: 0;
+
+  :deep(> .n-card-content) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
 }
 
 .page-title {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--text-lg);
+  font-weight: var(--font-medium);
+}
+
+.config-tabs {
+  flex-shrink: 0;
+
+  :deep(.n-tabs-bar) {
+    transition-duration: var(--motion-indicator-duration);
+    transition-timing-function: var(--motion-indicator-easing);
+  }
 }
 
 .config-spin {
-  min-height: 300px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+
+  :deep(.n-spin-content) {
+    height: 100%;
+    transition: opacity var(--motion-enter-duration) var(--motion-enter-easing);
+  }
+}
+
+.config-scroll {
+  height: 100%;
+  overflow: hidden auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scrollbar-thumb) transparent;
 }
 
 .config-content {
-  padding: 16px 0;
+  padding: var(--spacing-4) 0;
+}
+
+.config-fade-enter-active {
+  transition: opacity var(--motion-enter-duration) var(--motion-enter-easing);
+}
+
+.config-fade-leave-active {
+  pointer-events: none;
+  transition: opacity var(--motion-leave-duration) var(--motion-leave-easing);
+}
+
+.config-fade-enter-from,
+.config-fade-leave-to {
+  opacity: 0;
 }
 </style>

@@ -51,6 +51,7 @@ export function normalizeAIConfig(raw: AIConfig): AIConfig {
     embeddingDimensions: rest.embeddingDimensions ?? 0,
     doubaoModelAPIKey: rest.doubaoModelAPIKey ?? '',
     systemPrompt: rest.systemPrompt ?? '',
+    menuGenerationSystemPrompt: rest.menuGenerationSystemPrompt ?? '',
     imageModel: rest.imageModel ?? '',
     imageModels: normalizeModelList(rest.imageModels),
     videoModel: rest.videoModel ?? '',
@@ -63,6 +64,7 @@ export function normalizeAIConfig(raw: AIConfig): AIConfig {
 
 export function normalizeTranscodeConfig(raw: TranscodeConfig): TranscodeConfig {
   return {
+    localConsumerDisabled: raw.localConsumerDisabled ?? false,
     maxWorkers: raw.maxWorkers ?? 1,
     transcodeResolutions: Array.isArray(raw.transcodeResolutions) ? raw.transcodeResolutions : [],
     highBitrateThreshold: raw.highBitrateThreshold ?? 0,
@@ -89,6 +91,9 @@ export function normalizeTranscodeConfig(raw: TranscodeConfig): TranscodeConfig 
     mp4Enable: raw.mp4Enable ?? false,
     dashEnable: raw.dashEnable ?? false,
     dashSegDuration: raw.dashSegDuration ?? 4,
+    checkpointDir: raw.checkpointDir ?? '',
+    checkpointDisable: raw.checkpointDisable ?? false,
+    chunkDurationSec: raw.chunkDurationSec ?? 0,
   }
 }
 
@@ -104,6 +109,7 @@ export function normalizeThirdLoginConfig(raw: ThirdLoginConfig): ThirdLoginConf
 
 export function normalizeSiteConfig(raw: SiteConfig): SiteConfig {
   return {
+    disableUserSubmission: raw.disableUserSubmission ?? false,
     defaultUserBannerID: raw.defaultUserBannerID ?? 0,
     defaultUserBannerIDs: Array.isArray(raw.defaultUserBannerIDs) ? raw.defaultUserBannerIDs : [],
     contentReview: {
@@ -118,6 +124,9 @@ export function normalizeSiteConfig(raw: SiteConfig): SiteConfig {
       usernamePwdLogin: raw.login?.usernamePwdLogin ?? false,
       textGraphicCaptcha: raw.login?.textGraphicCaptcha ?? false,
       textClickCaptcha: raw.login?.textClickCaptcha ?? false,
+      slideCaptcha: raw.login?.slideCaptcha ?? false,
+      slideCaptchaTTL: raw.login?.slideCaptchaTTL || 300,
+      slideCaptchaPadding: raw.login?.slideCaptchaPadding ?? 10,
       textClickCaptchaTTL: raw.login?.textClickCaptchaTTL ?? 300,
       textClickCaptchaPadding: raw.login?.textClickCaptchaPadding ?? 20,
     },
@@ -125,6 +134,9 @@ export function normalizeSiteConfig(raw: SiteConfig): SiteConfig {
       emailCaptcha: raw.register?.emailCaptcha ?? false,
       textGraphicCaptcha: raw.register?.textGraphicCaptcha ?? false,
       slideCaptcha: raw.register?.slideCaptcha ?? false,
+      textClickCaptcha: raw.register?.textClickCaptcha ?? false,
+      textClickCaptchaTTL: raw.register?.textClickCaptchaTTL || 300,
+      textClickCaptchaPadding: raw.register?.textClickCaptchaPadding ?? 20,
       slideCaptchaTTL: raw.register?.slideCaptchaTTL ?? 300,
       slideCaptchaPadding: raw.register?.slideCaptchaPadding ?? 10,
     },
@@ -133,6 +145,9 @@ export function normalizeSiteConfig(raw: SiteConfig): SiteConfig {
       chunkSize: raw.storage?.chunkSize ?? 0,
       maxFileSize: raw.storage?.maxFileSize ?? 0,
       maxUploadNum: raw.storage?.maxUploadNum ?? 0,
+      dailyUploadLimit: raw.storage?.dailyUploadLimit ?? 10,
+      unmergedChunkRetentionHours: raw.storage?.unmergedChunkRetentionHours ?? 2,
+      unpublishedSourceRetentionHours: raw.storage?.unpublishedSourceRetentionHours ?? 1,
       chunkDir: raw.storage?.chunkDir ?? '',
       local: raw.storage?.local
         ? {
