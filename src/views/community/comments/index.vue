@@ -7,10 +7,10 @@ import { formatDateTime } from '@/utils'
  */
 import { ref, computed, h } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useDebouncedQueryParams } from '@/composables/useDebouncedQueryParams'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
   NCard,
-  NSpace,
   NButton,
   NIcon,
   NGi,
@@ -26,6 +26,7 @@ import type { CommentSortType } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar } from '@/components/common'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { useTableSelectionAction } from '@/composables'
 
 const { t } = useI18n()
@@ -42,27 +43,40 @@ const searchParams = ref({
   page: 1,
   pageSize: 10,
 })
+const { queryParams, flushQueryParams } = useDebouncedQueryParams(searchParams, [
+  'userId',
+  'username',
+  'keyword',
+])
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
 const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
-/** 获取评论列表 */
+/**
+ * 获取评论列表。queryKey 使用输入防抖后的参数快照，分页和下拉筛选立即生效。
+ * 参数变化自动驱动请求，handler 不额外调用 refetch，避免重复请求并保留 staleTime。
+ */
 const {
   data: commentData,
   isLoading,
+  isFetching,
+  isError,
   refetch,
 } = useQuery({
-  queryKey: ['commentList', searchParams],
-  queryFn: () =>
-    getCommentList({
-      userId: searchParams.value.userId ?? undefined,
-      username: searchParams.value.username || undefined,
-      keyword: searchParams.value.keyword || undefined,
-      sort: searchParams.value.sort,
-      page: searchParams.value.page,
-      pageSize: searchParams.value.pageSize,
-    }),
+  queryKey: computed(() => ['commentList', queryParams.value] as const),
+  queryFn: ({ queryKey: [, params], signal }) =>
+    getCommentList(
+      {
+        userId: params.userId ?? undefined,
+        username: params.username || undefined,
+        keyword: params.keyword || undefined,
+        sort: params.sort,
+        page: params.page,
+        pageSize: params.pageSize,
+      },
+      signal
+    ),
   staleTime: 30 * 1000,
 })
 
@@ -181,7 +195,7 @@ const batchActions = computed(() => [
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
-  void refetch()
+  flushQueryParams()
 }
 
 /** 处理重置 */
@@ -194,20 +208,41 @@ function handleReset(): void {
     page: 1,
     pageSize: 10,
   }
-  void refetch()
+  flushQueryParams()
 }
 
 /** 处理页码变化 */
 function handlePageChange(page: number): void {
   searchParams.value.page = page
-  void refetch()
 }
 
 /** 处理每页数量变化 */
 function handlePageSizeChange(pageSize: number): void {
   searchParams.value.pageSize = pageSize
   searchParams.value.page = 1
-  void refetch()
+}
+
+/**
+ * 用户 ID 输入为空时不筛选；非数字输入归一化为 null，防止 NaN 进入 queryKey、请求参数和输入框回显。
+ */
+function handleUserIdInput(value: string): void {
+  const parsed = Number(value.trim())
+  searchParams.value.userId = value.trim() === '' || !Number.isFinite(parsed) ? null : parsed
+}
+
+/** 排序变化 */
+function handleSortChange(value: string | number | null): void {
+  searchParams.value.sort = typeof value === 'string' ? (value as CommentSortType) : 'latest'
+}
+
+/** 选中行变化 */
+function handleCheckedRowKeysChange(keys: DataTableRowKey[]): void {
+  checkedRowKeys.value = keys
+}
+
+/** 清空选中 */
+function handleClearSelection(): void {
+  checkedRowKeys.value = []
 }
 
 /** 处理操作 */
@@ -247,7 +282,7 @@ function confirmDelete(commentIds: number[]): void {
   })
 }
 
-/** 处理刷新 */
+/** 处理刷新：用户主动发起，是 refetch 的正当用法（同时用作失败重试） */
 function handleRefresh(): void {
   void refetch()
 }
@@ -255,6 +290,33 @@ function handleRefresh(): void {
 
 <template>
   <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('community.comment.title')">
+      <template #actions>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 搜索表单 -->
     <n-card :bordered="false" class="page-list__search">
       <search-form :loading="isLoading" @search="handleSearch" @reset="handleReset">
@@ -284,7 +346,7 @@ function handleRefresh(): void {
               :value="searchParams.userId?.toString() || ''"
               :placeholder="t('community.comment.userIdPlaceholder')"
               clearable
-              @update:value="(val) => (searchParams.userId = val ? Number(val) : null)"
+              @update:value="handleUserIdInput"
               @keyup.enter="handleSearch"
             />
           </n-form-item>
@@ -297,7 +359,7 @@ function handleRefresh(): void {
               :placeholder="t('community.comment.sortBy')"
               :width="'100%'"
               :clearable="false"
-              @change="(val) => (searchParams.sort = (val as CommentSortType) || 'latest')"
+              @change="handleSortChange"
             />
           </n-form-item>
         </n-gi>
@@ -306,47 +368,20 @@ function handleRefresh(): void {
 
     <!-- 数据表格 -->
     <n-card :bordered="false" class="page-list__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="page-list__title">{{ t('community.comment.title') }}</span>
-          <n-button size="small" secondary @click="handleRefresh">
-            <template #icon>
-              <n-icon>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-              </n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </n-space>
-      </template>
-
       <!-- 批量操作栏 -->
       <BatchActions
         v-if="checkedRowKeys.length > 0"
         :selected-count="checkedRowKeys.length"
         :actions="batchActions"
         @action="handleBatchAction"
-        @clear="checkedRowKeys = []"
+        @clear="handleClearSelection"
       />
 
       <data-table
         :columns="columns"
         :data="commentList"
-        :loading="isLoading || deleteMutation.isPending.value"
+        :loading="isFetching || deleteMutation.isPending.value"
+        :error="isError"
         :selectable="true"
         :checked-row-keys="checkedRowKeys"
         :page="searchParams.page"
@@ -355,7 +390,8 @@ function handleRefresh(): void {
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
-        @update:checked-row-keys="(keys) => (checkedRowKeys = keys)"
+        @update:checked-row-keys="handleCheckedRowKeysChange"
+        @retry="handleRefresh"
       />
     </n-card>
   </div>
