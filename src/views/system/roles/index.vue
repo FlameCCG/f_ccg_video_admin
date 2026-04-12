@@ -7,11 +7,12 @@
 import { ref, computed, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { NCard, NSpace, NButton, NIcon, NTag, NText, useMessage, useDialog } from 'naive-ui'
+import { NCard, NButton, NIcon, NTag, NText, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 import { getRoles, createRole, updateRole, deleteRole } from '@/api/rbac'
 import type { Role, CreateRoleParams, UpdateRoleParams } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { RoleMenuDrawer, RolePermissionDrawer } from '@/components/rbac'
 import RoleFormModal from './components/RoleFormModal.vue'
 import RoleInheritDrawer from './components/RoleInheritDrawer.vue'
@@ -52,10 +53,16 @@ const menuAssigningRole = ref<Role | null>(null)
 const permissionDrawerVisible = ref(false)
 const permissionAssigningRole = ref<Role | null>(null)
 
-/** 获取角色列表 */
+/**
+ * 获取角色列表
+ * 接口一次返回全量角色，分页在本地做（见 paginatedRoles），
+ * 因此 queryKey 里没有分页参数，翻页也不需要重新请求。
+ */
 const {
   data: roleList,
-  isLoading,
+  isFetching,
+  isError,
+  error: listError,
   refetch,
 } = useQuery({
   queryKey: ['roleList'],
@@ -119,6 +126,9 @@ const paginatedRoles = computed(() => {
   const end = start + pagination.value.pageSize
   return roles.value.slice(start, end)
 })
+
+/** 加载失败描述：优先服务端 msg，缺失时由 DataTable 兜底通用文案 */
+const loadErrorDescription = computed(() => listError.value?.message?.trim() || undefined)
 
 /** 表格列配置 */
 const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
@@ -247,93 +257,90 @@ function handlePageSizeChange(pageSize: number): void {
 
 <template>
   <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('rbac.role.title')">
+      <template #actions>
+        <n-button type="primary" size="small" @click="handleCreate">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('rbac.role.create') }}
+        </n-button>
+        <n-button size="small" secondary @click="handleViewInheritTree">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 3v18" />
+                <path d="M18 9H6" />
+                <path d="M18 15H6" />
+                <circle cx="12" cy="3" r="1" />
+                <circle cx="6" cy="9" r="1" />
+                <circle cx="18" cy="9" r="1" />
+                <circle cx="6" cy="15" r="1" />
+                <circle cx="18" cy="15" r="1" />
+                <circle cx="12" cy="21" r="1" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('rbac.role.inheritTree.viewSystem') }}
+        </n-button>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 数据表格 -->
     <n-card :bordered="false" class="page-list__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="page-list__title">{{ t('rbac.role.title') }}</span>
-          <n-space :size="8">
-            <n-button type="primary" size="small" @click="handleCreate">
-              <template #icon>
-                <n-icon>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </n-icon>
-              </template>
-              {{ t('rbac.role.create') }}
-            </n-button>
-            <n-button size="small" secondary @click="handleViewInheritTree">
-              <template #icon>
-                <n-icon>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M12 3v18" />
-                    <path d="M18 9H6" />
-                    <path d="M18 15H6" />
-                    <circle cx="12" cy="3" r="1" />
-                    <circle cx="6" cy="9" r="1" />
-                    <circle cx="18" cy="9" r="1" />
-                    <circle cx="6" cy="15" r="1" />
-                    <circle cx="18" cy="15" r="1" />
-                    <circle cx="12" cy="21" r="1" />
-                  </svg>
-                </n-icon>
-              </template>
-              {{ t('rbac.role.inheritTree.viewSystem') }}
-            </n-button>
-            <n-button size="small" secondary @click="handleRefresh">
-              <template #icon>
-                <n-icon>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <polyline points="23 4 23 10 17 10" />
-                    <polyline points="1 20 1 14 7 14" />
-                    <path
-                      d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                    />
-                  </svg>
-                </n-icon>
-              </template>
-              {{ t('common.refresh') }}
-            </n-button>
-          </n-space>
-        </n-space>
-      </template>
-
       <data-table
         :columns="columns"
         :data="paginatedRoles"
-        :loading="isLoading || deleteMutation.isPending.value"
+        :loading="isFetching || deleteMutation.isPending.value"
+        :error="isError"
+        :error-description="loadErrorDescription"
         :selectable="false"
         :page="pagination.page"
         :page-size="pagination.pageSize"
@@ -341,6 +348,7 @@ function handlePageSizeChange(pageSize: number): void {
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
+        @retry="handleRefresh"
       />
     </n-card>
 

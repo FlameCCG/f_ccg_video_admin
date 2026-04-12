@@ -11,6 +11,7 @@ import { NCard, NSpace, NButton, NIcon, NTag, NInput, NSelect } from 'naive-ui'
 import type { DataTableColumns, SelectOption } from 'naive-ui'
 import { getResources } from '@/api/rbac'
 import { DataTable } from '@/components/table'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 
 const { t } = useI18n()
 
@@ -29,10 +30,16 @@ const pagination = ref({
   pageSize: 10,
 })
 
-/** 获取资源列表 */
+/**
+ * 获取资源列表
+ * 接口一次返回全量接口资源，关键词/标签/方法筛选与分页都在本地做，
+ * 因此 queryKey 里没有可变参数，筛选与翻页都不需要重新请求。
+ */
 const {
   data: resourceList,
-  isLoading,
+  isFetching,
+  isError,
+  error: listError,
   refetch,
 } = useQuery({
   queryKey: ['resourceList'],
@@ -92,6 +99,9 @@ const paginatedResources = computed(() => {
   const end = start + pagination.value.pageSize
   return filteredResources.value.slice(start, end)
 })
+
+/** 加载失败描述：优先服务端 msg，缺失时由 DataTable 兜底通用文案 */
+const loadErrorDescription = computed(() => listError.value?.message?.trim() || undefined)
 
 /** 获取方法标签类型 */
 function getMethodType(method: string): 'success' | 'info' | 'warning' | 'error' | 'default' {
@@ -175,6 +185,33 @@ function handlePageSizeChange(pageSize: number): void {
 
 <template>
   <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('rbac.api.title')">
+      <template #actions>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 筛选区域 -->
     <n-card :bordered="false" class="page-list__search">
       <n-space :size="12" align="center" wrap>
@@ -228,42 +265,12 @@ function handlePageSizeChange(pageSize: number): void {
 
     <!-- 数据表格 -->
     <n-card :bordered="false" class="page-list__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="page-list__title">{{ t('rbac.api.title') }}</span>
-          <n-space :size="8">
-            <n-button size="small" secondary @click="handleRefresh">
-              <template #icon>
-                <n-icon>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <polyline points="23 4 23 10 17 10" />
-                    <polyline points="1 20 1 14 7 14" />
-                    <path
-                      d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                    />
-                  </svg>
-                </n-icon>
-              </template>
-              {{ t('common.refresh') }}
-            </n-button>
-          </n-space>
-        </n-space>
-      </template>
-
       <data-table
         :columns="columns"
         :data="paginatedResources"
-        :loading="isLoading"
+        :loading="isFetching"
+        :error="isError"
+        :error-description="loadErrorDescription"
         :selectable="false"
         :page="pagination.page"
         :page-size="pagination.pageSize"
@@ -271,6 +278,7 @@ function handlePageSizeChange(pageSize: number): void {
         row-key="path"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
+        @retry="handleRefresh"
       />
     </n-card>
   </div>

@@ -26,29 +26,36 @@
  * - 动态路由：根据用户菜单动态生成的 Vue Router 路由配置
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import type { RouteRecordRaw, RouteComponent } from 'vue-router'
+import { computed, defineComponent, h, ref } from 'vue'
+import { useRoute, type RouteRecordRaw, type RouteComponent } from 'vue-router'
 import { getCurrentUserMenus, getUserPermissions } from '@/api/rbac'
 import type { Menu, Permission } from '@/api/types'
 import type { LocaleType } from '@/locales'
+import MenuComponentBoundary from '@/components/rbac/MenuComponentBoundary.vue'
 
 /**
- * ============================================================================
- * 组件懒加载映射
- * ============================================================================
- *
- * 使用 Vite 的 import.meta.glob 实现视图组件的懒加载。
- * 这样可以实现代码分割，只有在访问对应路由时才加载组件。
- *
- * 【工作原理】
- * import.meta.glob 会在构建时扫描匹配的文件，生成一个对象：
- * {
- *   '/src/views/user/list/index.vue': () => import('/src/views/user/list/index.vue'),
- *   '/src/views/video/list/index.vue': () => import('/src/views/video/list/index.vue'),
- *   ...
- * }
+ * 组件懒加载映射。
+ * Vite 的 import.meta.glob 仅匹配 views/<模块>/<页面>/index.vue，访问对应路由时才加载页面。
+ * 后端菜单的 component 为 Layout 或上述页面路径，具体列表见 menus.csv。
+ * 各页面 components 目录中的抽屉和弹窗由页面管理，避免额外分割入口将媒体依赖带入公共包。
+ * 登录页、403 与 404 在 src/router/routes.ts 显式懒加载。
  */
-const viewModules = import.meta.glob<{ default: RouteComponent }>('@/views/**/*.vue')
+const viewModules = import.meta.glob<{ default: RouteComponent }>('@/views/**/index.vue')
+
+// 配置子路由共用一个边界组件，使 Tab 导航只更新表单，不重建整张卡片。
+// eslint-disable-next-line vue/one-component-per-file -- 路由工厂在此共享配置页边界，而非定义多个页面。
+const SiteConfigRouteComponent = defineComponent({
+  name: 'SiteConfigRouteBoundary',
+  setup() {
+    const route = useRoute()
+    return () =>
+      h(MenuComponentBoundary, {
+        menuTitle: route.meta.title ?? '',
+        componentPath: 'views/system/site-config/index.vue',
+        loader: viewModules['/src/views/system/site-config/index.vue'],
+      })
+  },
+})
 
 /**
  * 布局组件映射
@@ -79,10 +86,14 @@ const layoutModules: Record<string, () => Promise<{ default: RouteComponent }>> 
  * 2. 处理视图组件路径，移除前缀，确保格式正确
  * 3. 从 viewModules 中查找对应的懒加载函数
  *
+ * 【导出说明】
+ * 对外导出仅为了让 permission.glob.test.ts 能锁定「menus.csv 里每个 component 都解析得到
+ * 懒加载函数」这一契约（glob 收窄后的回归防线），业务代码不要直接调用。
+ *
  * @param component 后端返回的组件路径
  * @returns 懒加载组件函数，如果找不到则返回 undefined
  */
-function resolveComponent(
+export function resolveComponent(
   component: string | undefined
 ): (() => Promise<{ default: RouteComponent }>) | undefined {
   if (!component) return undefined
@@ -127,6 +138,40 @@ function resolveComponent(
 
   console.warn(`[Permission] Component not found: ${component}, tried path: ${fullPath}`)
   return undefined
+}
+
+/**
+ * 为菜单页面增加组件错误边界。
+ *
+ * 布局组件保持原始懒加载；实际页面则统一经过边界，以覆盖路径为空、
+ * 文件不存在、异步加载失败以及组件 setup/render 抛错四种情况。
+ */
+function createMenuRouteComponent(
+  menu: Menu,
+  title: string,
+  componentPath: string | undefined
+): RouteComponent {
+  if (componentPath && layoutModules[componentPath]) {
+    return layoutModules[componentPath]
+  }
+
+  const loader = resolveComponent(componentPath)
+  if (loader && loader === viewModules['/src/views/system/site-config/index.vue']) {
+    return SiteConfigRouteComponent
+  }
+
+  // eslint-disable-next-line vue/one-component-per-file -- 按菜单生成独立路由边界，保持页面异步加载和错误隔离。
+  return defineComponent({
+    name: `MenuRouteBoundary${String(menu.id)}`,
+    setup() {
+      return () =>
+        h(MenuComponentBoundary, {
+          menuTitle: title,
+          componentPath,
+          loader,
+        })
+    },
+  })
 }
 
 /**
@@ -216,8 +261,9 @@ function menuToRoute(menu: Menu, locale: LocaleType, isTopLevel = false): RouteR
 
   // 解析组件
   // 顶级菜单强制使用 Layout，即使后端配置了其他组件
-  const componentPath = isTopLevel && menu.component !== 'Layout' ? 'Layout' : menu.component
-  const component = resolveComponent(componentPath)
+  const componentPath =
+    isTopLevel && menu.children && menu.children.length > 0 ? 'Layout' : menu.component
+  const component = createMenuRouteComponent(menu, title, componentPath)
 
   // 递归处理子菜单
   let children: RouteRecordRaw[] | undefined
@@ -242,15 +288,22 @@ function menuToRoute(menu: Menu, locale: LocaleType, isTopLevel = false): RouteR
   const baseRoute = {
     path: menu.path,
     name: menu.name || `menu-${menu.id}`,
-    meta: baseMeta,
+    meta: {
+      ...baseMeta,
+      ...(component === SiteConfigRouteComponent ? { viewKey: 'site-config' } : {}),
+    },
     component,
     children,
   }
 
-  // 添加重定向（如果后端提供了）
-  const route = (
-    menu.redirect ? { ...baseRoute, redirect: menu.redirect } : baseRoute
-  ) as RouteRecordRaw
+  // 父菜单是纯布局占位时，默认进入排序后的第一个有效子菜单。
+  // 使用命名路由避免手动拼接绝对/相对 path；后端显式 redirect 仍拥有最高优先级。
+  const isPlaceholderParent = Boolean(
+    children?.length && componentPath && layoutModules[componentPath]
+  )
+  const firstChildName = isPlaceholderParent ? children?.[0]?.name : undefined
+  const redirect = menu.redirect || (firstChildName ? { name: firstChildName } : undefined)
+  const route = (redirect ? { ...baseRoute, redirect } : baseRoute) as RouteRecordRaw
 
   // 特殊处理：Layout 组件但没有子路由的情况
   // 例如：仪表盘页面，顶级菜单直接对应一个页面
@@ -277,6 +330,16 @@ function menuToRoute(menu: Menu, locale: LocaleType, isTopLevel = false): RouteR
           path: '',
           name: `${menu.name || `menu-${menu.id}`}-index`,
           component: defaultComponent,
+          meta: { ...baseMeta },
+        },
+      ]
+    } else {
+      const expectedComponentPath = `views/${pathSegment}/index.vue`
+      route.children = [
+        {
+          path: '',
+          name: `${menu.name || `menu-${menu.id}`}-missing`,
+          component: createMenuRouteComponent(menu, title, expectedComponentPath),
           meta: { ...baseMeta },
         },
       ]

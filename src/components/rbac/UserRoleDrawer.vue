@@ -4,7 +4,7 @@
  * User Role Management Drawer
  * 用户角色管理
  */
-import { ref, computed, watch, h } from 'vue'
+import { ref, computed, watch, h, defineAsyncComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
@@ -20,9 +20,9 @@ import {
   useMessage,
 } from 'naive-ui'
 import type { TransferRenderSourceLabel } from 'naive-ui'
+import type { FunctionalComponent } from 'vue'
 import { getRoles, getUserRoles, updateUserRoles, getRoleInheritTreeById } from '@/api/rbac'
 import type { AdminUserListItem, RoleInheritTreeNode } from '@/api/types'
-import { RoleInheritTree } from '@/components/rbac'
 
 interface Props {
   /** 是否显示 */
@@ -44,6 +44,32 @@ const { t } = useI18n()
 const message = useMessage()
 const queryClient = useQueryClient()
 
+/** 异步组件占位延迟（ms）：网络足够快时不闪一下骨架 */
+const ASYNC_LOADING_DELAY_MS = 150
+
+/** 继承树 chunk 加载中的占位 */
+const RoleInheritTreeLoading: FunctionalComponent = () =>
+  h('div', { class: 'role-inherit-tree-loading' }, [
+    h(NSpin, { size: 'small' }),
+    h('span', { class: 'role-inherit-tree-loading__text' }, t('common.loading')),
+  ])
+
+/**
+ * 角色继承树（内部依赖 @vue-flow，约 359KB）。
+ * 这里必须异步加载：本抽屉从用户列表页静态引入，若同步 import 会把整个图库
+ * 打进用户列表的公共 chunk —— 而绝大多数用户从不点开继承树。
+ *
+ * 下面的 disable 说明：typescript-eslint 的 program 不解析 .vue 模块，
+ * 动态 import 在它眼里是 any；vue-tsc 能拿到真实 SFC 类型，
+ * 模板上的 props 依旧受 strictTemplates 校验，所以这里不是真的丢类型。
+ */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+const RoleInheritTree = defineAsyncComponent({
+  loader: () => import('@/components/rbac/RoleInheritTree.vue'),
+  loadingComponent: RoleInheritTreeLoading,
+  delay: ASYNC_LOADING_DELAY_MS,
+})
+
 /** 选中的角色 ID */
 const selectedRoleIds = ref<Array<string | number>>([])
 
@@ -61,17 +87,14 @@ const loadingRoleTree = ref(false)
 
 /** 获取所有角色 */
 const { data: allRoles, isLoading: rolesLoading } = useQuery({
-  queryKey: ['allRoles'],
+  queryKey: ['roles'],
   queryFn: getRoles,
+  enabled: computed(() => props.visible),
   staleTime: 60 * 1000,
 })
 
 /** 获取用户已分配的角色 */
-const {
-  data: userRoles,
-  isLoading: userRolesLoading,
-  refetch: refetchUserRoles,
-} = useQuery({
+const { data: userRoles, isLoading: userRolesLoading } = useQuery({
   queryKey: ['userRoles', computed(() => props.user?.id)],
   queryFn: () => (props.user ? getUserRoles(props.user.id) : Promise.resolve([])),
   enabled: computed(() => !!props.user && props.visible),
@@ -123,7 +146,7 @@ watch(
   () => props.visible,
   (visible) => {
     if (visible && props.user) {
-      void refetchUserRoles()
+      selectedRoleIds.value = (userRoles.value ?? []).map((role) => role.id)
       // 重置继承树状态
       showInheritTree.value = false
       viewingTreeRoleId.value = null
@@ -256,8 +279,8 @@ const renderLabel: TransferRenderSourceLabel = ({ option }) => {
           </template>
         </n-alert>
 
-        <!-- 角色继承树 -->
-        <template v-if="showInheritTree">
+        <!-- 角色继承树：抽屉关闭时不挂载，@vue-flow chunk 才不会被提前拉取 -->
+        <template v-if="visible && showInheritTree">
           <role-inherit-tree
             :data="roleTreeData"
             :loading="loadingRoleTree"
@@ -333,5 +356,20 @@ const renderLabel: TransferRenderSourceLabel = ({ option }) => {
   justify-content: space-between;
   width: 100%;
   gap: var(--spacing-3);
+}
+
+// 继承树 chunk 加载占位（由渲染函数产出，故需穿透 scoped）
+:deep(.role-inherit-tree-loading) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-16) 0;
+}
+
+:deep(.role-inherit-tree-loading__text) {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 </style>
