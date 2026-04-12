@@ -191,6 +191,8 @@ export interface BanRecordItem {
   operatorId: number
   /** 操作人用户名 */
   operatorUsername: string
+  /** 原封禁记录是否已经解封 */
+  isUnbanned: boolean
   /** 创建时间 */
   createdAt: string
 }

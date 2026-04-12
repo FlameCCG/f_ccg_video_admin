@@ -74,6 +74,9 @@ export default {
     banTime: 'Ban Time',
     expireTime: 'Expire Time',
     status: 'Status',
+    isUnbanned: 'Unbanned',
+    unbanned: 'Yes',
+    notUnbanned: 'No',
     statusOptions: {
       active: 'Active',
       expired: 'Expired',

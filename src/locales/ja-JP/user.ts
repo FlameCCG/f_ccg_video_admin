@@ -74,6 +74,9 @@ export default {
     banTime: 'BAN日時',
     expireTime: '期限',
     status: 'ステータス',
+    isUnbanned: '解除済み',
+    unbanned: 'はい',
+    notUnbanned: 'いいえ',
     statusOptions: {
       active: '有効',
       expired: '期限切れ',

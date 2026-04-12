@@ -27,8 +27,11 @@ export function getUserInfo(): Promise<AdminUserInfo> {
  * 获取用户列表
  * GET /admin/user/list
  */
-export function getUserList(params?: UserListParams): Promise<PaginatedData<AdminUserListItem>> {
-  return request.get('/admin/user/list', { params })
+export function getUserList(
+  params?: UserListParams,
+  signal?: AbortSignal
+): Promise<PaginatedData<AdminUserListItem>> {
+  return request.get('/admin/user/list', { params, signal })
 }
 
 /**
@@ -59,6 +62,9 @@ export function banUser(params: BanUserParams): Promise<BanUserResult> {
  * 获取封禁记录列表
  * GET /admin/user/ban/records
  */
-export function getBanRecords(params?: BanRecordParams): Promise<PaginatedData<BanRecordItem>> {
-  return request.get('/admin/user/ban/records', { params })
+export function getBanRecords(
+  params?: BanRecordParams,
+  signal?: AbortSignal
+): Promise<PaginatedData<BanRecordItem>> {
+  return request.get('/admin/user/ban/records', { params, signal })
 }
