@@ -5,13 +5,21 @@
  * 滚动条始终在内部，不影响外部布局
  */
 import { computed, ref, watch } from 'vue'
+import type { CSSProperties, HTMLAttributes } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, NPagination, NSpace, NSpin } from 'naive-ui'
-import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
+import { NDataTable, NPagination, NSpace } from 'naive-ui'
+import type { DataTableColumns, DataTableRowKey, ScrollbarProps } from 'naive-ui'
+import AppEmpty from '@/components/common/AppEmpty.vue'
 
 /** 表格行数据类型 */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RowData = any
+
+/** 单列配置（可能是分组列） */
+type TableColumnItem = DataTableColumns<RowData>[number]
+
+/** 首屏骨架行数上限：再多也填不满一屏，只是徒增 DOM */
+const MAX_SKELETON_ROWS = 10
 
 interface Props {
   /** 表格列配置 */
@@ -22,6 +30,8 @@ interface Props {
   loading?: boolean
   /** 行 key 字段 */
   rowKey?: string | ((row: unknown) => DataTableRowKey)
+  /** 自定义行属性（可用于拖拽、键盘或测试属性） */
+  rowProps?: (row: RowData, rowIndex: number) => HTMLAttributes
   /** 是否可选择 */
   selectable?: boolean
   /** 已选择的行 keys */
@@ -50,7 +60,7 @@ interface Props {
   striped?: boolean
   /** 表格大小 */
   size?: 'small' | 'medium' | 'large'
-  /** 是否虚拟滚动 */
+  /** 是否虚拟滚动；默认在大分页的平面列表中自动开启，树表/展开行保持完整渲染 */
   virtualScroll?: boolean
   /** 空状态描述 */
   emptyDescription?: string
@@ -62,11 +72,20 @@ interface Props {
   defaultExpandAll?: boolean
   /** 缩进宽度（树形表格） */
   indent?: number
+  /** 是否加载失败（在表格框架内渲染重试态，取代空状态） */
+  error?: boolean
+  /** 加载失败描述（默认 common.tips.loadFailed） */
+  errorDescription?: string
+  /** 首屏骨架行数（默认取 pageSize，最多 10 行） */
+  skeletonRows?: number
+  /** 横向滚动宽度；不传则按各列声明的 width 之和自动推导 */
+  scrollX?: string | number
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   rowKey: 'id',
+  rowProps: undefined,
   selectable: false,
   checkedRowKeys: () => [],
   pagination: true,
@@ -81,12 +100,16 @@ const props = withDefaults(defineProps<Props>(), {
   singleLine: true,
   striped: false,
   size: 'medium',
-  virtualScroll: false,
+  virtualScroll: undefined,
   emptyDescription: undefined,
   childrenKey: 'children',
   defaultExpandedRowKeys: () => [],
   defaultExpandAll: false,
   indent: 24,
+  error: false,
+  errorDescription: undefined,
+  skeletonRows: undefined,
+  scrollX: undefined,
 })
 
 const emit = defineEmits<{
@@ -96,6 +119,7 @@ const emit = defineEmits<{
   pageChange: [page: number]
   pageSizeChange: [pageSize: number]
   selectionChange: [keys: DataTableRowKey[], rows: unknown[]]
+  retry: []
 }>()
 
 const { t } = useI18n()
@@ -124,6 +148,67 @@ const tableColumns = computed(() => {
   ]
 })
 
+/** 小列表不付出虚拟列表的测量成本；大列表只挂载视口附近的行。 */
+const resolvedVirtualScroll = computed(
+  () =>
+    props.virtualScroll ??
+    (props.pagination &&
+      props.data.length >= 50 &&
+      !props.rowProps &&
+      !leafColumns.value.some(
+        (column) =>
+          ('type' in column && column.type === 'expand') || ('rowSpan' in column && column.rowSpan)
+      ) &&
+      !props.data.some((row: Record<string, unknown>) => Array.isArray(row[props.childrenKey])))
+)
+
+/** 展开分组列，取出真正占一列的叶子列 */
+function flattenColumns(cols: DataTableColumns<RowData>): TableColumnItem[] {
+  const leaves: TableColumnItem[] = []
+  for (const col of cols) {
+    if ('children' in col) {
+      leaves.push(...flattenColumns(col.children))
+    } else {
+      leaves.push(col)
+    }
+  }
+  return leaves
+}
+
+/** 列声明宽度转像素数；未声明或非像素值按 0 计（即「这列可伸缩」） */
+function toPxWidth(width: number | string | undefined): number {
+  if (typeof width === 'number') return width
+  if (typeof width !== 'string') return 0
+  const parsed = Number.parseFloat(width)
+  if (!Number.isFinite(parsed)) return 0
+  const unit = width.trim().replace(/^[\d.+-]+/, '')
+  return unit === '' || unit === 'px' ? parsed : 0
+}
+
+/** 叶子列 */
+const leafColumns = computed(() => flattenColumns(tableColumns.value))
+
+/**
+ * 横向滚动宽度取已声明列宽之和。
+ * 启用 ellipsis 时 Naive 使用 fixed 表格布局，必须传入 scroll-x 才会渲染横向轨道。
+ * 内容盒采用 min-width=scrollX、width=100%，实际宽度为容器宽与声明列宽之和的较大值。
+ */
+const resolvedScrollX = computed<string | number | undefined>(() => {
+  if (props.scrollX !== undefined) return props.scrollX
+  let total = 0
+  for (const col of leafColumns.value) {
+    total += Math.max(toPxWidth(col.width), 'minWidth' in col ? toPxWidth(col.minWidth) : 0)
+  }
+  return total > 0 ? total : undefined
+})
+
+/**
+ * 表格内滚动条常显（Naive 默认 trigger: 'hover'）。
+ * 轨道是绝对定位的浮层，不占布局，所以常显不会引起任何纵向位移，
+ * 但「右边还有列」这件事必须不 hover 也看得见。
+ */
+const bodyScrollbarProps: ScrollbarProps = { trigger: 'none' }
+
 /** 行 key 函数 */
 const rowKeyFn = computed(() => {
   if (typeof props.rowKey === 'function') {
@@ -133,14 +218,54 @@ const rowKeyFn = computed(() => {
     (row as Record<string, unknown>)[props.rowKey as string] as DataTableRowKey
 })
 
+/** 选中 key 集合（行样式每行都要查一次，用 Set 避免 O(n²)） */
+const checkedKeySet = computed(() => new Set(internalCheckedKeys.value))
+
+/**
+ * 行样式类：选中态由本组件显式标记，Naive 仅提供 striped、summary 与 expanded 状态类。
+ */
+function rowClassName(row: RowData): string {
+  if (!props.selectable) return ''
+  return checkedKeySet.value.has(rowKeyFn.value(row)) ? 'is-row-selected' : ''
+}
+
+/** 首屏加载：没有任何数据可看 */
+const isFirstLoad = computed(() => props.loading && props.data.length === 0)
+
+/** 已有数据上的重新拉取：只走顶部进度条，不遮挡内容 */
+const isRefetching = computed(() => props.loading && props.data.length > 0)
+
+/** 错误态：仅当没有数据可看且不在重试中时接管空状态 */
+const showError = computed(() => props.error && !props.loading && props.data.length === 0)
+
+/** 骨架行数 */
+const skeletonRowCount = computed(
+  () => props.skeletonRows ?? Math.min(props.pageSize, MAX_SKELETON_ROWS)
+)
+
+/** 骨架列数 */
+const skeletonColumnCount = computed(() => Math.max(leafColumns.value.length, 1))
+
+/** 骨架行网格轨道：按真实列宽排布，骨架屏与真实行同形 */
+const skeletonRowStyle = computed<CSSProperties>(() => {
+  const tracks = leafColumns.value
+    .map((col) => {
+      const width = toPxWidth(col.width)
+      return width > 0 ? `${width}px` : 'minmax(0, 1fr)'
+    })
+    .join(' ')
+  return { gridTemplateColumns: tracks || 'minmax(0, 1fr)' }
+})
+
 /** 处理选择变化 */
 function handleCheckedRowKeysChange(keys: DataTableRowKey[]): void {
   internalCheckedKeys.value = keys
   emit('update:checkedRowKeys', keys)
 
+  const selectedKeys = new Set(keys)
   const selectedRows = props.data.filter((row) => {
     const key = rowKeyFn.value(row)
-    return keys.includes(key)
+    return selectedKeys.has(key)
   })
   emit('selectionChange', keys, selectedRows)
 }
@@ -156,72 +281,107 @@ function handlePageSizeChange(pageSize: number): void {
   emit('update:pageSize', pageSize)
   emit('pageSizeChange', pageSize)
 }
+
+/** 处理错误态重试 */
+function handleRetry(): void {
+  emit('retry')
+}
 </script>
 
 <template>
   <div class="data-table">
+    <!-- 刷新时在顶部显示 2px 进度条，已有表格数据始终保持清晰可读。 -->
+    <div
+      v-if="isRefetching"
+      class="data-table__progress"
+      role="progressbar"
+      :aria-label="t('common.loading')"
+    />
+
     <!-- 表格容器 - 滚动区域 -->
-    <div class="data-table__body">
-      <n-spin :show="loading" class="data-table__spin">
-        <n-data-table
-          :columns="tableColumns"
-          :data="data"
-          :row-key="rowKeyFn"
-          :checked-row-keys="selectable ? internalCheckedKeys : undefined"
-          :max-height="maxHeight"
-          :bordered="bordered"
-          :single-line="singleLine"
-          :striped="striped"
-          :size="size"
-          :virtual-scroll="virtualScroll"
-          :pagination="false"
-          :children-key="childrenKey"
-          :default-expanded-row-keys="defaultExpandAll ? undefined : defaultExpandedRowKeys"
-          :default-expand-all="defaultExpandAll"
-          :indent="indent"
-          class="data-table__table"
-          @update:checked-row-keys="handleCheckedRowKeysChange"
-        >
-          <template #empty>
-            <slot name="empty">
-              <div class="data-table__empty">
-                <div class="data-table__empty-icon">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="48"
-                    height="48"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                    <polyline points="13 2 13 9 20 9" />
-                    <line x1="9" y1="13" x2="15" y2="13" />
-                    <line x1="9" y1="17" x2="15" y2="17" />
-                  </svg>
-                </div>
-                <span class="data-table__empty-text">
-                  {{ emptyDescription || t('common.tips.noData') }}
-                </span>
-              </div>
+    <div class="data-table__body" :aria-busy="loading">
+      <n-data-table
+        :columns="tableColumns"
+        :data="data"
+        :row-key="rowKeyFn"
+        :row-props="rowProps"
+        :row-class-name="rowClassName"
+        :checked-row-keys="selectable ? internalCheckedKeys : undefined"
+        :max-height="maxHeight"
+        :bordered="bordered"
+        :single-line="singleLine"
+        :striped="striped"
+        :size="size"
+        :virtual-scroll="resolvedVirtualScroll"
+        :flex-height="resolvedVirtualScroll && maxHeight === undefined"
+        :pagination="false"
+        :scroll-x="resolvedScrollX"
+        :scrollbar-props="bodyScrollbarProps"
+        :children-key="childrenKey"
+        :default-expanded-row-keys="defaultExpandAll ? undefined : defaultExpandedRowKeys"
+        :default-expand-all="defaultExpandAll"
+        :indent="indent"
+        class="data-table__table"
+        @update:checked-row-keys="handleCheckedRowKeysChange"
+      >
+        <template #empty>
+          <!--
+            首屏骨架屏：放在 #empty 里，表头/边框/分页全部保持挂载，
+            加载结束时不会整块塌陷再弹回来。
+          -->
+          <div
+            v-if="isFirstLoad"
+            class="data-table__skeleton"
+            role="status"
+            :aria-label="t('common.loading')"
+          >
+            <div
+              v-for="row in skeletonRowCount"
+              :key="row"
+              class="data-table__skeleton-row"
+              :style="skeletonRowStyle"
+            >
+              <span
+                v-for="cell in skeletonColumnCount"
+                :key="cell"
+                class="data-table__skeleton-cell"
+              />
+            </div>
+          </div>
+
+          <!-- 加载失败：重试入口留在表格框架内，而不是渲染成「暂无数据」 -->
+          <template v-else-if="showError">
+            <slot name="error">
+              <app-empty
+                type="error"
+                :description="errorDescription || t('common.tips.loadFailed')"
+                show-action
+                @action="handleRetry"
+              />
             </slot>
           </template>
-        </n-data-table>
-      </n-spin>
+
+          <template v-else>
+            <slot name="empty">
+              <app-empty
+                type="default"
+                :description="emptyDescription || t('common.tips.noData')"
+              />
+            </slot>
+          </template>
+        </template>
+      </n-data-table>
     </div>
 
-    <!-- 分页 - 固定在底部 -->
-    <div v-if="pagination && total > 0" class="data-table__footer">
+    <!-- 分页 - 固定在底部（加载中/空数据时也保持挂载，避免页面高度反复塌陷） -->
+    <div v-if="pagination" class="data-table__footer">
       <n-space justify="space-between" align="center" class="data-table__pagination">
         <span v-if="selectable && internalCheckedKeys.length > 0" class="data-table__selected">
           <span class="data-table__selected-badge">{{ internalCheckedKeys.length }}</span>
           {{ t('common.table.selected', { count: internalCheckedKeys.length }) }}
         </span>
         <span v-else class="data-table__total">
-          {{ t('common.table.total', { total }) }}
+          {{ isFirstLoad ? t('common.loading') : t('common.table.total', { total }) }}
         </span>
         <n-pagination
           :page="page"
@@ -239,7 +399,10 @@ function handlePageSizeChange(pageSize: number): void {
 </template>
 
 <style scoped lang="scss">
+@use '@/styles/transitions/interaction' as ix;
+
 .data-table {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -248,23 +411,41 @@ function handlePageSizeChange(pageSize: number): void {
   border-radius: var(--radius-lg);
   overflow: hidden;
 
+  // ============================================
+  // 刷新指示条
+  // ============================================
+
+  // z-index: 4 —— 高于 Naive 的表头与固定列（它们最高 3）
+  // height: 2px —— 发丝级指示条，与 ix.sliding-indicator 的默认厚度同级
+  // background —— 静态底色：减少动效偏好下滑块动画会被冻结，
+  // 底色仍能表达「正在刷新」
+  &__progress {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 4;
+    height: 2px;
+    overflow: hidden;
+    background: var(--color-primary-subtle);
+
+    &::after {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 40%;
+      content: '';
+      background: var(--color-primary);
+      animation: data-table-progress calc(var(--duration-slowest) * 3) var(--easing-ease-in-out)
+        infinite;
+    }
+  }
+
   &__body {
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    position: relative;
-  }
-
-  &__spin {
-    height: 100%;
-
-    :deep(.n-spin-container) {
-      height: 100%;
-    }
-
-    :deep(.n-spin-content) {
-      height: 100%;
-    }
   }
 
   &__table {
@@ -282,194 +463,155 @@ function handlePageSizeChange(pageSize: number): void {
       height: 100%;
     }
 
+    // 此元素为 NScrollbar 外壳，实际滚动容器是其子元素 .n-scrollbar-container。
+    // 表格横向轨道由 scroll-x 决定，见 resolvedScrollX。
     :deep(.n-data-table-base-table-body) {
       flex: 1;
       min-height: 0;
-
-      // 仅纵向滚动；横向由列宽自适应吃掉，避免底部横条与叠字
-      overflow: hidden auto;
-      scrollbar-width: thin;
-      scrollbar-color: color-mix(in srgb, var(--color-border) 70%, transparent) transparent;
-
-      &::-webkit-scrollbar {
-        width: 6px;
-        height: 0;
-      }
-
-      &::-webkit-scrollbar-track {
-        background: transparent;
-        border-radius: 3px;
-      }
-
-      &::-webkit-scrollbar-thumb {
-        background: var(--color-border);
-        border-radius: 3px;
-        transition: background 200ms;
-
-        &:hover {
-          background: var(--color-text-muted);
-        }
-      }
-
-      &::-webkit-scrollbar-corner {
-        background: transparent;
-      }
     }
 
-    // 表头样式优化
-    :deep(.n-data-table-th) {
-      background: color-mix(in srgb, var(--color-surface) 95%, var(--color-primary) 5%);
-      font-weight: 600;
-      color: var(--color-text);
-      border-bottom: 1px solid var(--color-border-light);
-      transition: background 200ms;
+    // 真正的滚动容器是它的子元素 .n-scrollbar-container。
+    // 这里只补 overscroll-behavior：表格滚到底/滚到最右时不要把整页带着一起滚
+    // （横向尤其重要，否则会触发浏览器的「侧滑返回」）。
+    // 没有用 ix.scroll-container：那个 mixin 的 overflow-y 与 scrollbar-gutter
+    // 是给普通滚动区准备的，而这个容器的 overflow 由 Naive 自己管理（自绘轨道）。
+    :deep(.n-scrollbar-container) {
+      overscroll-behavior: contain;
     }
 
-    // 行样式优化
-    :deep(.n-data-table-tr) {
-      transition: background 150ms;
+    // 自绘滚动条着色。
+    // DataTable 的 peer 主题拿不到全局 themeOverrides.Scrollbar
+    // （useTheme 只合并 themeOverrides.DataTable.peers），
+    // 不在这里接回 token 的话用的就是 Naive 写死的 rgba 灰。
+    :deep(.n-scrollbar-rail__scrollbar) {
+      background-color: var(--color-scrollbar-thumb);
+      border-radius: var(--radius-full);
 
       &:hover {
-        background: color-mix(in srgb, var(--color-surface) 97%, var(--color-primary) 3%);
+        background-color: var(--color-scrollbar-thumb-hover);
       }
     }
+
+    // 表头与正文层级由 themeOverrides.DataTable 控制：
+    // thColor=surface-2、thTextColor=text-secondary、thFontWeight=600；
+    // tdColor=surface、tdTextColor=text、borderColor=border-subtle。
 
     :deep(.n-data-table-td) {
-      border-bottom: 1px solid var(--color-border-light);
-      color: var(--color-text-secondary);
+      // 计数、时长和日期列使用等宽数字，避免分页时宽度抖动。
+      // 这里同时覆盖自定义单元格中的 font 简写，因为它会复位 font-variant-numeric。
+      font-variant-numeric: tabular-nums;
     }
 
-    // 若业务仍用 fixed：去掉阴影线，避免赛博朋克主题下「黑影分割」
-    :deep(.n-data-table-th--fixed-left),
-    :deep(.n-data-table-th--fixed-right),
-    :deep(.n-data-table-td--fixed-left),
-    :deep(.n-data-table-td--fixed-right) {
-      background-color: var(--color-surface) !important;
-      box-shadow: none !important;
-    }
+    // 行反馈：
+    // - hover 底色由 tdColorHover(--color-surface-hover) 提供。
+    // - 按压不能使用 transform，避免 sticky 固定列的包含块变化。
+    // - row-reveal 按需显示 .is-row-action，并支持 :focus-within，保证键盘用户可见操作区。
+    :deep(.n-data-table-tbody .n-data-table-tr) {
+      @include ix.row-reveal;
+      @include ix.focus-ring-inset;
 
-    :deep(.n-data-table-th--fixed-left),
-    :deep(.n-data-table-th--fixed-right) {
-      background: color-mix(in srgb, var(--color-surface) 95%, var(--color-primary) 5%) !important;
-    }
-
-    :deep(.n-data-table-tr:hover .n-data-table-td--fixed-left),
-    :deep(.n-data-table-tr:hover .n-data-table-td--fixed-right) {
-      background-color: color-mix(
-        in srgb,
-        var(--color-surface) 97%,
-        var(--color-primary) 3%
-      ) !important;
-    }
-
-    :deep(.n-data-table-tr--selected .n-data-table-td--fixed-left),
-    :deep(.n-data-table-tr--selected .n-data-table-td--fixed-right) {
-      background-color: color-mix(
-        in srgb,
-        var(--color-surface) 92%,
-        var(--color-primary) 8%
-      ) !important;
-    }
-
-    // 选中行样式
-    :deep(.n-data-table-tr--selected) {
-      background: color-mix(in srgb, var(--color-surface) 92%, var(--color-primary) 8%);
-
-      &:hover {
-        background: color-mix(in srgb, var(--color-surface) 88%, var(--color-primary) 12%);
+      &:active > .n-data-table-td {
+        background-color: var(--color-surface-active);
+        transition-duration: var(--motion-press-duration);
       }
     }
 
-    // 树形表格展开图标样式
+    // 选中行：类由 rowClassName 打上，见 script
+    :deep(.n-data-table-tr.is-row-selected > .n-data-table-td) {
+      background-color: var(--color-row-selected);
+    }
+
+    :deep(.n-data-table-tr.is-row-selected:hover > .n-data-table-td) {
+      background-color: var(--color-row-selected-hover);
+    }
+
+    // 固定列表面使用不透明的主题色，背景与边缘阴影由 Naive 的 tdColor、thColor 和 hover 状态提供。
+    // 边缘阴影仅在横向滚动时显示，提示侧边仍有内容。
+
+    // 空状态容器：内边距交给 AppEmpty / 骨架屏自己控制，
+    // 否则 Naive 的 48px 会和它们的内边距叠加
+    :deep(.n-data-table-empty) {
+      padding: 0;
+    }
+
+    // 树形表格展开图标
     :deep(.n-data-table-expand-trigger) {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 22px;
-      height: 22px;
-      margin-right: 6px;
-      border-radius: var(--radius-sm);
+      width: var(--spacing-5);
+      height: var(--spacing-5);
+      margin-right: var(--spacing-2);
       color: var(--color-text-muted);
       cursor: pointer;
-      transition:
-        background 150ms,
-        color 150ms,
-        transform 200ms;
+      border-radius: var(--radius-sm);
+
+      @include ix.feedback-transition;
 
       &:hover {
-        background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-        color: var(--color-primary);
+        color: var(--color-primary-text);
+        background: var(--color-primary-subtle);
       }
 
       svg {
-        width: 14px;
-        height: 14px;
+        width: var(--text-base);
+        height: var(--text-base);
       }
     }
 
     :deep(.n-data-table-expand-trigger--expanded) {
-      color: var(--color-primary);
-    }
-
-    // 树形缩进优化 - 确保子级有明显缩进
-    :deep(.n-data-table-indent) {
-      display: inline-block;
-      height: 1px;
-      flex-shrink: 0;
-    }
-
-    // 树形表格行层级样式
-    :deep(.n-data-table-td__indent) {
-      display: inline-flex;
-      align-items: center;
-    }
-
-    // 子级行添加视觉连接线
-    :deep(.n-data-table-tr[data-level]:not([data-level='0'])) {
-      .n-data-table-td:first-child {
-        position: relative;
-
-        &::before {
-          content: '';
-          position: absolute;
-          left: 16px;
-          top: 0;
-          bottom: 0;
-          width: 1px;
-          background: var(--color-border-light);
-        }
-      }
+      color: var(--color-primary-text);
     }
   }
 
-  &__empty {
+  // ============================================
+  // 首屏骨架屏
+  // ============================================
+
+  // overflow: hidden —— 网格轨道按真实列宽铺开，可能宽于可视区
+  &__skeleton {
     display: flex;
+    flex: 1;
     flex-direction: column;
+    align-self: stretch;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  // 与 Naive medium 尺寸的真实行等高：一行正文 + 上下 12px 内边距
+  &__skeleton-row {
+    display: grid;
     align-items: center;
-    justify-content: center;
-    padding: var(--spacing-12) var(--spacing-8);
-    gap: var(--spacing-4);
+    min-height: calc(var(--text-base) * var(--leading-normal) + var(--spacing-6));
+    border-bottom: 1px solid var(--color-border-subtle);
   }
 
-  &__empty-icon {
-    color: var(--color-text-muted);
-    opacity: 0.5;
+  // 左右外边距对齐单元格的 12px 内边距
+  &__skeleton-cell {
+    display: block;
+    height: var(--text-base);
+    margin: 0 var(--spacing-3);
+    border-radius: var(--radius-xs);
+
+    @include ix.skeleton-shimmer;
+
+    // 让骨架读起来像内容而不是条形码
+    &:nth-child(4n) {
+      margin-right: var(--spacing-10);
+    }
   }
 
-  &__empty-text {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-  }
+  // ============================================
+  // 底部分页
+  // ============================================
 
+  // 页码/总数同样用等宽数字（继承给分页器），翻页时不左右跳
   &__footer {
     flex-shrink: 0;
     padding: var(--spacing-4) var(--spacing-5);
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-surface) 98%, var(--color-primary) 2%) 0%,
-      var(--color-surface) 100%
-    );
-    border-top: 1px solid var(--color-border-light);
+    font-variant-numeric: tabular-nums;
+    background: var(--color-surface-2);
+    border-top: 1px solid var(--color-border-subtle);
   }
 
   &__pagination {
@@ -481,37 +623,39 @@ function handlePageSizeChange(pageSize: number): void {
     font-size: var(--text-sm);
   }
 
+  // 语义色作为「表面上的文字」必须用 -text 角色，保证 ≥ 4.5:1
   &__selected {
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
-    color: var(--color-primary);
+    color: var(--color-primary-text);
     font-size: var(--text-sm);
-    font-weight: 500;
+    font-weight: var(--font-medium);
   }
 
+  // 实色填充上的文字用 on-primary：白字在赛博朋克的霓虹青底上读不出来
   &__selected-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
+    min-width: var(--spacing-5);
+    height: var(--spacing-5);
+    padding: 0 var(--spacing-2);
+    color: var(--color-on-primary);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
     background: var(--color-primary);
-    color: white;
-    font-size: 11px;
-    font-weight: 600;
-    border-radius: 10px;
+    border-radius: var(--radius-full);
   }
 }
 
-// Reduced motion
-@media (prefers-reduced-motion: reduce) {
-  .data-table {
-    :deep(.n-data-table-tr),
-    :deep(.n-data-table-th) {
-      transition: none;
-    }
+@keyframes data-table-progress {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
   }
 }
 </style>

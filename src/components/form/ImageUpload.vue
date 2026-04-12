@@ -45,7 +45,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   value: () => [],
-  action: '/v1/common/video/image/upload',
+  action: '/v1/common/image/upload',
   max: 1,
   maxSize: 20,
   accept: 'image/*',
