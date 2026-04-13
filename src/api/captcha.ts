@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { ClickCaptcha } from './types'
+import type { ClickCaptcha, GraphicsCaptcha } from './types'
 
 export type CaptchaType = 'none' | 'click' | 'slide'
 export type CaptchaScene = 'login' | 'register'
@@ -13,3 +13,6 @@ export const getCaptchaType = (scene: CaptchaScene): Promise<{ type: CaptchaType
 
 export const getClickCaptcha = (): Promise<ClickCaptcha> =>
   request.get('/common/captcha/click', { params: { scene: 'login' } })
+
+export const getGraphicsCaptcha = (): Promise<GraphicsCaptcha> =>
+  request.get('/common/captcha/graphics-text', { silent: true })

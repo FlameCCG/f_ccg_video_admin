@@ -7,6 +7,8 @@ import { onMounted, onUnmounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import { setErrorMessageHandler, setLoginRedirectHandler } from '@/utils/request'
+import { useUserStore } from '@/stores/user'
+import { usePermissionStore } from '@/stores/permission'
 
 const message = useMessage()
 const router = useRouter()
@@ -28,6 +30,8 @@ function handleApiError(msg: string): void {
 }
 
 function handleLoginRedirect(): void {
+  useUserStore().resetUser()
+  usePermissionStore().resetPermission()
   const current = router.currentRoute.value
   if (current.path === '/login') return
   void router.replace({

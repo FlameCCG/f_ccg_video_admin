@@ -466,11 +466,13 @@ export const usePermissionStore = defineStore('permission', () => {
    *
    * @param userId 用户 ID（用于获取权限列表）
    */
+  let generation = 0
   async function fetchUserPermissions(userId: number): Promise<void> {
     // 防止重复请求
     if (isLoading.value) return
 
     isLoading.value = true
+    const requestGeneration = generation
 
     try {
       // 并行获取菜单和权限，提高加载速度
@@ -478,6 +480,8 @@ export const usePermissionStore = defineStore('permission', () => {
         getCurrentUserMenus(), // GET /admin/rbac/user/menus
         getUserPermissions({ userId }), // GET /admin/rbac/user/permissions
       ])
+
+      if (requestGeneration !== generation) throw new Error('登录状态已变化，请重试')
 
       menus.value = menusData
       permissions.value = permissionsData
@@ -487,7 +491,7 @@ export const usePermissionStore = defineStore('permission', () => {
 
       isLoaded.value = true
     } finally {
-      isLoading.value = false
+      if (requestGeneration === generation) isLoading.value = false
     }
   }
 
@@ -720,6 +724,7 @@ export const usePermissionStore = defineStore('permission', () => {
    * 用户退出登录时调用，清除所有权限数据。
    */
   function resetPermission(): void {
+    generation += 1
     menus.value = []
     permissions.value = []
     routes.value = []

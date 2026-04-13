@@ -18,9 +18,11 @@ import ClickCaptcha from '@/components/captcha/ClickCaptcha.vue'
 import LanguageDropdown from '@/components/common/LanguageDropdown.vue'
 import ThemeDropdown from '@/components/common/ThemeDropdown.vue'
 import { useCaptchaTypeQueue } from '@/composables/useCaptchaTypeQueue'
-import type { ClickCaptchaResult } from '@/api/captcha'
+import { getGraphicsCaptcha, type ClickCaptchaResult } from '@/api/captcha'
+import { getPublicSiteConfig } from '@/api/site'
 import type { LoginCredentials } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
+import { getCaptchaFailureType, isInteractiveCaptchaFailure } from '@/utils/captchaError'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -28,6 +30,9 @@ const message = useMessage()
 const authStore = useAuthStore()
 const formRef = ref<FormInst | null>(null)
 const usernameInputRef = ref<InputInst | null>(null)
+const graphicInputRef = ref<InputInst | null>(null)
+const graphicError = ref('')
+const submittingLogin = ref(false)
 interface CaptchaExposed {
   reset: () => void
   refresh: () => void
@@ -35,21 +40,70 @@ interface CaptchaExposed {
   success: () => void
 }
 const captchaRef = ref<CaptchaExposed | null>(null)
-const formData = reactive({ username: '', password: '' })
+const formData = reactive({ username: '', password: '', captchaCode: '' })
+const graphicCaptcha = ref({ captchaID: '', captchaB64: '' })
+const graphicEnabled = ref(false)
+const configReady = ref(false)
+const configLoading = ref(false)
+const configFailed = ref(false)
+const graphicLoading = ref(false)
 const showCaptchaModal = ref(false)
 const shouldNavigateAfterCaptcha = ref(false)
 const captchaKind = ref<'click' | 'slide'>('slide')
 const captchaRevision = ref(0)
 const preparingCaptcha = ref(false)
 const typeQueue = useCaptchaTypeQueue(() => 'login')
-const isLoading = computed(() => authStore.isLoggingIn || preparingCaptcha.value)
+const isLoading = computed(
+  () =>
+    authStore.isLoggingIn || submittingLogin.value || preparingCaptcha.value || configLoading.value
+)
 let selectionId = 0
 const rules: FormRules = {
   username: [{ required: true, message: () => t('auth.tips.usernameRequired'), trigger: 'blur' }],
   password: [{ required: true, message: () => t('auth.tips.passwordRequired'), trigger: 'blur' }],
+  captchaCode: [
+    {
+      validator: () => !graphicEnabled.value || !!formData.captchaCode.trim(),
+      message: () => t('auth.captcha.graphicRequired'),
+      trigger: 'blur',
+    },
+  ],
+}
+async function refreshGraphicCaptcha(): Promise<void> {
+  if (graphicLoading.value) return
+  graphicLoading.value = true
+  formData.captchaCode = ''
+  graphicCaptcha.value = { captchaID: '', captchaB64: '' }
+  try {
+    graphicCaptcha.value = await getGraphicsCaptcha()
+  } catch {
+    message.error(t('auth.captcha.graphicLoadFailed'))
+  } finally {
+    graphicLoading.value = false
+    if (graphicError.value && !showCaptchaModal.value) {
+      void nextTick(() => graphicInputRef.value?.focus())
+    }
+  }
+}
+async function loadLoginConfig(): Promise<void> {
+  if (configLoading.value) return
+  configLoading.value = true
+  configFailed.value = false
+  try {
+    const config = await getPublicSiteConfig()
+    graphicEnabled.value = config.site.login.textGraphicCaptcha
+    configReady.value = true
+    if (graphicEnabled.value) await refreshGraphicCaptcha()
+  } catch {
+    configReady.value = false
+    configFailed.value = true
+  } finally {
+    configLoading.value = false
+  }
 }
 onMounted(() => {
   typeQueue.warmup()
+  void loadLoginConfig()
   void nextTick(() => usernameInputRef.value?.focus())
 })
 watch(
@@ -60,9 +114,15 @@ watch(
   },
   { flush: 'post' }
 )
+watch(
+  () => formData.captchaCode,
+  (code) => {
+    if (code.trim()) graphicError.value = ''
+  }
+)
 
 async function handleLoginClick(): Promise<void> {
-  if (isLoading.value) return
+  if (isLoading.value || !configReady.value || graphicLoading.value) return
   preparingCaptcha.value = true
   try {
     try {
@@ -106,6 +166,8 @@ async function handleCaptchaRetry(): Promise<void> {
     if (id !== selectionId || !showCaptchaModal.value) return
     if (type === 'none') {
       showCaptchaModal.value = false
+      await nextTick()
+      await doLogin({})
     } else {
       captchaKind.value = type
       captchaRevision.value += 1
@@ -121,12 +183,28 @@ async function handleCaptchaRetry(): Promise<void> {
   }
 }
 async function doLogin(captcha: Partial<LoginCredentials>): Promise<void> {
-  if (authStore.isLoggingIn) return
+  if (
+    authStore.isLoggingIn ||
+    submittingLogin.value ||
+    (showCaptchaModal.value && preparingCaptcha.value)
+  )
+    return
+  submittingLogin.value = true
   const withCaptcha = showCaptchaModal.value
   const id = selectionId
   try {
     await authStore.login(
-      { username: formData.username.trim(), password: formData.password, ...captcha },
+      {
+        username: formData.username.trim(),
+        password: formData.password,
+        ...(graphicEnabled.value
+          ? {
+              captchaID: graphicCaptcha.value.captchaID,
+              captchaCode: formData.captchaCode.trim(),
+            }
+          : {}),
+        ...captcha,
+      },
       { silent: withCaptcha }
     )
     if (withCaptcha) {
@@ -138,18 +216,35 @@ async function doLogin(captcha: Partial<LoginCredentials>): Promise<void> {
       void router.push({ path: '/' })
     }
   } catch (error: unknown) {
+    const interactiveFailure = isInteractiveCaptchaFailure(error)
+    if (graphicEnabled.value && !interactiveFailure) void refreshGraphicCaptcha()
+    if (getCaptchaFailureType(error) === 'graphic') {
+      graphicError.value =
+        error instanceof Error ? error.message : t('auth.captcha.graphicRequired')
+    }
     if (withCaptcha && id === selectionId && showCaptchaModal.value) {
       shouldNavigateAfterCaptcha.value = false
-      captchaRef.value?.fail(error instanceof Error ? error.message : '')
+      const reason = error instanceof Error ? error.message : ''
+      if (interactiveFailure) {
+        captchaRef.value?.fail(reason)
+      } else {
+        showCaptchaModal.value = false
+        message.error(reason || t('auth.tips.loginFailed'))
+      }
       typeQueue.warmup()
     }
+  } finally {
+    submittingLogin.value = false
   }
 }
 function handleCaptchaSettled(): void {
   if (shouldNavigateAfterCaptcha.value) showCaptchaModal.value = false
 }
 function handleCaptchaAfterLeave(): void {
-  if (!shouldNavigateAfterCaptcha.value) return
+  if (!shouldNavigateAfterCaptcha.value) {
+    if (graphicError.value) void nextTick(() => graphicInputRef.value?.focus())
+    return
+  }
   shouldNavigateAfterCaptcha.value = false
   message.success(t('auth.tips.loginSuccess'))
   void router.push({ path: '/' })
@@ -262,12 +357,49 @@ function handleEnterSubmit(): void {
                 </n-input>
               </n-form-item>
 
+              <n-form-item
+                v-if="graphicEnabled"
+                path="captchaCode"
+                :label="t('auth.captcha.graphicLabel')"
+                class="login-page__form-item"
+                :validation-status="graphicError ? 'error' : undefined"
+                :feedback="graphicError || undefined"
+              >
+                <n-input
+                  ref="graphicInputRef"
+                  v-model:value="formData.captchaCode"
+                  :placeholder="t('auth.captcha.graphicRequired')"
+                  :disabled="isLoading || graphicLoading"
+                  @keydown.enter="handleEnterSubmit"
+                />
+                <n-button
+                  :loading="graphicLoading"
+                  :disabled="isLoading"
+                  :aria-label="t('auth.captcha.refresh')"
+                  @click="refreshGraphicCaptcha"
+                >
+                  <img
+                    v-if="graphicCaptcha.captchaB64"
+                    :src="graphicCaptcha.captchaB64"
+                    :alt="t('auth.captcha.graphicLabel')"
+                    class="graphic-captcha-image"
+                  />
+                  <span v-else>{{ t('auth.captcha.refresh') }}</span>
+                </n-button>
+              </n-form-item>
+              <p v-if="configFailed" role="alert">
+                {{ t('auth.captcha.configFailed') }}
+                <n-button text @click="loadLoginConfig">{{ t('auth.captcha.retry') }}</n-button>
+              </p>
               <n-form-item class="login-page__form-item login-page__form-item--button">
                 <n-button
                   type="primary"
                   block
                   size="large"
                   :loading="isLoading"
+                  :disabled="
+                    !configReady || graphicLoading || (graphicEnabled && !graphicCaptcha.captchaID)
+                  "
                   class="login-page__submit-btn"
                   @click="handleLoginClick"
                 >
@@ -310,8 +442,8 @@ function handleEnterSubmit(): void {
       :style="{ width: 'min(24rem, calc(100vw - var(--spacing-8)))' }"
       :bordered="false"
       :mask-closable="false"
-      :closable="!isLoading && !shouldNavigateAfterCaptcha"
-      :close-on-esc="!isLoading && !shouldNavigateAfterCaptcha"
+      :closable="!authStore.isLoggingIn && !submittingLogin && !shouldNavigateAfterCaptcha"
+      :close-on-esc="!authStore.isLoggingIn && !submittingLogin && !shouldNavigateAfterCaptcha"
       @after-leave="handleCaptchaAfterLeave"
     >
       <template #header>
@@ -330,7 +462,11 @@ function handleEnterSubmit(): void {
           </div>
         </div>
       </template>
-      <div class="captcha-switch-stage" :aria-busy="preparingCaptcha">
+      <div
+        class="captcha-switch-stage"
+        :aria-busy="preparingCaptcha"
+        :inert="preparingCaptcha || undefined"
+      >
         <Transition name="captcha-switch" mode="out-in">
           <SlideCaptcha
             v-if="captchaKind === 'slide'"

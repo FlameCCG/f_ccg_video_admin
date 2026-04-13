@@ -18,6 +18,11 @@ export default {
     logging: 'Logging in...',
   },
   captcha: {
+    graphicLabel: 'Image captcha',
+    graphicRequired: 'Enter the image captcha',
+    graphicLoadFailed: 'Unable to load the image captcha. Refresh to retry.',
+    configFailed: 'Unable to load login settings. Please retry.',
+    retry: 'Retry',
     title: 'Security Verification',
     subtitle: 'Slide the puzzle piece into the gap',
     successHint: 'All set. Taking you in…',

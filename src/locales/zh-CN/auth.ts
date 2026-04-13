@@ -18,6 +18,11 @@ export default {
     logging: '登录中...',
   },
   captcha: {
+    graphicLabel: '图形验证码',
+    graphicRequired: '请输入图形验证码',
+    graphicLoadFailed: '图形验证码加载失败，请点击刷新',
+    configFailed: '登录配置加载失败，请重试',
+    retry: '重试',
     title: '安全验证',
     subtitle: '拖动滑块，将拼图移至缺口',
     successHint: '安全校验完成，即将进入',

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { keepPreviousData } from '@tanstack/vue-query'
 import { BusinessError } from './request'
+import { SessionExpiredError } from './authSession'
 import {
   shouldRetryQuery,
   createAppQueryClient,
@@ -9,6 +10,12 @@ import {
 } from './queryClient'
 
 describe('shouldRetryQuery', () => {
+  it('does not retry terminal sessions, including errors from another bundle', () => {
+    expect(shouldRetryQuery(0, new SessionExpiredError())).toBe(false)
+    const error = new Error('session expired')
+    error.name = 'SessionExpiredError'
+    expect(shouldRetryQuery(0, error)).toBe(false)
+  })
   it('does not retry BusinessError (e.g. 无权限访问)', () => {
     const err = new BusinessError(1, '无权限访问')
     expect(shouldRetryQuery(0, err)).toBe(false)

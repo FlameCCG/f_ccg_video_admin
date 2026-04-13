@@ -3,12 +3,24 @@
  * 实现统一的请求/响应拦截、Token 管理、错误处理
  */
 import axios, {
+  CanceledError,
   type AxiosInstance,
   type AxiosRequestConfig,
   type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from 'axios'
-import { getAccessToken, getRefreshToken, setTokens, clearTokens } from './storage'
+import {
+  getAccessToken,
+  isAuthenticationError,
+  isLoginRequest,
+  refreshAccessToken,
+  isRefreshingTokens,
+  setSessionExpiredHandler,
+  SessionExpiredError,
+  isAuthNavigationPending,
+} from './authSession'
+import { useUserStore } from '@/stores/user'
+import { usePermissionStore } from '@/stores/permission'
 
 // ==================== 类型定义 ====================
 
@@ -27,86 +39,13 @@ export interface ApiResponse<T = unknown> {
  */
 export class BusinessError extends Error {
   code: number
+  readonly data: unknown
 
-  constructor(code: number, message: string) {
+  constructor(code: number, message: string, data?: unknown) {
     super(message)
     this.code = code
+    this.data = data
     this.name = 'BusinessError'
-  }
-}
-
-/**
- * Token 刷新响应数据
- */
-interface RefreshTokenResponse {
-  accessToken: string
-  refreshToken: string
-}
-
-// ==================== Token 刷新 Single-Flight ====================
-
-/**
- * Token 刷新器
- * 实现 Single-Flight 模式，防止并发刷新
- */
-class TokenRefresher {
-  private refreshing: Promise<string> | null = null
-
-  /**
-   * 刷新 Token
-   * 如果已有刷新请求在进行中，返回同一个 Promise
-   */
-  async refresh(): Promise<string> {
-    if (this.refreshing) {
-      return this.refreshing
-    }
-
-    this.refreshing = this.doRefresh()
-
-    try {
-      return await this.refreshing
-    } finally {
-      this.refreshing = null
-    }
-  }
-
-  /**
-   * 执行实际的刷新请求
-   */
-  private async doRefresh(): Promise<string> {
-    const refreshToken = getRefreshToken()
-
-    if (!refreshToken) {
-      throw new Error('No refresh token available')
-    }
-
-    // 直接使用 axios 发送请求，绕过拦截器避免循环
-    const response = await axios.post<ApiResponse<RefreshTokenResponse>>(
-      '/v1/common/user/login/refresh',
-      { refreshToken },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    )
-
-    const { code, data, msg } = response.data
-
-    if (code === 0 && data) {
-      setTokens(data.accessToken, data.refreshToken)
-      return data.accessToken
-    }
-
-    // 刷新失败
-    throw new Error(msg || 'Token refresh failed')
-  }
-
-  /**
-   * 检查是否正在刷新
-   */
-  isRefreshing(): boolean {
-    return this.refreshing !== null
   }
 }
 
@@ -178,7 +117,15 @@ function createAxiosInstance(): AxiosInstance {
 const request = createAxiosInstance()
 
 // 创建 Token 刷新器
-const tokenRefresher = new TokenRefresher()
+const tokenRefresher = {
+  refresh: refreshAccessToken,
+  isRefreshing: () => isRefreshingTokens.value,
+}
+setSessionExpiredHandler((message) => {
+  useUserStore().resetUser()
+  usePermissionStore().resetPermission()
+  showErrorMessage(message)
+})
 
 // ==================== 请求拦截器 ====================
 
@@ -212,26 +159,37 @@ request.interceptors.request.use(
  * 处理 Token 错误
  * 尝试刷新 Token 并重试原请求
  */
-async function handleTokenError(config: AxiosRequestConfig): Promise<AxiosResponse> {
-  try {
-    const newToken = await tokenRefresher.refresh()
-
-    // 重试原请求
-    const retryConfig: AxiosRequestConfig = {
-      ...config,
-      headers: {
-        ...config.headers,
-        Authorization: `Bearer ${newToken}`,
-      },
-    }
-
-    return request(retryConfig)
-  } catch {
-    // 刷新失败，先清除 token 再跳转登录（防止循环刷新）
-    clearTokens()
-    redirectToLogin()
-    return Promise.reject(new BusinessError(1, '认证失败，请重新登录'))
+async function handleTokenError(
+  config: AxiosRequestConfig & { _authRetry?: boolean }
+): Promise<AxiosResponse> {
+  if (config.signal?.aborted) throw new CanceledError()
+  if (config._authRetry || isLoginRequest(config.url)) {
+    throw new BusinessError(1, '登录状态验证失败，请重试')
   }
+  config._authRetry = true
+  const authorization: unknown = config.headers?.Authorization
+  const failedToken = typeof authorization === 'string' ? authorization.replace(/^Bearer /, '') : ''
+  let newToken: string
+  try {
+    newToken = await tokenRefresher.refresh(failedToken)
+  } catch (error) {
+    if (error instanceof SessionExpiredError && !isAuthNavigationPending()) redirectToLogin()
+    if (
+      !axios.isCancel(error) &&
+      !config.silent &&
+      !(error instanceof SessionExpiredError && error.notified)
+    ) {
+      const message = axios.isAxiosError<{ msg?: string }>(error)
+        ? error.response?.data?.msg || '网络连接失败，请检查网络'
+        : error instanceof Error
+          ? error.message
+          : '请求失败'
+      showErrorMessage(message)
+    }
+    throw error
+  }
+  if (config.signal?.aborted) throw new CanceledError()
+  return request({ ...config, headers: { ...config.headers, Authorization: `Bearer ${newToken}` } })
 }
 
 request.interceptors.response.use(
@@ -244,12 +202,16 @@ request.interceptors.response.use(
       return data as AxiosResponse
     }
 
+    if (code === 1 && isAuthenticationError(msg) && !isLoginRequest(response.config.url)) {
+      return handleTokenError(response.config)
+    }
+
     // 普通业务错误（含无权限等）- 展示后端 msg，并 reject 供调用方结束 loading
     const errorMsg = (typeof msg === 'string' && msg.trim()) || '请求失败'
     if (!response.config?.silent) {
       showErrorMessage(errorMsg)
     }
-    return Promise.reject(new BusinessError(code, errorMsg))
+    return Promise.reject(new BusinessError(code, errorMsg, data))
   },
   async (error: unknown) => {
     // 筛选变化/翻页会取消过期查询，这是正常控制流，不应弹出网络错误。
@@ -261,7 +223,7 @@ request.interceptors.response.use(
       const silent = Boolean(error.config?.silent)
 
       // 401 状态码 - 尝试刷新 Token
-      if (status === 401 && error.config) {
+      if (status === 401 && error.config && !isLoginRequest(error.config.url)) {
         return handleTokenError(error.config)
       }
 
@@ -272,7 +234,7 @@ request.interceptors.response.use(
         if (!silent) {
           showErrorMessage(bizMsg)
         }
-        return Promise.reject(new BusinessError(1, bizMsg))
+        return Promise.reject(new BusinessError(1, bizMsg, body.data))
       }
 
       // 其他网络错误

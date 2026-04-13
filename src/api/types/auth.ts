@@ -54,6 +54,8 @@ export interface SlideCaptchaVerify {
  * 管理员登录凭证（提交预取类型对应的点选或滑块验证码参数）
  */
 export interface LoginCredentials extends Partial<SlideCaptchaVerify> {
+  captchaID?: string
+  captchaCode?: string
   captchaToken?: string
   captchaDots?: { index: number; x: number; y: number }[]
   /** 用户名或邮箱 */

@@ -1,3 +1,11 @@
+import {
+  getAccessToken as readAccessToken,
+  getRefreshToken as readRefreshToken,
+  clearTokens as clearSessionTokens,
+  setTokens as setSessionTokens,
+  syncAuthTokens,
+} from './authSession'
+
 /**
  * 本地存储工具
  * 提供类型安全的 localStorage 操作
@@ -50,7 +58,7 @@ export function removeStorageItem(key: string): void {
  * 获取 Access Token
  */
 export function getAccessToken(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
+  return readAccessToken()
 }
 
 /**
@@ -58,13 +66,14 @@ export function getAccessToken(): string | null {
  */
 export function setAccessToken(token: string): void {
   localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token)
+  syncAuthTokens()
 }
 
 /**
  * 获取 Refresh Token
  */
 export function getRefreshToken(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN)
+  return readRefreshToken()
 }
 
 /**
@@ -72,22 +81,21 @@ export function getRefreshToken(): string | null {
  */
 export function setRefreshToken(token: string): void {
   localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, token)
+  syncAuthTokens()
 }
 
 /**
  * 设置 Token（同时设置 access 和 refresh）
  */
 export function setTokens(accessToken: string, refreshToken: string): void {
-  setAccessToken(accessToken)
-  setRefreshToken(refreshToken)
+  setSessionTokens(accessToken, refreshToken)
 }
 
 /**
  * 清除所有 Token
  */
 export function clearTokens(): void {
-  removeStorageItem(STORAGE_KEYS.ACCESS_TOKEN)
-  removeStorageItem(STORAGE_KEYS.REFRESH_TOKEN)
+  clearSessionTokens()
 }
 
 /**

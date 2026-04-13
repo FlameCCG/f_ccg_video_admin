@@ -914,6 +914,12 @@
   }
 }
 
+.graphic-captcha-image {
+  display: block;
+  max-width: 100%;
+  height: var(--spacing-8);
+}
+
 .captcha-switch-stage {
   min-height: 17rem;
 }

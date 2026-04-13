@@ -46,6 +46,12 @@ import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/user'
 import { usePermissionStore } from '@/stores/permission'
 import { useAppStore } from '@/stores/app'
+import {
+  ensureAccessToken,
+  getRefreshToken,
+  SessionExpiredError,
+  beginAuthNavigation,
+} from '@/utils/authSession'
 import { WHITE_LIST_ROUTES } from './routes'
 import type { Menu } from '@/api/types'
 
@@ -104,7 +110,9 @@ async function loadUserPermissions(): Promise<boolean> {
     return true
   } catch (error) {
     console.error('[Router Guard] Failed to load user permissions:', error)
-    return false
+    userStore.resetUser()
+    permissionStore.resetPermission()
+    throw error
   }
 }
 
@@ -289,38 +297,35 @@ export function setupRouterGuard(router: Router): void {
     ) => {
       const authStore = useAuthStore()
       const permissionStore = usePermissionStore()
+      const finishAuthNavigation = beginAuthNavigation()
+      try {
+        // 首次打开或切页时，AT 过期且 RT 有效应先续期，避免直接退回登录页。
+        if (!isWhiteList(to.path) || to.path === '/login') {
+          try {
+            await ensureAccessToken()
+          } catch {
+            if (to.path === '/login') next()
+            else next({ path: '/login', query: { redirect: to.fullPath } })
+            return
+          }
+        }
 
-      // ========== 步骤1：白名单检查 ==========
-      if (isWhiteList(to.path)) {
-        // 已登录用户访问登录页 → 重定向到首页仪表盘
-        // （/ 会由动态 Root 路由跳到第一个有权限的菜单）
-        if (to.path === '/login' && authStore.isLoggedIn) {
-          next({ path: '/' })
+        // ========== 步骤1：白名单检查 ==========
+        if (isWhiteList(to.path)) {
+          // 已登录用户访问登录页 → 重定向到首页仪表盘
+          // （/ 会由动态 Root 路由跳到第一个有权限的菜单）
+          if (to.path === '/login' && authStore.isLoggedIn) {
+            next({ path: '/' })
+            return
+          }
+          next()
           return
         }
-        next()
-        return
-      }
 
-      // ========== 步骤2：登录状态检查 ==========
-      if (!authStore.isLoggedIn) {
-        // 未登录，跳转到登录页
-        // 携带 redirect 参数，登录成功后可以跳回原页面
-        next({
-          path: '/login',
-          query: { redirect: to.fullPath },
-        })
-        return
-      }
-
-      // ========== 步骤3：权限数据加载 ==========
-      if (!permissionStore.isLoaded) {
-        // 加载用户信息和权限数据
-        const success = await loadUserPermissions()
-
-        if (!success) {
-          // 加载失败，清除登录状态并跳转登录页
-          authStore.logout()
+        // ========== 步骤2：登录状态检查 ==========
+        if (!authStore.isLoggedIn) {
+          // 未登录，跳转到登录页
+          // 携带 redirect 参数，登录成功后可以跳回原页面
           next({
             path: '/login',
             query: { redirect: to.fullPath },
@@ -328,31 +333,49 @@ export function setupRouterGuard(router: Router): void {
           return
         }
 
-        // 添加动态路由
-        addDynamicRoutes(router)
+        // ========== 步骤3：权限数据加载 ==========
+        if (!permissionStore.isLoaded) {
+          // 加载用户信息和权限数据
+          try {
+            await loadUserPermissions()
+          } catch (error) {
+            if (error instanceof SessionExpiredError || !getRefreshToken()) {
+              authStore.logout()
+              next({ path: '/login', query: { redirect: to.fullPath } })
+            } else {
+              next(false)
+            }
+            return
+          }
 
-        // 【关键】重新导航到目标路由
-        // 因为动态路由刚刚添加，需要重新匹配
-        // replace: true 表示替换当前历史记录，避免用户点击后退时回到空白页
-        next({ ...to, replace: true })
-        return
-      }
+          // 添加动态路由
+          addDynamicRoutes(router)
 
-      // ========== 步骤4：路由权限检查 ==========
-      const requiresAuth = to.meta.requiresAuth !== false
-      if (!requiresAuth) {
-        next()
-        return
-      }
+          // 【关键】重新导航到目标路由
+          // 因为动态路由刚刚添加，需要重新匹配
+          // replace: true 表示替换当前历史记录，避免用户点击后退时回到空白页
+          next({ ...to, replace: true })
+          return
+        }
 
-      // 检查是否有访问权限
-      const hasAccess = checkRoutePermission(to)
+        // ========== 步骤4：路由权限检查 ==========
+        const requiresAuth = to.meta.requiresAuth !== false
+        if (!requiresAuth) {
+          next()
+          return
+        }
 
-      if (hasAccess) {
-        next()
-      } else {
-        // 无权限，跳转到 403 页面
-        next({ path: '/403' })
+        // 检查是否有访问权限
+        const hasAccess = checkRoutePermission(to)
+
+        if (hasAccess) {
+          next()
+        } else {
+          // 无权限，跳转到 403 页面
+          next({ path: '/403' })
+        }
+      } finally {
+        finishAuthNavigation()
       }
     }
   )

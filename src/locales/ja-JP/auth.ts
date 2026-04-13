@@ -18,6 +18,11 @@ export default {
     logging: 'ログイン中...',
   },
   captcha: {
+    graphicLabel: '画像認証',
+    graphicRequired: '画像の認証コードを入力してください',
+    graphicLoadFailed: '画像認証を読み込めません。更新して再試行してください。',
+    configFailed: 'ログイン設定を読み込めません。再試行してください。',
+    retry: '再試行',
     title: 'セキュリティ認証',
     tip: 'スライダーをドラッグして認証を完了してください',
     verifying: 'セキュリティ情報を確認しています',

@@ -4,15 +4,12 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { adminLogin, refreshToken as refreshTokenApi } from '@/api/auth'
-import {
-  getAccessToken,
-  getRefreshToken,
-  setTokens,
-  clearTokens,
-  isTokenExpired,
-} from '@/utils/storage'
+import { adminLogin } from '@/api/auth'
+import { authTokens, refreshTokens, isRefreshingTokens, syncAuthTokens } from '@/utils/authSession'
+import { getAccessToken, setTokens, clearTokens, isTokenExpired } from '@/utils/storage'
 import type { LoginCredentials, JwtToken } from '@/api/types'
+import { useUserStore } from './user'
+import { usePermissionStore } from './permission'
 
 /**
  * 认证状态 Store
@@ -21,16 +18,17 @@ export const useAuthStore = defineStore('auth', () => {
   // ==================== 状态 ====================
 
   /** 访问令牌 */
-  const accessToken = ref<string | null>(getAccessToken())
+  syncAuthTokens()
+  const accessToken = computed(() => authTokens.value.accessToken)
 
   /** 刷新令牌 */
-  const refreshTokenValue = ref<string | null>(getRefreshToken())
+  const refreshTokenValue = computed(() => authTokens.value.refreshToken)
 
   /** 是否正在登录 */
   const isLoggingIn = ref(false)
 
   /** 是否正在刷新 Token */
-  const isRefreshing = ref(false)
+  const isRefreshing = isRefreshingTokens
 
   // ==================== 计算属性 ====================
 
@@ -55,8 +53,8 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await adminLogin(credentials, options?.silent ? { silent: true } : undefined)
 
       // 存储 Token
-      accessToken.value = result.accessToken
-      refreshTokenValue.value = result.refreshToken
+      useUserStore().resetUser()
+      usePermissionStore().resetPermission()
       setTokens(result.accessToken, result.refreshToken)
 
       return result
@@ -69,12 +67,9 @@ export const useAuthStore = defineStore('auth', () => {
    * 退出登录
    */
   function logout(): void {
-    // 清除状态
-    accessToken.value = null
-    refreshTokenValue.value = null
-
-    // 清除存储
     clearTokens()
+    useUserStore().resetUser()
+    usePermissionStore().resetPermission()
   }
 
   /**
@@ -82,30 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
    * @returns 新的 JWT Token
    */
   async function refreshAccessToken(): Promise<JwtToken> {
-    const currentRefreshToken = refreshTokenValue.value || getRefreshToken()
-
-    if (!currentRefreshToken) {
-      throw new Error('No refresh token available')
-    }
-
-    isRefreshing.value = true
-
-    try {
-      const result = await refreshTokenApi({ refreshToken: currentRefreshToken })
-
-      // 更新 Token
-      accessToken.value = result.accessToken
-      refreshTokenValue.value = result.refreshToken
-      setTokens(result.accessToken, result.refreshToken)
-
-      return result
-    } catch (error) {
-      // 刷新失败，清除登录状态
-      logout()
-      throw error
-    } finally {
-      isRefreshing.value = false
-    }
+    return refreshTokens()
   }
 
   /**
@@ -113,8 +85,7 @@ export const useAuthStore = defineStore('auth', () => {
    * 从 localStorage 恢复 Token
    */
   function initAuth(): void {
-    accessToken.value = getAccessToken()
-    refreshTokenValue.value = getRefreshToken()
+    syncAuthTokens()
   }
 
   /**

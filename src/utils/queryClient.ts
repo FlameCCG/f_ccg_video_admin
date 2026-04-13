@@ -5,6 +5,7 @@
  */
 import { QueryClient, keepPreviousData } from '@tanstack/vue-query'
 import { BusinessError } from './request'
+import { SessionExpiredError } from './authSession'
 
 /**
  * 默认数据新鲜期为 30 秒，期间重新挂载页面可直接使用缓存；各页面可按需覆盖。
@@ -21,9 +22,9 @@ export const DEFAULT_GC_TIME = 5 * 60_000
  * BusinessError 表示后端已明确返回业务失败，重试无意义
  */
 export function shouldRetryQuery(failureCount: number, error: Error): boolean {
-  if (error instanceof BusinessError) return false
+  if (error instanceof BusinessError || error instanceof SessionExpiredError) return false
   // 跨 bundle / 序列化边界时 instanceof 可能失效，回退 name 判断
-  if (error?.name === 'BusinessError') return false
+  if (error?.name === 'BusinessError' || error?.name === 'SessionExpiredError') return false
   return failureCount < 2
 }
 

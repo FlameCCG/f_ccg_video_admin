@@ -6,7 +6,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getUserInfo, switchRole } from '@/api/user'
 import type { AdminUserInfo, SwitchRoleParams } from '@/api/types'
-import { normalizeResourceUrl } from '@/utils'
+import { normalizeResourceUrl } from '@/utils/url'
 
 /**
  * 用户状态 Store
@@ -61,6 +61,7 @@ export const useUserStore = defineStore('user', () => {
   // ==================== Actions ====================
 
   let activePromise: Promise<AdminUserInfo> | null = null
+  let generation = 0
 
   /**
    * 获取用户信息
@@ -70,16 +71,20 @@ export const useUserStore = defineStore('user', () => {
       return activePromise
     }
 
+    const requestGeneration = generation
     activePromise = (async () => {
       isLoading.value = true
       try {
         const data = await getUserInfo()
+        if (requestGeneration !== generation) throw new Error('登录状态已变化，请重试')
         userInfo.value = data
         isLoaded.value = true
         return data
       } finally {
-        isLoading.value = false
-        activePromise = null
+        if (requestGeneration === generation) {
+          isLoading.value = false
+          activePromise = null
+        }
       }
     })()
 
@@ -113,6 +118,7 @@ export const useUserStore = defineStore('user', () => {
    * 重置用户状态
    */
   function resetUser(): void {
+    generation += 1
     userInfo.value = null
     isLoaded.value = false
     isLoading.value = false
