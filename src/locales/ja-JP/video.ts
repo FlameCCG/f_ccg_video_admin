@@ -48,6 +48,7 @@ export default {
       oldest: '古い順',
       views: '再生数順',
       likes: 'いいね順',
+      duration: '再生時間順',
     },
   },
   detail: {

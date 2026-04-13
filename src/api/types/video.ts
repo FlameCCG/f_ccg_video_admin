@@ -12,7 +12,7 @@ export type VideoStatus = 1 | 2 | 3 | 4
 /**
  * 视频排序方式
  */
-export type VideoSortType = 'latest' | 'oldest' | 'views' | 'likes'
+export type VideoSortType = 'latest' | 'oldest' | 'views' | 'likes' | 'duration'
 
 /**
  * 举报类型

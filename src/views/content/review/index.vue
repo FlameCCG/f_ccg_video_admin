@@ -22,7 +22,7 @@ import {
 } from 'naive-ui'
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 import { getVideoList, reviewVideo, getPartitions } from '@/api/video'
-import type { AdminVideoItem, ReviewStatus } from '@/api/types'
+import type { AdminVideoItem, ReviewStatus, VideoSortType } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar } from '@/components/common'
@@ -37,6 +37,7 @@ const queryClient = useQueryClient()
 const searchParams = ref({
   keyword: '',
   partitionId: null as number | null,
+  sort: 'latest' as VideoSortType,
   page: 1,
   pageSize: 10,
 })
@@ -62,7 +63,7 @@ const {
       partitionId: searchParams.value.partitionId ?? undefined,
       page: searchParams.value.page,
       pageSize: searchParams.value.pageSize,
-      sort: 'oldest', // 按提交时间排序，先提交先审核
+      sort: searchParams.value.sort,
     }),
   staleTime: 30 * 1000,
 })
@@ -101,6 +102,11 @@ const partitionOptions = computed(() => {
     label: p.name,
   }))
 })
+
+const sortOptions = computed(() => [
+  { value: 'latest', label: t('video.filter.sortOptions.newest') },
+  { value: 'duration', label: t('video.filter.sortOptions.duration') },
+])
 
 /** 格式化时长 */
 function formatDuration(seconds: number): string {
@@ -224,6 +230,7 @@ function handleReset(): void {
   searchParams.value = {
     keyword: '',
     partitionId: null,
+    sort: 'latest',
     page: 1,
     pageSize: 10,
   }
@@ -320,6 +327,18 @@ function handleRefresh(): void {
               :placeholder="t('video.filter.partitionPlaceholder')"
               :width="'100%'"
               @change="(val) => (searchParams.partitionId = val as number | null)"
+            />
+          </n-form-item>
+        </n-gi>
+        <n-gi span="6 m:3 l:2">
+          <n-form-item :label="t('video.filter.sortBy')" path="sort">
+            <filter-select
+              :value="searchParams.sort"
+              :options="sortOptions"
+              :placeholder="t('video.filter.sortBy')"
+              :clearable="false"
+              :width="'100%'"
+              @change="(val) => (searchParams.sort = (val as VideoSortType) || 'latest')"
             />
           </n-form-item>
         </n-gi>

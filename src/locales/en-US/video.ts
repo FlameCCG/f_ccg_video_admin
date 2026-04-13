@@ -48,6 +48,7 @@ export default {
       oldest: 'Oldest',
       views: 'Most Views',
       likes: 'Most Likes',
+      duration: 'Longest Duration',
     },
   },
   detail: {

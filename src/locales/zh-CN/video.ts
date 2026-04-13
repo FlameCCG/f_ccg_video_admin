@@ -48,6 +48,7 @@ export default {
       oldest: '最早发布',
       views: '播放量最高',
       likes: '点赞最多',
+      duration: '时长最长',
     },
   },
   detail: {
