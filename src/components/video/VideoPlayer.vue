@@ -4,10 +4,21 @@
  * Advanced Video Player Component
  * 支持：分P切换、清晰度选择(DASH优先/MP4兜底)、全屏、音量控制、进度条、快捷键
  */
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, h } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NSlider, NDropdown, NIcon, NTooltip, NSpin, NTag } from 'naive-ui'
-import type { DropdownOption } from 'naive-ui'
+import {
+  NButton,
+  NConfigProvider,
+  NSlider,
+  NDropdown,
+  NIcon,
+  NTooltip,
+  NSpin,
+  NTag,
+} from 'naive-ui'
+import { normalizeResourceUrl } from '@/utils'
+import { prepareVideoQuality } from '@/utils/videoQuality'
+import type { DropdownOption, GlobalThemeOverrides } from 'naive-ui'
 import {
   PlayCircle,
   PauseCircle,
@@ -21,8 +32,9 @@ import {
   ChevronBack,
 } from '@vicons/ionicons5'
 import type { VideoResource, VideoPart } from '@/api/types'
+// 只保留类型导入（编译期擦除）：dash.js 整包由 @/utils/dash 在真正要播 DASH 时动态加载，
+// 这里一旦出现值导入（import * as dashjs）就会把 830KB 重新钉回视频列表的路由 chunk。
 import type { MediaPlayerClass } from 'dashjs'
-import * as dashjs from 'dashjs'
 import {
   isDashResource,
   isDashSupported,
@@ -54,22 +66,155 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const videoRef = ref<HTMLVideoElement | null>(null)
+const activeVideoIndex = ref(0)
+const videoElements: (HTMLVideoElement | null)[] = [null, null]
 const playerRef = ref<HTMLDivElement | null>(null)
+
+function setVideoElement(element: unknown, index: number): void {
+  const video = element instanceof HTMLVideoElement ? element : null
+  videoElements[index] = video
+  if (index === activeVideoIndex.value) videoRef.value = video
+}
+
+function handleVideoEvent(event: Event, handler: () => void): void {
+  // 备用视频的加载、静音预播和回收事件不能改变主播放器的状态。
+  if (event.currentTarget === videoRef.value) handler()
+}
+
+function releaseVideo(video: HTMLVideoElement): void {
+  video.pause()
+  video.removeAttribute('src')
+  video.load()
+}
 
 const isPlaying = ref(false)
 const isLoading = ref(true)
 const isBuffering = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
-const buffered = ref(0)
+const bufferedRanges = ref<{ start: number; end: number }[]>([])
 const volume = ref(1)
 const isMuted = ref(false)
 const isFullscreen = ref(false)
 const showControls = ref(true)
 const playbackRate = ref(1)
+const isMenuOpen = ref(false)
+// 全屏元素之外的 body 弹层不会进入浏览器的全屏顶层。
+const overlayTarget = computed(() =>
+  isFullscreen.value ? playerRef.value || undefined : undefined
+)
+const qualityFeedback = ref<{
+  state: 'switching' | 'success' | 'error' | 'auto'
+  label: string
+} | null>(null)
+const qualityFeedbackText = computed(() => {
+  const feedback = qualityFeedback.value
+  if (!feedback) return ''
+  const keys = {
+    switching: 'video.player.qualitySwitching',
+    success: 'video.player.qualitySwitched',
+    error: 'video.player.qualitySwitchFailed',
+    auto: 'video.player.qualityAutoEnabled',
+  }
+  return t(keys[feedback.state], { quality: feedback.label })
+})
+let qualityFeedbackTimer: ReturnType<typeof setTimeout> | null = null
+let qualitySwitchAbort: AbortController | null = null
+let pendingDashQuality: number | null = null
+// 所选档位独立于提示的显示时长，准备期间按钮也立即显示用户的选择。
+const pendingQualitySelection = ref<{ key: number; label: string } | null>(null)
+
+function cancelQualitySwitch(): void {
+  qualitySwitchAbort?.abort()
+  qualitySwitchAbort = null
+  pendingDashQuality = null
+  pendingQualitySelection.value = null
+}
+
+function clearQualityFeedback(): void {
+  cancelQualitySwitch()
+  if (qualityFeedbackTimer) clearTimeout(qualityFeedbackTimer)
+  qualityFeedbackTimer = null
+  qualityFeedback.value = null
+}
+
+function showQualityFeedback(
+  state: NonNullable<typeof qualityFeedback.value>['state'],
+  label = ''
+): void {
+  if (qualityFeedbackTimer) clearTimeout(qualityFeedbackTimer)
+  qualityFeedback.value = { state, label }
+  qualityFeedbackTimer = setTimeout(
+    () => {
+      qualityFeedback.value = null
+      qualityFeedbackTimer = null
+    },
+    state === 'error' ? 4000 : 2000
+  )
+}
+
+function completeQualitySwitch(label: string): void {
+  cancelQualitySwitch()
+  showQualityFeedback('success', label)
+}
+
+function failQualitySwitch(): void {
+  if (!qualitySwitchAbort && pendingDashQuality === null) return
+  const label = pendingQualitySelection.value?.label || qualityFeedback.value?.label || ''
+  cancelQualitySwitch()
+  showQualityFeedback('error', label)
+}
+
+// 使用组件主题覆盖，避免 Naive UI 的行内主题变量盖过 scoped CSS。
+const playerThemeOverrides: GlobalThemeOverrides = {
+  Button: {
+    textColor: 'rgb(var(--player-ink-rgb))',
+    colorQuaternary: 'transparent',
+    colorQuaternaryHover: 'rgb(var(--player-ink-rgb) / 15%)',
+    colorQuaternaryPressed: 'rgb(var(--player-ink-rgb) / 25%)',
+  },
+  Slider: {
+    railColor: 'rgb(var(--player-ink-rgb) / 25%)',
+    railColorHover: 'rgb(var(--player-ink-rgb) / 35%)',
+    fillColor: 'var(--color-primary)',
+    fillColorHover: 'var(--color-primary)',
+    handleColor: 'rgb(var(--player-ink-rgb))',
+    handleSize: '10px',
+    railHeight: '3px',
+  },
+  Tag: {
+    colorInfo: 'rgb(var(--player-ink-rgb) / 20%)',
+    textColorInfo: 'rgb(var(--player-ink-rgb))',
+  },
+}
+
+const progressThemeOverrides: GlobalThemeOverrides['Slider'] = {
+  railColor: 'transparent',
+  railColorHover: 'transparent',
+  handleSize: '12px',
+  railHeight: '4px',
+}
+
+const bufferedSegments = computed(() => {
+  if (!Number.isFinite(duration.value) || duration.value <= 0) return []
+  return bufferedRanges.value.flatMap(({ start, end }) => {
+    const from = Math.max(0, Math.min(start, duration.value))
+    const to = Math.max(from, Math.min(end, duration.value))
+    if (to <= from) return []
+    return [
+      {
+        left: `${(from / duration.value) * 100}%`,
+        width: `${((to - from) / duration.value) * 100}%`,
+      },
+    ]
+  })
+})
 
 const currentPartIndex = ref(0)
 const currentQualityIndex = ref(0)
+
+/** 播放中鼠标静止多久后自动隐藏控制条（ms） */
+const CONTROLS_HIDE_DELAY = 3000
 
 let controlsTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -89,6 +234,16 @@ const isDashAuto = ref(true)
 const currentDashLabel = ref('')
 // DASH label map for matching
 let dashLabelMap = new Map<number, string>()
+const renderedDashIndex = ref<number | null>(null)
+
+// ---- 本轮播放初始化的生命周期 ----
+// <video> 元素与组件同生共死，而「续播 / 自动起播」用的 canplay 监听器只在自己触发时
+// 才解绑：一旦 canplay 迟迟不来（快速切分P、清单报错、抽屉中途关闭），监听器就会在同一个
+// <video> 上不断堆积。这里用一个 AbortController 代表「当前这一轮初始化」：
+// 下一轮开始或组件卸载时 abort，既回收残留监听器，也作废尚未 resolve 的异步回调。
+let playbackAbort: AbortController | null = null
+// DASH 致命错误后「脱离错误回调栈」重建播放的定时器句柄
+let fallbackTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const isMultiPart = computed(() => props.parts.length > 1)
 
@@ -122,6 +277,13 @@ const currentResource = computed(() => {
   return availableResources.value[currentQualityIndex.value] || availableResources.value[0]
 })
 
+const qualityButtonLabel = computed(
+  () =>
+    pendingQualitySelection.value?.label ||
+    currentResource.value?.resolution ||
+    t('video.player.quality')
+)
+
 // 取「最佳」MP4：DASH 致命失败兜底用（优先源视频，否则最高码率）
 const pickBestMp4 = (): VideoResource | undefined => {
   const list = mp4Resources.value
@@ -134,7 +296,7 @@ const pickBestMp4 = (): VideoResource | undefined => {
 const videoUrl = computed(() => {
   // DASH 模式下 URL 由 dash.js 管理，不设 src
   if (isDashActive.value) return ''
-  return currentResource.value?.fileUrl || ''
+  return normalizeResourceUrl(currentResource.value?.fileUrl) || ''
 })
 
 const qualityOptions = computed(() => {
@@ -161,6 +323,7 @@ const dashDropdownOptions = computed(() => {
 
 // 当前 DASH 清晰度按钮的显示文本
 const dashQualityButtonLabel = computed(() => {
+  if (pendingQualitySelection.value) return pendingQualitySelection.value.label
   if (isDashAuto.value) {
     return currentDashLabel.value
       ? `${t('video.player.dashAuto')}(${currentDashLabel.value})`
@@ -217,12 +380,22 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+/**
+ * 起播。自动播放被浏览器策略拒绝（未静音 / 无用户手势）是常态，
+ * 不吞掉的话每次打开抽屉都会抛一个 unhandled rejection。
+ */
+function safePlay(video: HTMLVideoElement): void {
+  void video.play().catch(() => {
+    // 保持暂停态，等用户点击播放
+  })
+}
+
 function togglePlay(): void {
   if (!videoRef.value) return
   if (isPlaying.value) {
     videoRef.value.pause()
   } else {
-    void videoRef.value.play()
+    safePlay(videoRef.value)
   }
 }
 
@@ -261,30 +434,81 @@ async function toggleFullscreen(): Promise<void> {
 }
 
 function handleQualityChange(key: number): void {
-  // DASH 模式下走 DASH 清晰度切换
-  if (isDashActive.value) return
+  const video = videoRef.value
+  const resource = availableResources.value[key]
+  if (isDashActive.value || !video || !resource) return
+  const candidateIndex = 1 - activeVideoIndex.value
+  const candidate = videoElements[candidateIndex]
+  if (!candidate) return
 
-  const savedTime = currentTime.value
-  const wasPlaying = isPlaying.value
-  currentQualityIndex.value = key
+  if (key === currentQualityIndex.value) {
+    clearQualityFeedback()
+    return
+  }
 
-  void nextTick(() => {
-    if (videoRef.value) {
-      videoRef.value.currentTime = savedTime
-      if (wasPlaying) {
-        void videoRef.value.play()
-      }
+  abortPendingPlayback()
+  const abort = new AbortController()
+  qualitySwitchAbort = abort
+  pendingQualitySelection.value = { key, label: resource.resolution }
+  const { signal } = abort
+  signal.addEventListener(
+    'abort',
+    () => {
+      if (candidate !== videoRef.value) releaseVideo(candidate)
+    },
+    { once: true }
+  )
+  showQualityFeedback('switching', resource.resolution)
+
+  void prepareVideoQuality(video, candidate, normalizeResourceUrl(resource.fileUrl), signal).then(
+    () => {
+      if (signal.aborted) return
+      // 新画面已解码且进度已对齐，交接时才暂停旧视频并转移声音。
+      video.pause()
+      candidate.volume = volume.value
+      candidate.muted = isMuted.value
+      videoRef.value = candidate
+      activeVideoIndex.value = candidateIndex
+      currentQualityIndex.value = key
+      isPlaying.value = !candidate.paused
+      isLoading.value = false
+      isBuffering.value = false
+      onTimeUpdate()
+      onDurationChange()
+      resetControlsTimer()
+      completeQualitySwitch(resource.resolution)
+      releaseVideo(video)
+    },
+    () => {
+      if (!signal.aborted) failQualitySwitch()
     }
-  })
+  )
 }
 
 function handleDashQualityChange(key: number): void {
   if (!dashInstance) return
-  setDashQuality(dashInstance, key)
-  isDashAuto.value = key < 0
-  if (key >= 0) {
-    const opt = dashQualityOptions.value.find((o) => o.dashIndex === key)
-    currentDashLabel.value = opt?.label || ''
+  const option = dashQualityOptions.value.find((o) => o.dashIndex === key)
+  if (key >= 0 && !option) return
+  if (pendingDashQuality === key) return
+
+  cancelQualitySwitch()
+  pendingDashQuality = key
+  const label = option?.label || t('video.player.dashAuto')
+  pendingQualitySelection.value = { key, label }
+  showQualityFeedback('switching', label)
+  try {
+    setDashQuality(dashInstance, key)
+    isDashAuto.value = key < 0
+    if (key < 0) {
+      cancelQualitySwitch()
+      showQualityFeedback('auto')
+    } else if (renderedDashIndex.value === key) {
+      // 已经在渲染该档位时，不会再产生 QUALITY_CHANGE_RENDERED。
+      currentDashLabel.value = option!.label
+      completeQualitySwitch(option!.label)
+    }
+  } catch {
+    failQualitySwitch()
   }
 }
 
@@ -297,13 +521,15 @@ function handleRateChange(key: number): void {
 function switchPart(index: number): void {
   if (index < 0 || index >= props.parts.length) return
   if (index === currentPartIndex.value) return // 已经是当前分P，不重复切换
+  clearQualityFeedback()
 
   // 先暂停当前视频
   if (videoRef.value) {
     videoRef.value.pause()
   }
 
-  // 销毁旧 DASH 实例
+  // 中断上一轮初始化 + 销毁旧 DASH 实例
+  abortPendingPlayback()
   cleanupDash()
 
   // 分P切换允许重新尝试 DASH
@@ -314,7 +540,7 @@ function switchPart(index: number): void {
   currentQualityIndex.value = findBestQuality()
   currentTime.value = 0
   duration.value = 0
-  buffered.value = 0
+  bufferedRanges.value = []
   isLoading.value = true
   emit('partChange', index)
 
@@ -355,9 +581,24 @@ function cleanupDash(): void {
 }
 
 /**
+ * 中断上一轮初始化：
+ * 解绑其挂在 <video> 上的一次性监听器、作废其异步回调、清掉待执行的兜底重建。
+ */
+function abortPendingPlayback(): void {
+  cancelQualitySwitch()
+  playbackAbort?.abort()
+  playbackAbort = null
+  if (fallbackTimer !== null) {
+    window.clearTimeout(fallbackTimer)
+    fallbackTimer = null
+  }
+}
+
+/**
  * DASH 致命失败兜底：切到最佳 MP4 直链，保留播放进度。
  */
 function handleDashFatal(): void {
+  failQualitySwitch()
   const best = pickBestMp4()
   if (!best) {
     console.error('[VideoPlayer] DASH 播放失败，且没有可用的 MP4 备用源')
@@ -371,10 +612,123 @@ function handleDashFatal(): void {
   const idx = availableResources.value.findIndex((r) => r.id === best.id)
   currentQualityIndex.value = idx >= 0 ? idx : 0
 
-  // 脱离错误回调栈再重建
-  window.setTimeout(() => {
+  // 脱离错误回调栈再重建（句柄留存：卸载 / 下一轮初始化时清掉）
+  fallbackTimer = window.setTimeout(() => {
+    fallbackTimer = null
     initPlayback()
   }, 0)
+}
+
+/**
+ * 启动 DASH 播放：按需加载 dash.js → 挂载到 <video> → 续播 / 起播。
+ * dash.js 是动态加载的，await 期间组件可能已卸载或已换源，一律以 signal 判定本轮是否作废。
+ */
+async function startDashPlayback(
+  video: HTMLVideoElement,
+  url: string,
+  signal: AbortSignal
+): Promise<void> {
+  const dash = await attachDashToVideo(video, url, {
+    signal,
+    onFatalError: () => {
+      // 本轮已作废就不要再触发兜底（否则会和新一轮初始化互相踩）
+      if (signal.aborted) return
+      handleDashFatal()
+    },
+    onDashCreated: (dash, events) => {
+      dash.on(events.ERROR, () => {
+        if (!signal.aborted) failQualitySwitch()
+      })
+      // MSE 分片追加/回收不一定触发原生 progress，额外随 DASH 缓冲事件同步。
+      dash.on(events.BUFFER_LEVEL_UPDATED, () => {
+        if (!signal.aborted) onProgress()
+      })
+      // 等 dash.js 解析完清单后构建清晰度菜单
+      const buildMenu = (): void => {
+        if (signal.aborted) return
+        const mp4Labels = mp4Resources.value.map((r) => ({
+          resolution: r.resolution,
+          bitrate: r.bitrate,
+        }))
+        const options = getDashRepresentations(dash, mp4Labels)
+        dashQualityOptions.value = options
+        // 构建 label map 以追踪 ABR 自动切换时的当前清晰度
+        try {
+          const reps = dash.getRepresentationsByType('video')
+          dashLabelMap = buildDashLabelMap(reps, mp4Labels)
+        } catch {
+          // ignore
+        }
+        // 初始化时获取当前渲染清晰度
+        try {
+          const activeRep = dash.getCurrentRepresentationForType('video')
+          if (activeRep) {
+            renderedDashIndex.value = activeRep.index
+            currentDashLabel.value =
+              dashLabelMap.get(activeRep.index) ?? (activeRep.height ? `${activeRep.height}P` : '')
+          }
+        } catch {
+          // ignore
+        }
+      }
+      dash.on(events.STREAM_INITIALIZED, buildMenu)
+      if (dash.isReady()) buildMenu()
+
+      // 监听 ABR 自动切换，更新当前清晰度标签
+      dash.on(
+        events.QUALITY_CHANGE_RENDERED,
+        (e: { mediaType: string; newRepresentation?: { index: number; height?: number } }) => {
+          if (signal.aborted) return
+          if (e.mediaType !== 'video' || !e.newRepresentation) return
+          const rep = e.newRepresentation
+          renderedDashIndex.value = rep.index
+          const label = dashLabelMap.get(rep.index) ?? (rep.height ? `${rep.height}P` : '')
+          currentDashLabel.value = label
+          if (pendingDashQuality === rep.index) completeQualitySwitch(label)
+        }
+      )
+    },
+  })
+
+  if (signal.aborted || dashDisabled) {
+    // 本轮已作废：组件卸载 / 切分P / 换源（signal），
+    // 或 dash.js 在 initialize 阶段就同步抛出致命错误并已走过兜底（dashDisabled）。
+    // 直接销毁刚创建的实例，不回写任何状态。
+    destroyDashPlayer(dash)
+    return
+  }
+
+  dashInstance = dash
+
+  if (!dash) {
+    // 返回 null 说明 MSE 不可用或 dash.js 加载失败，立即降级
+    isDashActive.value = false
+    dashDisabled = true
+    fallbackToMp4(video, signal)
+    return
+  }
+
+  // 续播
+  const seekTo = pendingSeekTime
+  pendingSeekTime = null
+  if (seekTo && seekTo > 0) {
+    video.addEventListener(
+      'canplay',
+      () => {
+        video.currentTime = seekTo
+      },
+      { once: true, signal }
+    )
+  }
+
+  // DASH 自动 ABR，自动播放
+  video.addEventListener(
+    'canplay',
+    () => {
+      safePlay(video)
+    },
+    { once: true, signal }
+  )
 }
 
 /**
@@ -382,9 +736,15 @@ function handleDashFatal(): void {
  * 同时处理续播位置。
  */
 function initPlayback(): void {
+  // 先中断上一轮：避免一次性监听器堆积、也避免旧的异步回调回写状态
+  abortPendingPlayback()
   if (!videoRef.value) return
 
+  bufferedRanges.value = []
   const video = videoRef.value
+  const abort = new AbortController()
+  playbackAbort = abort
+  const { signal } = abort
 
   if (shouldUseDash() && dashResource.value) {
     isDashActive.value = true
@@ -392,104 +752,44 @@ function initPlayback(): void {
     currentDashLabel.value = ''
     dashQualityOptions.value = []
     dashLabelMap = new Map<number, string>()
+    renderedDashIndex.value = null
 
-    dashInstance = attachDashToVideo(video, dashResource.value.fileUrl, {
-      onFatalError: handleDashFatal,
-      onDashCreated: (dash) => {
-        // 等 dash.js 解析完清单后构建清晰度菜单
-        const buildMenu = (): void => {
-          const mp4Labels = mp4Resources.value.map((r) => ({
-            resolution: r.resolution,
-            bitrate: r.bitrate,
-          }))
-          const options = getDashRepresentations(dash, mp4Labels)
-          dashQualityOptions.value = options
-          // 构建 label map 以追踪 ABR 自动切换时的当前清晰度
-          try {
-            const reps = dash.getRepresentationsByType('video')
-            dashLabelMap = buildDashLabelMap(reps, mp4Labels)
-          } catch {
-            // ignore
-          }
-          // 初始化时获取当前渲染清晰度
-          try {
-            const activeRep = dash.getCurrentRepresentationForType('video')
-            if (activeRep) {
-              currentDashLabel.value =
-                dashLabelMap.get(activeRep.index) ??
-                (activeRep.height ? `${activeRep.height}P` : '')
-            }
-          } catch {
-            // ignore
-          }
-        }
-        dash.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, buildMenu)
-        if (dash.isReady()) buildMenu()
-
-        // 监听 ABR 自动切换，更新当前清晰度标签
-        dash.on(
-          dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED,
-          (e: { mediaType: string; newRepresentation?: { index: number; height?: number } }) => {
-            if (e.mediaType !== 'video' || !e.newRepresentation) return
-            const rep = e.newRepresentation
-            const label = dashLabelMap.get(rep.index) ?? (rep.height ? `${rep.height}P` : '')
-            if (isDashAuto.value) {
-              currentDashLabel.value = label
-            }
-          }
-        )
-      },
-    })
-
-    if (!dashInstance) {
-      // attachDashToVideo 返回 null 说明 MSE 不可用，立即降级
-      isDashActive.value = false
-      dashDisabled = true
-      fallbackToMp4()
-      return
-    }
-
-    // 续播
-    const seekTo = pendingSeekTime
-    pendingSeekTime = null
-    if (seekTo && seekTo > 0) {
-      const onCanPlaySeek = (): void => {
-        video.currentTime = seekTo
-        video.removeEventListener('canplay', onCanPlaySeek)
+    void startDashPlayback(video, normalizeResourceUrl(dashResource.value.fileUrl), signal).catch(
+      (error: unknown) => {
+        console.error('[VideoPlayer] DASH 初始化异常', error)
+        if (signal.aborted) return
+        isDashActive.value = false
+        dashDisabled = true
+        fallbackToMp4(video, signal)
       }
-      video.addEventListener('canplay', onCanPlaySeek)
-    }
-
-    // DASH 自动 ABR，自动播放
-    const onCanPlayAutoPlay = (): void => {
-      void video.play()
-      video.removeEventListener('canplay', onCanPlayAutoPlay)
-    }
-    video.addEventListener('canplay', onCanPlayAutoPlay)
+    )
   } else {
-    fallbackToMp4()
+    fallbackToMp4(video, signal)
   }
 }
 
-function fallbackToMp4(): void {
+/** 降级到 MP4 直链播放（signal 用于把一次性监听器绑定到本轮初始化）。 */
+function fallbackToMp4(video: HTMLVideoElement, signal: AbortSignal): void {
   isDashActive.value = false
-  if (!videoRef.value) return
-  const video = videoRef.value
 
   // 续播
   const seekTo = pendingSeekTime
   pendingSeekTime = null
 
+  video.addEventListener(
+    'canplay',
+    () => {
+      if (seekTo && seekTo > 0) {
+        video.currentTime = seekTo
+      }
+      safePlay(video)
+    },
+    { once: true, signal }
+  )
+  // src 由播放生命周期管理；模板不重复赋值，以免交接备用视频时重新加载。
+  if (videoUrl.value) video.src = videoUrl.value
+  else video.removeAttribute('src')
   video.load()
-
-  const onCanPlayOnce = (): void => {
-    if (seekTo && seekTo > 0) {
-      video.currentTime = seekTo
-    }
-    void video.play()
-    video.removeEventListener('canplay', onCanPlayOnce)
-  }
-  video.addEventListener('canplay', onCanPlayOnce)
 }
 
 function showControlsBar(): void {
@@ -500,12 +800,19 @@ function showControlsBar(): void {
 function resetControlsTimer(): void {
   if (controlsTimer) {
     clearTimeout(controlsTimer)
+    controlsTimer = null
   }
-  if (isPlaying.value) {
+  if (isPlaying.value && !isMenuOpen.value) {
     controlsTimer = setTimeout(() => {
       showControls.value = false
-    }, 3000)
+    }, CONTROLS_HIDE_DELAY)
   }
+}
+
+function handleMenuShow(show: boolean): void {
+  isMenuOpen.value = show
+  if (show) showControls.value = true
+  resetControlsTimer()
 }
 
 function onPlay(): void {
@@ -521,27 +828,41 @@ function onPause(): void {
 function onTimeUpdate(): void {
   if (!videoRef.value) return
   currentTime.value = videoRef.value.currentTime
+  onProgress()
 }
 
 function onDurationChange(): void {
   if (!videoRef.value) return
-  duration.value = videoRef.value.duration
+  const value = videoRef.value.duration
+  duration.value = Number.isFinite(value) && value > 0 ? value : 0
+  onProgress()
 }
 
 function onProgress(): void {
   if (!videoRef.value) return
   const buf = videoRef.value.buffered
-  if (buf.length > 0) {
-    buffered.value = buf.end(buf.length - 1)
+  const ranges: { start: number; end: number }[] = []
+  for (let i = 0; i < buf.length; i++) {
+    ranges.push({ start: buf.start(i), end: buf.end(i) })
   }
+  bufferedRanges.value = ranges
+}
+
+function onEmptied(): void {
+  currentTime.value = 0
+  duration.value = 0
+  bufferedRanges.value = []
+  isBuffering.value = false
 }
 
 function onLoadStart(): void {
+  onEmptied()
   isLoading.value = true
 }
 
 function onCanPlay(): void {
   isLoading.value = false
+  onDurationChange()
 }
 
 function onWaiting(): void {
@@ -550,6 +871,12 @@ function onWaiting(): void {
 
 function onPlaying(): void {
   isBuffering.value = false
+}
+
+function onMediaError(): void {
+  isLoading.value = false
+  isBuffering.value = false
+  failQualitySwitch()
 }
 
 function onEnded(): void {
@@ -561,6 +888,11 @@ function onEnded(): void {
 
 function handleKeydown(e: KeyboardEvent): void {
   if (!videoRef.value) return
+  if (
+    e.defaultPrevented ||
+    (e.target instanceof Element && e.target.closest('button, [role="slider"], .n-dropdown-menu'))
+  )
+    return
   switch (e.code) {
     case 'Space':
       e.preventDefault()
@@ -594,7 +926,7 @@ function handleKeydown(e: KeyboardEvent): void {
 }
 
 function onFullscreenChange(): void {
-  isFullscreen.value = !!document.fullscreenElement
+  isFullscreen.value = document.fullscreenElement === playerRef.value
 }
 
 onMounted(() => {
@@ -607,18 +939,28 @@ onMounted(() => {
   })
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
+  clearQualityFeedback()
+  // 一次性监听器 / 待执行的兜底重建 / dash.js 实例 / 控制条定时器 / 全屏监听：全部释放
+  abortPendingPlayback()
   cleanupDash()
+  videoElements.forEach((video) => {
+    if (video) releaseVideo(video)
+  })
   if (controlsTimer) {
     clearTimeout(controlsTimer)
+    controlsTimer = null
   }
   document.removeEventListener('fullscreenchange', onFullscreenChange)
 })
 
 watch(
+  // 新数组必然改变引用，无需 deep（深比较在多分P长列表上纯属浪费）
   () => props.resources,
   () => {
+    clearQualityFeedback()
     // 资源变化时重新初始化（允许重新尝试 DASH）
+    abortPendingPlayback()
     cleanupDash()
     dashDisabled = false
     pendingSeekTime = null
@@ -626,8 +968,7 @@ watch(
     void nextTick(() => {
       initPlayback()
     })
-  },
-  { deep: true }
+  }
 )
 
 // 暴露方法给父组件
@@ -647,24 +988,45 @@ defineExpose({
     @keydown="handleKeydown"
   >
     <video
-      ref="videoRef"
+      v-for="index in 2"
+      :key="index"
+      :ref="(element) => setVideoElement(element, index - 1)"
       class="video-player__video"
-      :src="isDashActive ? undefined : videoUrl"
-      :poster="poster"
-      :autoplay="autoplay"
+      :class="{ 'video-player__video--standby': index - 1 !== activeVideoIndex }"
+      :aria-hidden="index - 1 !== activeVideoIndex"
+      :poster="normalizeResourceUrl(poster)"
+      playsinline
       preload="metadata"
-      @play="onPlay"
-      @pause="onPause"
-      @timeupdate="onTimeUpdate"
-      @durationchange="onDurationChange"
-      @progress="onProgress"
-      @loadstart="onLoadStart"
-      @canplay="onCanPlay"
-      @waiting="onWaiting"
-      @playing="onPlaying"
-      @ended="onEnded"
+      @play="handleVideoEvent($event, onPlay)"
+      @pause="handleVideoEvent($event, onPause)"
+      @timeupdate="handleVideoEvent($event, onTimeUpdate)"
+      @durationchange="handleVideoEvent($event, onDurationChange)"
+      @loadedmetadata="handleVideoEvent($event, onDurationChange)"
+      @progress="handleVideoEvent($event, onProgress)"
+      @seeked="handleVideoEvent($event, onTimeUpdate)"
+      @emptied="handleVideoEvent($event, onEmptied)"
+      @loadstart="handleVideoEvent($event, onLoadStart)"
+      @canplay="handleVideoEvent($event, onCanPlay)"
+      @waiting="handleVideoEvent($event, onWaiting)"
+      @playing="handleVideoEvent($event, onPlaying)"
+      @error="handleVideoEvent($event, onMediaError)"
+      @ended="handleVideoEvent($event, onEnded)"
       @click="togglePlay"
     />
+
+    <Transition name="fade" mode="out-in">
+      <div
+        v-if="qualityFeedback"
+        :key="`${qualityFeedback.state}:${qualityFeedback.label}`"
+        class="video-player__quality-feedback"
+        :class="{ 'video-player__quality-feedback--error': qualityFeedback.state === 'error' }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {{ qualityFeedbackText }}
+      </div>
+    </Transition>
 
     <Transition name="fade">
       <div v-if="isLoading || isBuffering" class="video-player__loading">
@@ -683,11 +1045,25 @@ defineExpose({
     </Transition>
 
     <Transition name="slide-up">
-      <div v-show="showControls" class="video-player__controls">
+      <n-config-provider
+        v-show="showControls"
+        class="video-player__controls"
+        :theme-overrides="playerThemeOverrides"
+      >
         <div class="video-player__progress">
+          <div class="video-player__progress-track" aria-hidden="true">
+            <div
+              v-for="(segment, index) in bufferedSegments"
+              :key="index"
+              class="video-player__buffered"
+              :style="segment"
+            />
+          </div>
           <n-slider
             :value="currentTime"
             :max="duration || 100"
+            :disabled="duration <= 0"
+            :theme-overrides="progressThemeOverrides"
             :step="0.1"
             :tooltip="false"
             @update:value="handleProgressChange"
@@ -696,7 +1072,7 @@ defineExpose({
 
         <div class="video-player__controls-bar">
           <div class="video-player__controls-left">
-            <n-tooltip>
+            <n-tooltip :to="overlayTarget">
               <template #trigger>
                 <n-button quaternary circle size="small" @click="togglePlay">
                   <template #icon>
@@ -711,7 +1087,7 @@ defineExpose({
             </n-tooltip>
 
             <template v-if="isMultiPart">
-              <n-tooltip>
+              <n-tooltip :to="overlayTarget">
                 <template #trigger>
                   <n-button
                     quaternary
@@ -727,7 +1103,7 @@ defineExpose({
                 </template>
                 {{ t('video.player.prevPart') }}
               </n-tooltip>
-              <n-tooltip>
+              <n-tooltip :to="overlayTarget">
                 <template #trigger>
                   <n-button
                     quaternary
@@ -775,9 +1151,12 @@ defineExpose({
 
             <n-dropdown
               v-if="isMultiPart"
+              :to="overlayTarget"
+              placement="top"
               trigger="click"
               :options="partOptions"
               :render-label="renderPartLabel"
+              @update:show="handleMenuShow"
               @select="switchPart"
             >
               <n-button quaternary size="small">
@@ -788,27 +1167,42 @@ defineExpose({
               </n-button>
             </n-dropdown>
 
-            <n-dropdown trigger="click" :options="rateOptions" @select="handleRateChange">
+            <n-dropdown
+              :to="overlayTarget"
+              placement="top"
+              trigger="click"
+              :options="rateOptions"
+              @update:show="handleMenuShow"
+              @select="handleRateChange"
+            >
               <n-button quaternary size="small"> {{ playbackRate }}x </n-button>
             </n-dropdown>
 
             <n-dropdown
               v-if="!isDashActive"
+              :to="overlayTarget"
+              placement="top"
               trigger="click"
               :options="qualityOptions"
+              :value="pendingQualitySelection?.key ?? currentQualityIndex"
+              @update:show="handleMenuShow"
               @select="handleQualityChange"
             >
               <n-button quaternary size="small">
                 <template #icon>
                   <n-icon :size="18"><Settings /></n-icon>
                 </template>
-                {{ currentResource?.resolution || t('video.player.quality') }}
+                {{ qualityButtonLabel }}
               </n-button>
             </n-dropdown>
             <n-dropdown
               v-else-if="dashQualityOptions.length > 0"
+              :to="overlayTarget"
+              placement="top"
               trigger="click"
               :options="dashDropdownOptions"
+              :value="pendingQualitySelection?.key ?? (isDashAuto ? -1 : renderedDashIndex)"
+              @update:show="handleMenuShow"
               @select="handleDashQualityChange"
             >
               <n-button quaternary size="small">
@@ -825,7 +1219,7 @@ defineExpose({
               {{ t('video.player.dashAuto') }}
             </n-button>
 
-            <n-tooltip>
+            <n-tooltip :to="overlayTarget">
               <template #trigger>
                 <n-button quaternary circle size="small" @click="toggleFullscreen">
                   <template #icon>
@@ -840,30 +1234,51 @@ defineExpose({
             </n-tooltip>
           </div>
         </div>
-      </div>
+      </n-config-provider>
     </Transition>
   </div>
 </template>
 
 <style scoped lang="scss">
 .video-player {
+  // ── 媒体 chrome 的局部 token ──
+  // 播放器 UI 永远叠在「视频画面」之上，而画面亮度与主题无关：
+  // 这里刻意不用会随主题反转的 ink token（obsidian / cyberpunk 下
+  // --color-text-inverse 是深色，糊在黑底画面上直接不可读）。
+  // 全组件仅在此处出现两个通道基色，其余颜色一律由它们派生。
+  --player-ink-rgb: 255 255 255;
+  --player-stage-rgb: 0 0 0;
+
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background-color: #000;
+  background-color: rgb(var(--player-stage-rgb));
   border-radius: var(--radius-md);
   outline: none;
+
+  // tabindex="0" 的容器必须有可见焦点环；内描边以免被媒体框裁掉
+  &:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -2px;
+  }
 
   &--fullscreen {
     border-radius: 0;
   }
 
   &__video {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: contain;
     cursor: pointer;
+
+    &--standby {
+      pointer-events: none;
+      opacity: 0;
+    }
   }
 
   &__loading {
@@ -872,7 +1287,25 @@ defineExpose({
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: rgb(0 0 0 / 50%);
+    background-color: rgb(var(--player-stage-rgb) / 50%);
+  }
+
+  &__quality-feedback {
+    position: absolute;
+    top: var(--spacing-4);
+    left: var(--spacing-4);
+    z-index: 1;
+    max-width: calc(100% - var(--spacing-8));
+    padding: var(--spacing-2) var(--spacing-3);
+    color: rgb(var(--player-ink-rgb));
+    font-size: var(--text-sm);
+    background-color: rgb(var(--player-stage-rgb) / 75%);
+    border-radius: var(--radius-md);
+    pointer-events: none;
+
+    &--error {
+      border: 1px solid var(--color-danger);
+    }
   }
 
   &__play-overlay {
@@ -882,7 +1315,7 @@ defineExpose({
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    background-color: rgb(0 0 0 / 30%);
+    background-color: rgb(var(--player-stage-rgb) / 30%);
   }
 
   &__play-btn {
@@ -891,12 +1324,12 @@ defineExpose({
     justify-content: center;
     width: 80px;
     height: 80px;
-    color: #fff;
-    background-color: rgb(0 0 0 / 60%);
-    border-radius: 50%;
+    color: rgb(var(--player-ink-rgb));
+    background-color: rgb(var(--player-stage-rgb) / 60%);
+    border-radius: var(--radius-full);
     transition:
-      transform 0.2s,
-      background-color 0.2s;
+      transform var(--motion-hover-duration) var(--motion-hover-easing),
+      background-color var(--motion-hover-duration) var(--motion-hover-easing);
 
     &:hover {
       background-color: var(--color-primary);
@@ -910,36 +1343,54 @@ defineExpose({
     bottom: 0;
     left: 0;
     padding: var(--spacing-2) var(--spacing-3);
-    background: linear-gradient(transparent, rgb(0 0 0 / 80%));
+    background: linear-gradient(transparent, rgb(var(--player-stage-rgb) / 80%));
   }
 
   &__progress {
     position: relative;
-    height: 4px;
-    margin-bottom: var(--spacing-2);
-    border-radius: 2px;
+    height: 20px;
+    margin-bottom: var(--spacing-1);
 
     :deep(.n-slider) {
-      --n-rail-height: 4px;
-      --n-rail-color: rgb(255 255 255 / 30%);
-      --n-rail-color-hover: rgb(255 255 255 / 40%);
-      --n-fill-color: var(--color-primary);
-      --n-fill-color-hover: var(--color-primary);
-      --n-handle-size: 12px;
+      padding: 8px 0;
 
       .n-slider-handle {
         opacity: 0;
-        transition: opacity 0.2s;
+        transition: opacity var(--motion-hover-duration) var(--motion-hover-easing);
       }
     }
 
-    &:hover :deep(.n-slider .n-slider-handle) {
+    &:hover :deep(.n-slider .n-slider-handle),
+    &:focus-within :deep(.n-slider .n-slider-handle),
+    :deep(.n-slider--active .n-slider-handle) {
       opacity: 1;
     }
   }
 
+  &__progress-track {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: 4px;
+    overflow: hidden;
+    pointer-events: none;
+    background-color: rgb(var(--player-ink-rgb) / 25%);
+    border-radius: var(--radius-full);
+    transform: translateY(-50%);
+  }
+
+  &__buffered {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background-color: rgb(var(--player-ink-rgb) / 55%);
+  }
+
   &__controls-bar {
     display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
     align-items: center;
     justify-content: space-between;
   }
@@ -951,6 +1402,10 @@ defineExpose({
     align-items: center;
   }
 
+  &__controls-right {
+    margin-left: auto;
+  }
+
   &__volume {
     display: flex;
     align-items: center;
@@ -958,17 +1413,15 @@ defineExpose({
     &-slider {
       width: 0;
       overflow: hidden;
-      transition: width 0.2s;
+      transition: width var(--motion-expand-duration) var(--motion-expand-easing);
 
       :deep(.n-slider) {
-        --n-rail-height: 3px;
-        --n-handle-size: 10px;
-
         width: 60px;
       }
     }
 
-    &:hover &-slider {
+    &:hover &-slider,
+    &:focus-within &-slider {
       width: 70px;
       margin-left: var(--spacing-1);
     }
@@ -976,45 +1429,19 @@ defineExpose({
 
   &__time {
     margin-left: var(--spacing-2);
-    color: #fff;
+    color: rgb(var(--player-ink-rgb));
     font-size: var(--text-xs);
-  }
-
-  :deep(.n-button) {
-    color: #fff;
-
-    &:hover {
-      color: var(--color-primary);
-      background-color: rgb(255 255 255 / 10%);
-    }
-  }
-
-  :deep(.n-tag) {
-    --n-color: rgb(255 255 255 / 20%);
-    --n-text-color: #fff;
+    white-space: nowrap;
   }
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s;
-}
+// fade 与 slide-up 由全局 transitions/_page-transitions.scss 提供，并统一处理动效 token 与 reduced-motion。
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.slide-up-enter-active,
-.slide-up-leave-active {
-  transition:
-    transform 0.3s,
-    opacity 0.3s;
-}
-
-.slide-up-enter-from,
-.slide-up-leave-to {
-  opacity: 0;
-  transform: translateY(100%);
+// 尊重「减少动效」：所有 duration token 在 reduce 下已被 themes.scss 清零，
+// 这里只需去掉纯装饰的缩放 —— 0ms 的 scale 依旧是「瞬间跳一下」。
+@media (prefers-reduced-motion: reduce) {
+  .video-player__play-btn:hover {
+    transform: none;
+  }
 }
 </style>

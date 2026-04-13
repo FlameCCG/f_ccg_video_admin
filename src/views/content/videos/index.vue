@@ -1,22 +1,22 @@
 <script setup lang="ts">
 import { formatDateTime } from '@/utils'
+import AppImage from '@/components/common/AppImage.vue'
 /**
  * 视频列表页
  * Video List Page
  * 视频列表、筛选、删除
  */
-import { ref, computed, h } from 'vue'
+import { ref, computed, provide, h } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useDebouncedQueryParams } from '@/composables/useDebouncedQueryParams'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
   NCard,
-  NSpace,
   NButton,
   NIcon,
   NGi,
   NFormItem,
   NInput,
-  NImage,
   NTag,
   useMessage,
   useDialog,
@@ -24,12 +24,18 @@ import {
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 import { getVideoList, deleteVideo, getPartitions } from '@/api/video'
 import type { AdminVideoItem, VideoStatus, VideoSortType } from '@/api/types'
-import { DataTable, TableActions } from '@/components/table'
+import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar, AppStatusTag } from '@/components/common'
-import TranscodePipelineProgress from '@/components/video/TranscodePipelineProgress.vue'
-import { useTableSelectionAction, useTranscodeProgressSSE } from '@/composables'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
+import TranscodeProgressCell from '@/components/video/TranscodeProgressCell.vue'
+import {
+  useTableSelectionAction,
+  useTranscodeProgressSSE,
+  transcodeProgressKey,
+} from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
+import { useVideoPublicationColumns } from '@/composables/useVideoPublicationColumns'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -41,11 +47,16 @@ const searchParams = ref({
   userId: null as number | null,
   keyword: '',
   status: null as VideoStatus | null,
+  isScheduled: null as number | null,
   partitionId: null as number | null,
   sort: 'latest' as VideoSortType,
   page: 1,
   pageSize: 10,
 })
+const { queryParams, flushQueryParams } = useDebouncedQueryParams(searchParams, [
+  'userId',
+  'keyword',
+])
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
@@ -55,23 +66,33 @@ const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checke
 const detailDrawerVisible = ref(false)
 const selectedVideoId = ref<number | null>(null)
 
-/** 获取视频列表 */
+/**
+ * 获取视频列表。queryKey 使用输入防抖后的参数快照，分页和下拉筛选立即生效。
+ * 参数变化自动驱动请求，handler 不额外调用 refetch，避免重复请求并保留 staleTime。
+ */
 const {
   data: videoData,
   isLoading,
+  isFetching,
+  isError,
+  error: listError,
   refetch,
 } = useQuery({
-  queryKey: ['videoList', searchParams],
-  queryFn: () =>
-    getVideoList({
-      userId: searchParams.value.userId ?? undefined,
-      keyword: searchParams.value.keyword || undefined,
-      status: searchParams.value.status ?? undefined,
-      partitionId: searchParams.value.partitionId ?? undefined,
-      sort: searchParams.value.sort,
-      page: searchParams.value.page,
-      pageSize: searchParams.value.pageSize,
-    }),
+  queryKey: computed(() => ['videoList', queryParams.value] as const),
+  queryFn: ({ queryKey: [, params], signal }) =>
+    getVideoList(
+      {
+        userId: params.userId ?? undefined,
+        keyword: params.keyword || undefined,
+        status: params.status ?? undefined,
+        isScheduled: params.isScheduled == null ? undefined : params.isScheduled === 1,
+        partitionId: params.partitionId ?? undefined,
+        sort: params.sort,
+        page: params.page,
+        pageSize: params.pageSize,
+      },
+      signal
+    ),
   staleTime: 30 * 1000,
 })
 
@@ -91,8 +112,8 @@ const deleteMutation = useMutation({
     void queryClient.invalidateQueries({ queryKey: ['videoList'] })
     void queryClient.invalidateQueries({ queryKey: ['recycleVideoList'] })
   },
-  onError: (error: Error) => {
-    message.error(error.message || t('common.tips.operationFailed'))
+  onError: (err: Error) => {
+    message.error(err.message || t('common.tips.operationFailed'))
   },
 })
 
@@ -103,13 +124,36 @@ const videoList = computed(() => {
 })
 const total = computed(() => videoData.value?.total ?? 0)
 
+/**
+ * 失败详情优先使用服务端 msg，缺失时显示通用说明。
+ * DataTable 仅在 error && !loading && data.length===0 时使用失败态替换表格。
+ */
+const loadErrorDetail = computed(() => {
+  const msg = listError.value?.message?.trim()
+  return msg ? msg : t('video.list.loadFailedHint')
+})
+
 /** 当前页视频 ID → 转码进度 SSE */
 const pageVideoIds = computed(() =>
   (videoData.value?.list ?? [])
     .map((v) => v.id)
     .filter((id): id is number => typeof id === 'number' && id > 0)
 )
-const { progressMap } = useTranscodeProgressSSE(pageVideoIds)
+const {
+  progressMap,
+  error: transcodeStreamError,
+  reconnect: reconnectTranscodeStream,
+} = useTranscodeProgressSSE(pageVideoIds)
+
+/**
+ * 进度表向下 provide，由每行的 TranscodeProgressCell 自行订阅。
+ * 列的 render 函数一旦读了 progressMap，整个 tbody（Naive 用同一个渲染
+ * effect 产出）就会跟着每秒数次的 SSE 推送一起重渲染。
+ */
+provide(transcodeProgressKey, progressMap)
+
+/** 只有「已放弃重连」才提示用户：disconnected 期间 EventSource 仍在自动重试 */
+const transcodeStreamAborted = computed(() => transcodeStreamError.value === 'aborted')
 
 /** 分区选项 */
 const partitionOptions = computed(() => {
@@ -124,7 +168,14 @@ const statusOptions = computed(() => [
   { value: 1, label: t('video.status.published') },
   { value: 2, label: t('video.status.private') },
   { value: 4, label: t('video.status.reviewing') },
+  { value: 5, label: t('video.status.scheduled') },
 ])
+
+const publicationOptions = computed(() => [
+  { value: 1, label: t('video.publication.scheduled') },
+  { value: 0, label: t('video.publication.immediate') },
+])
+const publicationColumns = useVideoPublicationColumns()
 
 /** 排序选项 */
 const sortOptions = computed(() => [
@@ -141,6 +192,7 @@ function getStatusType(status: VideoStatus): 'success' | 'warning' | 'error' | '
     2: 'warning',
     3: 'error',
     4: 'processing',
+    5: 'processing',
   }
   return typeMap[status]
 }
@@ -152,6 +204,7 @@ function getStatusText(status: VideoStatus): string {
     2: t('video.status.private'),
     3: t('video.status.deleted'),
     4: t('video.status.reviewing'),
+    5: t('video.status.scheduled'),
   }
   return textMap[status]
 }
@@ -172,9 +225,10 @@ function formatNumber(num: number): string {
 }
 
 /**
- * 表格列配置
- * - 不用 fixed / scroll-x：整表随容器自适应，无横向滚动条、无固定列阴影/叠字
- * - 头像并入作者列，转码列可收缩，保证所有字段同一屏可见
+ * 表格列配置。
+ * - 声明列宽合计约 1.4k，窄屏由 DataTable 横向滚动承接。
+ * - 作者列包含头像。
+ * - 转码列只渲染 TranscodeProgressCell 并传入 row.id，不读取 progressMap，避免 SSE 推送使整个 tbody 重渲染。
  */
 const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
@@ -186,14 +240,13 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     key: 'cover',
     width: 88,
     render: (row) =>
-      h(NImage, {
+      h(AppImage, {
         src: row.cover as string,
+        alt: row.title as string,
         width: 72,
         height: 40,
-        objectFit: 'cover',
         lazy: true,
         previewDisabled: false,
-        style: { borderRadius: '4px' },
       }),
   },
   {
@@ -215,7 +268,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
           style: {
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--spacing-2)',
             maxWidth: '100%',
             minWidth: 0,
           },
@@ -249,23 +302,18 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
         dot: true,
       }),
   },
+  ...publicationColumns.value,
   {
     title: t('video.list.transcode'),
     key: 'transcode',
     minWidth: 200,
     width: 260,
-    render: (row) => {
-      const id = row.id as number
-      return h(TranscodePipelineProgress, {
-        items: progressMap.value[id] ?? [],
-        density: 'compact',
-      })
-    },
+    render: (row) => h(TranscodeProgressCell, { videoId: row.id as number }),
   },
   {
     title: t('video.list.partition'),
     key: 'partitionName',
-    width: 80,
+    width: 96,
     ellipsis: { tooltip: true },
   },
   {
@@ -324,8 +372,12 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   },
 ])
 
-/** 批量操作配置 */
-const batchActions = computed(() => [
+/**
+ * 批量操作配置。
+ * 刻意不叫 batchActions：模板里的 <batch-actions> 会被按 camelize / PascalCase
+ * 两种写法去 setup 绑定里找组件，同名变量会让人（和 lint）分不清指的是哪一个。
+ */
+const batchActionOptions = computed(() => [
   { key: 'softDelete', label: t('video.delete.softDelete'), type: 'warning' as const },
   { key: 'hardDelete', label: t('video.delete.hardDelete'), type: 'error' as const },
 ])
@@ -333,7 +385,7 @@ const batchActions = computed(() => [
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
-  void refetch()
+  flushQueryParams()
 }
 
 /** 处理重置 */
@@ -342,25 +394,55 @@ function handleReset(): void {
     userId: null,
     keyword: '',
     status: null,
+    isScheduled: null,
     partitionId: null,
     sort: 'latest',
     page: 1,
     pageSize: 10,
   }
-  void refetch()
+  flushQueryParams()
 }
 
 /** 处理页码变化 */
 function handlePageChange(page: number): void {
   searchParams.value.page = page
-  void refetch()
 }
 
 /** 处理每页数量变化 */
 function handlePageSizeChange(pageSize: number): void {
   searchParams.value.pageSize = pageSize
   searchParams.value.page = 1
-  void refetch()
+}
+
+/** 状态筛选变化 */
+function handleStatusChange(value: string | number | null): void {
+  searchParams.value.status = typeof value === 'number' ? (value as VideoStatus) : null
+}
+
+/** 发布方式筛选变化 */
+function handlePublicationChange(value: string | number | null): void {
+  searchParams.value.isScheduled = typeof value === 'number' ? value : null
+  searchParams.value.page = 1
+}
+
+/** 分区筛选变化 */
+function handlePartitionChange(value: string | number | null): void {
+  searchParams.value.partitionId = typeof value === 'number' ? value : null
+}
+
+/** 排序变化 */
+function handleSortChange(value: string | number | null): void {
+  searchParams.value.sort = typeof value === 'string' ? (value as VideoSortType) : 'latest'
+}
+
+/** 选中行变化 */
+function handleCheckedRowKeysChange(keys: DataTableRowKey[]): void {
+  checkedRowKeys.value = keys
+}
+
+/** 清空选中 */
+function handleClearSelection(): void {
+  checkedRowKeys.value = []
 }
 
 /** 处理操作 */
@@ -406,14 +488,55 @@ function confirmDelete(videoIds: number[], hardDelete: boolean): void {
   })
 }
 
-/** 处理刷新 */
+/** 处理刷新：用户主动发起，是 refetch 的正当用法（同时用作失败重试） */
 function handleRefresh(): void {
   void refetch()
+}
+
+/** 转码进度流已放弃重连时的手动重连 */
+function handleReconnectStream(): void {
+  reconnectTranscodeStream()
 }
 </script>
 
 <template>
   <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('video.list.title')">
+      <template #actions>
+        <n-button
+          v-if="transcodeStreamAborted"
+          size="small"
+          quaternary
+          type="warning"
+          @click="handleReconnectStream"
+        >
+          {{ t('video.transcode.streamOffline') }}
+        </n-button>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 搜索表单 -->
     <n-card :bordered="false" class="page-list__search">
       <search-form :loading="isLoading" @search="handleSearch" @reset="handleReset">
@@ -434,7 +557,7 @@ function handleRefresh(): void {
               :options="statusOptions"
               :placeholder="t('video.filter.statusPlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.status = val as VideoStatus | null)"
+              @change="handleStatusChange"
             />
           </n-form-item>
         </n-gi>
@@ -445,7 +568,18 @@ function handleRefresh(): void {
               :options="partitionOptions"
               :placeholder="t('video.filter.partitionPlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.partitionId = val as number | null)"
+              @change="handlePartitionChange"
+            />
+          </n-form-item>
+        </n-gi>
+        <n-gi span="6 m:3 l:2">
+          <n-form-item :label="t('video.filter.publicationType')" path="isScheduled">
+            <filter-select
+              :value="searchParams.isScheduled"
+              :options="publicationOptions"
+              :placeholder="t('video.filter.publicationPlaceholder')"
+              :width="'100%'"
+              @change="handlePublicationChange"
             />
           </n-form-item>
         </n-gi>
@@ -457,7 +591,7 @@ function handleRefresh(): void {
               :placeholder="t('video.filter.sortBy')"
               :width="'100%'"
               :clearable="false"
-              @change="(val) => (searchParams.sort = (val as VideoSortType) || 'latest')"
+              @change="handleSortChange"
             />
           </n-form-item>
         </n-gi>
@@ -466,47 +600,24 @@ function handleRefresh(): void {
 
     <!-- 数据表格 -->
     <n-card :bordered="false" class="page-list__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="page-list__title">{{ t('video.list.title') }}</span>
-          <n-button size="small" secondary @click="handleRefresh">
-            <template #icon>
-              <n-icon>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-              </n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </n-space>
-      </template>
-
       <!-- 批量操作栏 -->
       <batch-actions
         v-if="checkedRowKeys.length > 0"
         :selected-count="checkedRowKeys.length"
-        :actions="batchActions"
+        :actions="batchActionOptions"
         @action="handleBatchAction"
-        @clear="checkedRowKeys = []"
+        @clear="handleClearSelection"
       />
 
+      <!-- 加载失败：500 与「无数据」必须长得不一样，且要给出重试出口。
+           交给 DataTable 统一渲染（与其余 15 个列表页同一套契约），
+           这样失败态出现在表格框架内部，表头与分页栏不会整块塌陷。 -->
       <data-table
         :columns="columns"
         :data="videoList"
         :loading="isLoading || deleteMutation.isPending.value"
+        :error="isError"
+        :error-description="loadErrorDetail"
         :selectable="true"
         :checked-row-keys="checkedRowKeys"
         :page="searchParams.page"
@@ -515,7 +626,8 @@ function handleRefresh(): void {
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
-        @update:checked-row-keys="(keys) => (checkedRowKeys = keys)"
+        @update:checked-row-keys="handleCheckedRowKeysChange"
+        @retry="handleRefresh"
       />
     </n-card>
 
@@ -525,5 +637,5 @@ function handleRefresh(): void {
 </template>
 
 <style scoped lang="scss">
-// 使用全局 page-list 样式
+// 失败态已由 DataTable 在表格框架内渲染，此处无需额外布局
 </style>

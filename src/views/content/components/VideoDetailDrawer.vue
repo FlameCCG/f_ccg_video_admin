@@ -29,6 +29,7 @@ import { VideoPlayer } from '@/components/video'
 import TranscodePipelineProgress from '@/components/video/TranscodePipelineProgress.vue'
 import { formatDateTime } from '@/utils'
 import { useTranscodeProgressSSE } from '@/composables'
+import { formatPublicationTime } from '@/composables/useVideoPublicationColumns'
 
 interface Props {
   visible: boolean
@@ -54,11 +55,7 @@ const videoPlayerRef = ref<VideoPlayerInstance | null>(null)
 /** 播放器容器引用，用于滚动定位 */
 const playerContainerRef = ref<HTMLDivElement | null>(null)
 
-const {
-  data: videoDetail,
-  isLoading,
-  refetch,
-} = useQuery({
+const { data: videoDetail, isLoading } = useQuery({
   queryKey: ['videoDetail', () => props.videoId],
   queryFn: () => getVideoDetail({ videoId: props.videoId! }),
   enabled: computed(() => props.visible && props.videoId !== null),
@@ -78,7 +75,6 @@ watch(
   (newId) => {
     if (newId && props.visible) {
       currentPartIndex.value = 0
-      void refetch()
     }
   }
 )
@@ -104,6 +100,7 @@ function getStatusType(status: VideoStatus): 'success' | 'warning' | 'error' | '
     2: 'warning',
     3: 'error',
     4: 'processing',
+    5: 'processing',
   }
   return typeMap[status]
 }
@@ -114,6 +111,7 @@ function getStatusText(status: VideoStatus): string {
     2: t('video.status.private'),
     3: t('video.status.deleted'),
     4: t('video.status.reviewing'),
+    5: t('video.status.scheduled'),
   }
   return textMap[status]
 }
@@ -220,6 +218,23 @@ const isMultiPart = computed(() => {
             </n-descriptions-item>
             <n-descriptions-item :label="t('video.list.createdAt')">
               {{ formatDateTime(videoDetail.createdAt) }}
+            </n-descriptions-item>
+            <n-descriptions-item :label="t('video.list.publicationType')">
+              <n-tag :type="videoDetail.isScheduled ? 'info' : 'default'" size="small">
+                {{
+                  t(
+                    videoDetail.isScheduled
+                      ? 'video.publication.scheduled'
+                      : 'video.publication.immediate'
+                  )
+                }}
+              </n-tag>
+            </n-descriptions-item>
+            <n-descriptions-item :label="t('video.list.publishAt')">
+              {{ formatPublicationTime(videoDetail.publishAt) }}
+            </n-descriptions-item>
+            <n-descriptions-item :label="t('video.list.approvedAt')">
+              {{ formatPublicationTime(videoDetail.approvedAt) }}
             </n-descriptions-item>
           </n-descriptions>
 

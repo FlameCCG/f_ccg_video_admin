@@ -1,5 +1,9 @@
-import * as dashjs from 'dashjs'
-import type { ErrorEvent, MediaPlayerClass, MediaPlayerSettingClass } from 'dashjs'
+import type {
+  ErrorEvent,
+  MediaPlayerClass,
+  MediaPlayerEvents,
+  MediaPlayerSettingClass,
+} from 'dashjs'
 
 /**
  * dash.js v5 的 d.ts 把 `abr.throughput` 内的 `sampleSettings` / `ewma` 误标为必填，
@@ -12,7 +16,8 @@ type AbrThroughputSettings = NonNullable<
 
 // MPEG-DASH 接入辅助，使用 dash.js 与原生 video。
 // 混合模式的 resources 同时包含 DASH 清单与各清晰度 MP4 直链。
-// 本模块负责识别 DASH、探测能力并挂载 dash.js；选流与降级由播放器决定。
+// 本模块负责识别 DASH、探测能力、按需加载并挂载 dash.js；选流与降级由播放器决定。
+// dash.js 仅在播放 DASH 时动态加载，避免媒体依赖进入列表页首屏路径；单文件预压缩产物无法通过具名导入进一步缩减。
 
 import type { VideoResource } from '@/api/types'
 
@@ -61,33 +66,77 @@ const formatDashError = (event: ErrorEvent): string => {
   return parts.join(' | ')
 }
 
+/** dash.js 的事件名常量表（宿主注册事件时用，避免宿主再次静态引入 dashjs）。 */
+export type DashEvents = MediaPlayerEvents
+
+/** 记忆化的 dash.js 动态 import：同一会话内最多加载一次。 */
+let dashjsPromise: Promise<typeof import('dashjs')> | null = null
+
+/**
+ * 按需加载 dash.js。
+ * 失败不缓存失败态，允许后续（切分P / 重开抽屉）重试。
+ */
+export const loadDashjs = (): Promise<typeof import('dashjs')> => {
+  if (!dashjsPromise) {
+    const pending = import('dashjs')
+    void pending.catch(() => {
+      if (dashjsPromise === pending) dashjsPromise = null
+    })
+    dashjsPromise = pending
+  }
+  return dashjsPromise
+}
+
 export interface DashPlayerOptions {
+  /**
+   * 本轮挂载的取消信号。
+   * dash.js 加载完成时若宿主已卸载或换源，直接退出，不创建实例或请求清单。
+   */
+  signal?: AbortSignal
   /** dash.js 发生致命错误（尚未起播）时回调，宿主据此降级到 MP4 直链。 */
   onFatalError?: () => void
-  /** dash.js 实例创建完成后回调。 */
-  onDashCreated?: (dash: MediaPlayerClass) => void
+  /**
+   * dash.js 实例创建完成后回调。
+   * 一并把事件名常量表传出去：宿主不必自己引入 dashjs，否则按需加载就白做了。
+   */
+  onDashCreated?: (dash: MediaPlayerClass, events: DashEvents) => void
 }
 
 /**
  * 将 dash.js 挂载到指定 <video> 元素上播放 MPD 清单。
- * 返回 dash.js 实例，供外部销毁。
+ * 首次调用会动态加载 dash.js，故返回 Promise；结果为 dash.js 实例，供外部销毁。
  *
+ * - 返回 null 表示「本次没挂上 DASH」（MSE 不可用 / dash.js 加载失败 / initialize 抛错 /
+ *   options.signal 已取消），由宿主自行降级；此路径不触发 onFatalError，
+ *   避免宿主两条兜底路径同时跑
  * - 剔除 URL 中的 response-content-type，避免 dash.js 透传给 m4s/mp4 分片导致 MSE 失败
  * - 初始 autoplay=false，由组件控制起播
  * - 「尚未起播」时的错误视为致命并回调 onFatalError，播放中途的瞬时错误由 dash.js 自行恢复
+ *
+ * 注意：await 期间宿主可能已卸载或换了片源，调用方必须自行判断结果是否过期，
+ * 过期时对返回实例调用 destroyDashPlayer。
  */
-export const attachDashToVideo = (
+export const attachDashToVideo = async (
   video: HTMLVideoElement,
   url: string,
   options: DashPlayerOptions = {}
-): MediaPlayerClass | null => {
-  if (!window.MediaSource) {
-    options.onFatalError?.()
+): Promise<MediaPlayerClass | null> => {
+  if (!window.MediaSource) return null
+
+  let dashjs: typeof import('dashjs')
+  try {
+    dashjs = await loadDashjs()
+  } catch (error) {
+    console.error('[dash] dash.js 按需加载失败', error)
     return null
   }
 
-  // 剔除 URL 中的 response-content-type
-  const cleanUrl = new URL(url)
+  // 加载期间宿主已放弃本轮：连实例都不用建
+  if (options.signal?.aborted) return null
+
+  // 剔除 URL 中的 response-content-type。
+  // URL 可能是根相对路径（对外契约），显式给 base 解析为绝对地址后交给 dash.js。
+  const cleanUrl = new URL(url, window.location.origin)
   cleanUrl.searchParams.delete('response-content-type')
 
   const dash = dashjs.MediaPlayer().create()
@@ -118,7 +167,15 @@ export const attachDashToVideo = (
   } catch (error) {
     console.warn('[dash] updateSettings failed', error)
   }
-  dash.initialize(video, cleanUrl.toString(), false)
+  try {
+    dash.initialize(video, cleanUrl.toString(), false)
+  } catch (error) {
+    // initialize 同步抛错（能力探测失败 / 非法清单地址）时必须销毁刚创建的实例，
+    // 否则 dash.js 内部的定时器与事件总线会一直挂着；返回 null 让宿主走 MP4 兜底。
+    console.error('[dash] initialize failed', error)
+    destroyDashPlayer(dash)
+    return null
+  }
 
   let started = false
   dash.on(dashjs.MediaPlayer.events.PLAYBACK_STARTED, () => {
@@ -135,7 +192,7 @@ export const attachDashToVideo = (
     options.onFatalError?.()
   })
 
-  options.onDashCreated?.(dash)
+  options.onDashCreated?.(dash, dashjs.MediaPlayer.events)
   return dash
 }
 
@@ -233,7 +290,7 @@ export const getDashRepresentations = (
   } catch {
     return []
   }
-  if (reps.length <= 1) return []
+  if (reps.length === 0) return []
 
   const labelMap = buildDashLabelMap(reps, mp4Labels ?? [])
 
@@ -273,16 +330,17 @@ export const setDashQuality = (dash: MediaPlayerClass, dashIndex: number): void 
         buffer: { fastSwitchEnabled: false, flushBufferAtTrackSwitch: false },
       },
     })
+    // 保留正在播放的分片，在后续分片边界切换。强制替换会清缓冲并触发 seek，造成卡顿。
     // 兼容 dash.js v4/v5 API
     const dashAny = dash as unknown as Record<string, unknown>
     if (typeof dashAny.setQualityFor === 'function') {
       ;(dashAny.setQualityFor as (type: string, index: number, replace: boolean) => void)(
         'video',
         dashIndex,
-        true
+        false
       )
     } else {
-      dash.setRepresentationForTypeByIndex('video', dashIndex, true)
+      dash.setRepresentationForTypeByIndex('video', dashIndex, false)
     }
   }
 }
