@@ -1,31 +1,84 @@
 <script setup lang="ts">
 /**
- * 标签栏组件
- * 横向可滑动的标签页，类似浏览器标签
+ * 顶部页面标签栏
+ *
+ * Swiper 负责横向鼠标拖拽、触控惯性与滚轮映射；页面导航仍由 tabs store 和
+ * Vue Router 管理。两者职责分离，拖拽不会误触发标签跳转。
  */
-import { ref, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
+import { useRouter, type RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NDropdown } from 'naive-ui'
-import { Swiper, SwiperSlide } from 'swiper/vue'
-import { FreeMode, Mousewheel } from 'swiper/modules'
-import type { Swiper as SwiperType } from 'swiper'
-// @ts-expect-error - Swiper CSS modules don't have type declarations
-import 'swiper/css'
-// @ts-expect-error - Swiper CSS modules don't have type declarations
-import 'swiper/css/free-mode'
+import { NDropdown, type DropdownOption } from 'naive-ui'
+import { A11y, FreeMode, Mousewheel } from 'swiper/modules'
+import { Swiper as SwiperComponent, SwiperSlide } from 'swiper/vue'
+import type { Swiper as SwiperInstance } from 'swiper'
 import { useTabsStore, type TabItem } from '@/stores/tabs'
 import type { LocaleType } from '@/locales'
+import 'swiper/css'
+import 'swiper/css/a11y'
+import 'swiper/css/free-mode'
 
 const router = useRouter()
-const { locale } = useI18n()
+const { t, locale } = useI18n()
 const tabsStore = useTabsStore()
 
-const swiperRef = ref<SwiperType | null>(null)
+const swiperModules = [A11y, FreeMode, Mousewheel]
+// 第三方类实例必须用 shallowRef；深层响应式解包会破坏 Swiper 方法的 this 类型。
+const swiperRef = shallowRef<SwiperInstance | null>(null)
+const isDragging = ref(false)
+
+/**
+ * 漫游焦点索引：整条 tablist 只有一个标签进入 Tab 序列，
+ * 左右方向键负责在标签之间移动，Enter / Space 才激活页面。
+ */
+const focusIndex = ref(0)
+
 const showContextMenu = ref(false)
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
 const contextMenuTab = ref<TabItem | null>(null)
+
+const tabListLabel = computed(() => t('layout.tabs.label'))
+
+const swiperA11y = computed(() => ({
+  enabled: true,
+  containerRole: 'tablist',
+  containerMessage: tabListLabel.value,
+  slideRole: 'presentation',
+  slideLabelMessage: '',
+}))
+
+/**
+ * 自由模式保留鼠标拖拽后的轻量惯性；数值只描述交互物理，不参与视觉主题。
+ * sticky 关闭后不会强制把某个标签吸附到左侧，短距离拖动更自然。
+ */
+const freeModeOptions = {
+  enabled: true,
+  sticky: false,
+  momentum: true,
+  momentumRatio: 0.72,
+  momentumVelocityRatio: 0.82,
+  minimumVelocity: 0.03,
+}
+
+/**
+ * forceToAxis=false 会把普通鼠标的纵向滚轮映射到横向标签栏；
+ * releaseOnEdges=true 则在两端把滚动权交还给页面，避免“滚轮被锁死”。
+ */
+const mousewheelOptions = {
+  enabled: true,
+  forceToAxis: false,
+  releaseOnEdges: true,
+  sensitivity: 0.72,
+  thresholdDelta: 2,
+}
+
+const contextMenuOptions = computed<DropdownOption[]>(() => [
+  { key: 'close', label: t('layout.tabs.close') },
+  { key: 'closeOther', label: t('layout.tabs.closeOther') },
+  { key: 'closeRight', label: t('layout.tabs.closeRight') },
+  { key: 'closeAll', label: t('layout.tabs.closeAll') },
+])
 
 /** 获取标签标题（根据当前语言） */
 function getTabTitle(tab: TabItem): string {
@@ -40,32 +93,181 @@ function getTabTitle(tab: TabItem): string {
   }
 }
 
-/** 点击标签 */
-function handleTabClick(tab: TabItem): void {
-  if (tab.path !== tabsStore.activeTab) {
-    tabsStore.setActiveTab(tab.path)
-    void router.push(tab.path)
+function closeTabLabel(tab: TabItem): string {
+  return t('layout.tabs.closeTab', { title: getTabTitle(tab) })
+}
+
+function isRovingTab(index: number): boolean {
+  const total = tabsStore.tabs.length
+  if (total === 0) return false
+  return index === Math.min(Math.max(focusIndex.value, 0), total - 1)
+}
+
+function ariaCurrentFor(tab: TabItem): 'page' | undefined {
+  return tab.path === tabsStore.activeTab ? 'page' : undefined
+}
+
+/**
+ * 持久化标签优先使用 fullPath，缺失时回退至 path + query，保留配置页的 tab 查询上下文。
+ */
+function getTabTarget(tab: TabItem): RouteLocationRaw {
+  if (tab.fullPath) return tab.fullPath
+  if (tab.query && Object.keys(tab.query).length > 0) {
+    return { path: tab.path, query: tab.query }
+  }
+  return tab.path
+}
+
+function getTabElAt(index: number): HTMLElement | null {
+  const swiper = swiperRef.value
+  if (!swiper || swiper.destroyed || index < 0) return null
+  return swiper.slides[index]?.querySelector<HTMLElement>('.tab-item') ?? null
+}
+
+/** 从 CSS motion token 读取 Swiper 命令式位移时长 */
+function readMotionDuration(token: string, fallback: number): number {
+  if (typeof window === 'undefined') return fallback
+
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(token).trim()
+  const value = Number.parseFloat(raw)
+  if (!Number.isFinite(value)) return fallback
+  return raw.endsWith('ms') ? value : value * 1000
+}
+
+/**
+ * 只在激活标签越出视口时做“最近距离”位移，不把每次点击都强制居中。
+ * 这样相邻标签不会从鼠标下逃走，长标签仍能完整进入可视区域。
+ */
+function revealActiveTab(): void {
+  const swiper = swiperRef.value
+  if (!swiper || swiper.destroyed) return
+
+  swiper.update()
+
+  const slide = swiper.slides[tabsStore.activeIndex]
+  if (!slide) return
+
+  const viewportRect = swiper.el.getBoundingClientRect()
+  const slideRect = slide.getBoundingClientRect()
+  let targetTranslate = swiper.translate
+
+  if (slideRect.left < viewportRect.left) {
+    targetTranslate += viewportRect.left - slideRect.left
+  } else if (slideRect.right > viewportRect.right) {
+    targetTranslate -= slideRect.right - viewportRect.right
+  } else {
+    return
+  }
+
+  const boundedTranslate = Math.min(
+    swiper.minTranslate(),
+    Math.max(swiper.maxTranslate(), targetTranslate)
+  )
+  const duration = readMotionDuration('--motion-indicator-duration', 240)
+  swiper.translateTo(boundedTranslate, duration)
+}
+
+function handleSwiper(swiper: SwiperInstance): void {
+  swiperRef.value = swiper
+  void nextTick(revealActiveTab)
+}
+
+function handleSliderMove(): void {
+  isDragging.value = true
+}
+
+function handleTouchEnd(): void {
+  // click 紧跟在 pointerup 后触发，下一帧再解除才能可靠屏蔽拖拽后的误点击。
+  window.requestAnimationFrame(() => {
+    isDragging.value = false
+  })
+}
+
+function navigateToTab(tab: TabItem): void {
+  tabsStore.setActiveTab(tab.path)
+  void router.push(getTabTarget(tab))
+}
+
+function navigateToPath(path: string): void {
+  const tab = tabsStore.tabs.find((item) => item.path === path)
+  if (tab) {
+    navigateToTab(tab)
   }
 }
 
-/** 关闭标签 */
+function handleTabClick(tab: TabItem): void {
+  const swiper = swiperRef.value
+  if (isDragging.value || swiper?.allowClick === false) return
+
+  const targetChanged =
+    tab.path !== tabsStore.activeTab ||
+    (tab.fullPath !== undefined && tab.fullPath !== router.currentRoute.value.fullPath)
+
+  if (targetChanged) {
+    navigateToTab(tab)
+  }
+}
+
+function closeTabByPath(path: string): void {
+  const nextPath = tabsStore.closeTab(path)
+  if (nextPath) {
+    navigateToPath(nextPath)
+  }
+}
+
 function handleCloseTab(tab: TabItem, event: MouseEvent): void {
   event.stopPropagation()
-  const nextPath = tabsStore.closeTab(tab.path)
-  if (nextPath) {
-    void router.push(nextPath)
+  closeTabByPath(tab.path)
+}
+
+function handleCloseKeydown(event: KeyboardEvent): void {
+  event.stopPropagation()
+}
+
+function focusTabAt(index: number): void {
+  const total = tabsStore.tabs.length
+  if (total === 0) return
+
+  const clamped = Math.min(Math.max(index, 0), total - 1)
+  focusIndex.value = clamped
+  getTabElAt(clamped)?.focus()
+}
+
+function handleTabKeydown(tab: TabItem, index: number, event: KeyboardEvent): void {
+  switch (event.key) {
+    case 'ArrowLeft':
+      event.preventDefault()
+      focusTabAt(index - 1)
+      break
+    case 'ArrowRight':
+      event.preventDefault()
+      focusTabAt(index + 1)
+      break
+    case 'Home':
+      event.preventDefault()
+      focusTabAt(0)
+      break
+    case 'End':
+      event.preventDefault()
+      focusTabAt(tabsStore.tabs.length - 1)
+      break
+    case 'Enter':
+    case ' ':
+      event.preventDefault()
+      handleTabClick(tab)
+      break
+    case 'Delete':
+    case 'Backspace':
+      if (!tab.affix) {
+        event.preventDefault()
+        closeTabByPath(tab.path)
+      }
+      break
+    default:
+      break
   }
 }
 
-/** 右键菜单选项 */
-const contextMenuOptions = [
-  { label: '关闭', key: 'close' },
-  { label: '关闭其他', key: 'closeOther' },
-  { label: '关闭右侧', key: 'closeRight' },
-  { label: '关闭所有', key: 'closeAll' },
-]
-
-/** 右键菜单 */
 function handleContextMenu(tab: TabItem, event: MouseEvent): void {
   event.preventDefault()
   contextMenuTab.value = tab
@@ -74,82 +276,100 @@ function handleContextMenu(tab: TabItem, event: MouseEvent): void {
   showContextMenu.value = true
 }
 
-/** 处理右键菜单选择 */
 function handleContextMenuSelect(key: string): void {
-  if (!contextMenuTab.value) return
+  const tab = contextMenuTab.value
+  if (!tab) return
 
-  const path = contextMenuTab.value.path
+  const { path } = tab
   switch (key) {
-    case 'close': {
-      const nextPath = tabsStore.closeTab(path)
-      if (nextPath) void router.push(nextPath)
+    case 'close':
+      closeTabByPath(path)
       break
-    }
     case 'closeOther':
       tabsStore.closeOtherTabs(path)
-      void router.push(path)
+      navigateToPath(path)
       break
-    case 'closeRight':
+    case 'closeRight': {
+      const previousActivePath = tabsStore.activeTab
       tabsStore.closeRightTabs(path)
+      if (previousActivePath !== tabsStore.activeTab) {
+        navigateToPath(tabsStore.activeTab)
+      }
       break
+    }
     case 'closeAll':
       tabsStore.closeAllTabs()
-      if (tabsStore.tabs.length > 0 && tabsStore.tabs[0]) {
-        void router.push(tabsStore.tabs[0].path)
+      if (tabsStore.tabs[0]) {
+        navigateToTab(tabsStore.tabs[0])
       }
       break
   }
   showContextMenu.value = false
 }
 
-/** 关闭右键菜单 */
 function handleClickOutside(): void {
   showContextMenu.value = false
 }
 
-/** Swiper 初始化 */
-function onSwiperInit(swiper: SwiperType): void {
-  swiperRef.value = swiper
-}
-
-/** 滑动到激活的标签 */
-function slideToActive(): void {
-  if (swiperRef.value && tabsStore.activeIndex >= 0) {
-    swiperRef.value.slideTo(tabsStore.activeIndex)
-  }
-}
-
-/** 监听激活标签变化，自动滑动到可见位置 */
 watch(
-  () => tabsStore.activeTab,
+  () => [tabsStore.activeTab, tabsStore.tabs.length, locale.value],
   () => {
-    void nextTick(() => {
-      slideToActive()
-    })
-  }
+    focusIndex.value = Math.max(tabsStore.activeIndex, 0)
+    void nextTick(revealActiveTab)
+  },
+  { flush: 'post' }
 )
+
+onMounted(() => {
+  focusIndex.value = Math.max(tabsStore.activeIndex, 0)
+  void nextTick(revealActiveTab)
+})
 </script>
 
 <template>
   <div class="app-tab-bar">
-    <Swiper
-      :modules="[FreeMode, Mousewheel]"
-      :slides-per-view="'auto'"
-      :space-between="0"
-      :free-mode="true"
-      :mousewheel="{ forceToAxis: true }"
+    <SwiperComponent
       class="tab-swiper"
-      @swiper="onSwiperInit"
+      :modules="swiperModules"
+      :slides-per-view="'auto'"
+      :free-mode="freeModeOptions"
+      :mousewheel="mousewheelOptions"
+      :a11y="swiperA11y"
+      :grab-cursor="true"
+      :simulate-touch="true"
+      :threshold="4"
+      :watch-overflow="true"
+      :observer="true"
+      :observe-parents="true"
+      :prevent-clicks="true"
+      :prevent-clicks-propagation="true"
+      :touch-start-prevent-default="false"
+      @swiper="handleSwiper"
+      @slider-move="handleSliderMove"
+      @touch-end="handleTouchEnd"
     >
-      <SwiperSlide v-for="tab in tabsStore.tabs" :key="tab.path" class="tab-slide">
+      <SwiperSlide v-for="(tab, index) in tabsStore.tabs" :key="tab.path">
         <div
           class="tab-item"
           :class="{ 'is-active': tab.path === tabsStore.activeTab }"
+          role="tab"
+          :aria-selected="tab.path === tabsStore.activeTab"
+          :aria-current="ariaCurrentFor(tab)"
+          :tabindex="isRovingTab(index) ? 0 : -1"
+          :title="getTabTitle(tab)"
           @click="handleTabClick(tab)"
           @contextmenu="handleContextMenu(tab, $event)"
+          @keydown="handleTabKeydown(tab, index, $event)"
         >
           <span class="tab-item__title">{{ getTabTitle(tab) }}</span>
-          <button v-if="!tab.affix" class="tab-item__close" @click="handleCloseTab(tab, $event)">
+          <button
+            v-if="!tab.affix"
+            type="button"
+            class="tab-item__close"
+            :aria-label="closeTabLabel(tab)"
+            @click="handleCloseTab(tab, $event)"
+            @keydown="handleCloseKeydown"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -160,6 +380,7 @@ watch(
               stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
+              aria-hidden="true"
             >
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -167,9 +388,8 @@ watch(
           </button>
         </div>
       </SwiperSlide>
-    </Swiper>
+    </SwiperComponent>
 
-    <!-- 右键菜单 -->
     <NDropdown
       placement="bottom-start"
       trigger="manual"
@@ -184,59 +404,115 @@ watch(
 </template>
 
 <style scoped lang="scss">
+@use '@/styles/transitions/interaction' as ix;
+
 .app-tab-bar {
-  height: 36px;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border-light);
   display: flex;
   align-items: center;
-  padding: 0 8px;
+  height: var(--layout-tabbar-height);
+  padding: 0 var(--spacing-2);
+  overflow: hidden;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .tab-swiper {
   width: 100%;
+  min-width: 0;
   height: 100%;
+  margin: 0;
+  user-select: none;
 
+  // Swiper 位移时长由 JS 写入内联样式，缓动曲线使用设计 token。
   :deep(.swiper-wrapper) {
     align-items: center;
+    transition-timing-function: var(--motion-indicator-easing);
   }
-}
 
-.tab-slide {
-  width: auto !important;
-  flex-shrink: 0;
+  :deep(.swiper-slide) {
+    display: flex;
+    align-items: center;
+    width: auto;
+    height: 100%;
+    margin-right: var(--spacing-1);
+  }
+
+  :deep(.swiper-slide:last-child) {
+    margin-right: 0;
+  }
+
+  &.swiper-grab-cursor {
+    cursor: grab;
+  }
+
+  &.swiper-grab-cursor:active {
+    cursor: grabbing;
+  }
 }
 
 .tab-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 12px;
-  margin: 0 2px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: 13px;
+  gap: var(--spacing-1);
+  height: calc(var(--layout-tabbar-height) - var(--spacing-2));
+  padding: 0 var(--spacing-3);
+  font-size: var(--text-sm);
   color: var(--color-text-secondary);
-  background: transparent;
-  transition:
-    background 150ms ease,
-    color 150ms ease;
   white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border-radius: var(--radius-md);
+
+  @include ix.feedback-transition;
+  @include ix.focus-ring-inset;
+  @include ix.pressable(0.98, 0);
+
+  &::after {
+    position: absolute;
+    right: var(--spacing-2);
+    bottom: 0;
+    left: var(--spacing-2);
+    height: calc(var(--spacing-1) / 2);
+    content: '';
+    background: var(--color-primary);
+    border-radius: var(--radius-full);
+    box-shadow: 0 0 var(--spacing-2) color-mix(in srgb, var(--color-primary) 46%, transparent);
+    opacity: 0;
+    transform: scaleX(0.35);
+    transform-origin: center;
+    transition:
+      opacity ix.$hover-motion,
+      transform ix.$indicator-motion;
+    pointer-events: none;
+  }
 
   &:hover {
-    background: color-mix(in srgb, var(--color-text) 6%, transparent);
     color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+
+  &:active {
+    background: var(--color-surface-active);
   }
 
   &.is-active {
-    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    font-weight: var(--font-medium);
     color: var(--color-primary);
-    font-weight: 500;
+    background: var(--color-primary-subtle);
+  }
+
+  &.is-active:hover {
+    background: var(--color-primary-subtle-hover);
+  }
+
+  &.is-active::after {
+    opacity: 1;
+    transform: scaleX(1);
   }
 
   &__title {
-    max-width: 120px;
+    max-width: 18ch;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -245,36 +521,41 @@ watch(
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
+    width: var(--spacing-4);
+    height: var(--spacing-4);
     padding: 0;
-    border: none;
-    background: transparent;
-    border-radius: var(--radius-sm);
     color: var(--color-text-muted);
     cursor: pointer;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
     opacity: 0;
-    transition:
-      opacity 150ms ease,
-      background 150ms ease,
-      color 150ms ease;
 
-    .tab-item:hover &,
-    .tab-item.is-active & {
-      opacity: 1;
-    }
+    @include ix.feedback-transition;
+    @include ix.focus-ring-inset(1px);
 
     &:hover {
-      background: color-mix(in srgb, var(--color-danger) 15%, transparent);
       color: var(--color-danger);
+      background: var(--color-danger-subtle);
     }
+  }
+
+  &:hover &__close,
+  &:focus-within &__close,
+  &.is-active &__close {
+    opacity: 1;
+  }
+}
+
+@media (hover: none) {
+  .tab-item__close {
+    opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tab-item,
-  .tab-item__close {
-    transition: none;
+  .tab-item::after {
+    transform: none;
   }
 }
 </style>

@@ -4,7 +4,7 @@
  * 从后端动态获取菜单，递归渲染菜单树
  * 图标完全由后端返回的 SVG 字符串渲染，无兜底逻辑
  */
-import { computed, h, type VNode } from 'vue'
+import { computed, h, ref, watch, type VNode } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NMenu, type MenuOption } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
@@ -16,6 +16,12 @@ import { SvgIcon } from '@/components/common'
 defineProps<{
   /** 是否折叠状态 */
   collapsed?: boolean
+  /**
+   * 折叠态宽度（px）
+   * 与侧边栏折叠宽度同源（--layout-sider-collapsed-width）：NMenu 折叠态是按
+   * collapsedWidth 反算 padding-left 把图标推到中线的，两个数字不一致就会错位。
+   */
+  collapsedWidth: number
 }>()
 
 const route = useRoute()
@@ -160,10 +166,31 @@ const activeKey = computed(() => {
   return findMenuIdByPath(permissionStore.menus, route.path)
 })
 
-/** 展开的菜单 keys */
-const expandedKeys = computed(() => {
-  return findExpandedKeys(permissionStore.menus, route.path)
-})
+/**
+ * 菜单展开 keys 使用受控状态。
+ * 路由变化时补齐当前路由所需的父级节点，保留用户对其他节点的手动展开或收起结果。
+ */
+const expandedKeys = ref<string[]>([])
+
+watch(
+  [() => route.path, () => permissionStore.menus],
+  ([path, menus]) => {
+    const required = findExpandedKeys(menus, path)
+    if (required.length === 0) return
+
+    const merged = new Set([...expandedKeys.value, ...required])
+    // merged 一定是当前集合的超集，尺寸没变说明父级已经都是展开态
+    if (merged.size !== expandedKeys.value.length) {
+      expandedKeys.value = [...merged]
+    }
+  },
+  { immediate: true }
+)
+
+/** 用户手动展开/收起 */
+function handleExpandedKeysUpdate(keys: string[]): void {
+  expandedKeys.value = keys
+}
 
 /** 根据菜单 ID 查找菜单路径 */
 function findMenuPath(menus: Menu[], menuId: string, parentPath = ''): string | null {
@@ -205,137 +232,190 @@ function handleMenuSelect(key: string): void {
 <template>
   <NMenu
     :collapsed="collapsed"
-    :collapsed-width="64"
+    :collapsed-width="collapsedWidth"
     :collapsed-icon-size="20"
     :options="menuOptions"
     :value="activeKey"
-    :default-expanded-keys="expandedKeys"
+    :expanded-keys="expandedKeys"
     :indent="24"
     @update:value="handleMenuSelect"
+    @update:expanded-keys="handleExpandedKeysUpdate"
   />
 </template>
 
 <style scoped lang="scss">
-:deep(.n-menu) {
-  --n-item-height: 44px;
-  --n-item-text-color: var(--color-text-secondary);
-  --n-item-text-color-hover: var(--color-text);
-  --n-item-text-color-active: var(--color-primary);
-  --n-item-icon-color: var(--color-text-muted);
-  --n-item-icon-color-hover: var(--color-text-secondary);
-  --n-item-icon-color-active: var(--color-primary);
-  --n-arrow-color: var(--color-text-muted);
-  --n-arrow-color-hover: var(--color-text-secondary);
-  --n-arrow-color-active: var(--color-primary);
+@use '@/styles/transitions/interaction' as ix;
 
-  transition: padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
+// NMenu 的颜色与尺寸通过 useNaiveTheme.ts 的 themeOverrides.Menu 配置。
+// 组件会将 --n-item-* 等变量写入内联样式，局部样式表无需重复声明这些变量。
 :deep(.n-menu-item) {
-  margin: 2px 0;
+  margin: calc(var(--spacing-1) / 2) 0;
 }
 
 :deep(.n-menu-item-content) {
   position: relative;
-  border-radius: var(--radius-lg) !important;
-  margin: 0 8px;
-  padding: 0 12px !important;
-  transition:
-    background 200ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 200ms cubic-bezier(0.4, 0, 0.2, 1),
-    margin 280ms cubic-bezier(0.4, 0, 0.2, 1),
-    padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0 var(--spacing-2);
+  border-radius: var(--radius-lg);
 
-  // 折叠时调整边距
-  .n-menu--collapsed & {
-    margin: 0 4px;
-    padding: 0 !important;
-    justify-content: center;
+  // 同时接管 naive 自带的 background-color / padding-left / border-color 过渡：
+  // padding 的补间是按「每个菜单项」跑的，折叠一次要给二十多个元素各排一轮布局，
+  // 而宽度动画已经把状态变化说清楚了，看不出这一层补间。
+  @include ix.feedback-transition;
+  @include ix.pressable(0.98, 0);
+
+  // 所有菜单项都预留同一条指示器，只改变合成层上的 opacity / transform。
+  // 切换菜单时不会再销毁后重建一根线，视觉上是稳定、连续的状态交接。
+  &::after {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    z-index: 2;
+    width: calc(var(--spacing-1) / 2);
+    height: var(--spacing-5);
+    content: '';
+    background: var(--color-primary);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    box-shadow: 0 0 var(--spacing-2) color-mix(in srgb, var(--color-primary) 50%, transparent);
+    opacity: 0;
+    transform: translateY(-50%) scaleY(0.35);
+    transform-origin: center;
+    transition:
+      opacity ix.$hover-motion,
+      transform ix.$indicator-motion;
+    pointer-events: none;
   }
 }
 
-:deep(.n-menu-item-content--selected) {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--color-primary) 12%, transparent) 0%,
-    color-mix(in srgb, var(--color-primary) 8%, transparent) 100%
-  ) !important;
+// 展开态才接管横向内边距。必须 !important：naive 把 padding-left 写在 inline style 上，
+// 常规声明压不过它。折叠态刻意不覆盖 —— 那里要靠 naive 用 collapsedWidth 算出的
+// padding-left 把图标推到侧边栏中线（配合下面的 margin: 0 与 AppSidebar 折叠态去掉
+// 滚动容器横向内边距，菜单项宽度正好等于 collapsedWidth，公式才成立）。
+:deep(.n-menu:not(.n-menu--collapsed) .n-menu-item-content) {
+  padding: 0 var(--spacing-3) !important;
+}
 
-  // 左侧指示条
+:deep(.n-menu--collapsed .n-menu-item-content) {
+  margin: 0;
+}
+
+:deep(.n-menu-item-content--selected) {
+  // ::before 仍交给 Naive UI 负责选中表面；这里只换成 token 化渐变。
   &::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 20px;
-    background: var(--color-primary);
-    border-radius: 0 2px 2px 0;
-    box-shadow: 0 0 8px color-mix(in srgb, var(--color-primary) 50%, transparent);
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-primary) 13%, transparent) 0%,
+      color-mix(in srgb, var(--color-primary-hover) 7%, transparent) 100%
+    ) !important;
   }
 
-  .n-menu--collapsed &::before {
-    left: 50%;
+  &::after {
+    opacity: 1;
+    transform: translateY(-50%) scaleY(1);
+  }
+
+  // 折叠态使用底部指示条。
+  .n-menu--collapsed &::after {
     top: auto;
-    bottom: 4px;
-    transform: translateX(-50%);
-    width: 20px;
-    height: 3px;
-    border-radius: 2px 2px 0 0;
+    bottom: var(--spacing-1);
+    left: 50%;
+    width: var(--spacing-5);
+    height: calc(var(--spacing-1) / 2);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    transform: translateX(-50%) scaleX(1);
   }
 }
 
 :deep(.n-menu-item-content:not(.n-menu-item-content--selected):hover) {
-  background: color-mix(in srgb, var(--color-text) 5%, transparent) !important;
+  background: var(--color-surface-hover);
 }
 
 :deep(.n-menu-item-content:not(.n-menu-item-content--selected):active) {
-  background: color-mix(in srgb, var(--color-text) 8%, transparent) !important;
+  background: var(--color-surface-active);
 }
 
 // 图标样式
 :deep(.n-menu-item-content__icon) {
+  @include ix.feedback-transition;
+}
+
+// 横向轻移比放大更克制，也不会让细线 SVG 在缩放时发虚。
+:deep(.n-menu-item-content:hover .n-menu-item-content__icon) {
+  transform: translateX(calc(var(--spacing-1) / 2));
+}
+
+// 选中态图标着色。多写一个 .n-menu 是为了提高特异性：naive 在折叠态会给所有图标统一
+// 上色（.n-menu--collapsed .n-menu-item-content .n-menu-item-content__icon），
+// 与不带 .n-menu 的写法特异性相同，谁生效取决于样式注入顺序。
+:deep(.n-menu .n-menu-item-content--selected .n-menu-item-content__icon) {
+  color: var(--color-primary);
+}
+
+// 标题与指示器使用同一条 easing，选中反馈像一个整体，而不是各自动一下。
+:deep(.n-menu-item-content-header) {
   transition:
-    color 200ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    color ix.$hover-motion,
+    opacity ix.$hover-motion,
+    transform ix.$indicator-motion;
+}
 
-  .n-menu-item-content:hover & {
-    transform: scale(1.08);
-  }
-
-  .n-menu-item-content--selected & {
-    color: var(--color-primary) !important;
-  }
+:deep(.n-menu-item-content--selected .n-menu-item-content-header) {
+  transform: translateX(var(--spacing-1));
 }
 
 // 子菜单样式
+// 这里的 --n-item-height 是有效的：它声明在 .n-submenu-children 上，
+// 不与 .n-menu 的 inline style 竞争，而是被子项继承。
 :deep(.n-submenu-children) {
-  --n-item-height: 40px;
+  --n-item-height: var(--spacing-10);
 
-  .n-menu-item-content {
-    padding-left: 20px !important;
-
-    &::before {
-      left: 8px;
-      width: 2px;
-      height: 16px;
-    }
+  .n-menu-item-content::after {
+    left: var(--spacing-2);
+    height: var(--spacing-4);
   }
 }
 
-// 展开箭头动画
-:deep(.n-base-icon) {
-  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+// 子菜单缩进。选择器必须比上面那条展开态 padding 规则更具体，否则会被它压掉。
+:deep(.n-menu:not(.n-menu--collapsed) .n-submenu-children .n-menu-item-content) {
+  padding-left: var(--spacing-5) !important;
 }
 
-// Reduced motion
+// Naive UI 默认把子菜单的 max-height / opacity 都写死为 200ms。
+// 覆盖为“进慢出快”的语义 token：展开看得清，收起不拖沓。
+:deep(.n-submenu-children.fade-in-height-expand-transition-enter-active) {
+  transition:
+    max-height ix.$expand-motion,
+    opacity ix.$enter-motion,
+    margin-top ix.$expand-motion,
+    margin-bottom ix.$expand-motion;
+}
+
+:deep(.n-submenu-children.fade-in-height-expand-transition-leave-active) {
+  transition:
+    max-height ix.$leave-motion,
+    opacity ix.$leave-motion,
+    margin-top ix.$leave-motion,
+    margin-bottom ix.$leave-motion;
+}
+
+:deep(.n-menu-item-content__arrow) {
+  transition:
+    color ix.$hover-motion,
+    opacity ix.$hover-motion,
+    transform ix.$expand-motion;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  :deep(.n-menu),
-  :deep(.n-menu-item-content),
-  :deep(.n-menu-item-content__icon),
-  :deep(.n-base-icon) {
-    transition: none !important;
+  :deep(.n-menu-item-content-header),
+  :deep(.n-menu-item-content__icon) {
+    transform: none;
+  }
+
+  :deep(.n-menu:not(.n-menu--collapsed) .n-menu-item-content::after) {
+    transform: translateY(-50%);
+  }
+
+  :deep(.n-menu--collapsed .n-menu-item-content::after) {
+    transform: translateX(-50%);
   }
 }
 </style>

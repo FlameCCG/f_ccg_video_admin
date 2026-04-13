@@ -16,8 +16,8 @@ export default {
     language: '语言',
     fullscreen: '全屏',
     exitFullscreen: '退出全屏',
-    profile: '个人中心',
-    settings: '基础配置',
+    userManagement: '用户管理',
+    settings: '配置管理',
     permission: '权限管理',
     switchRole: '切换角色',
     switchRoleSuccess: '角色切换成功',
@@ -25,6 +25,14 @@ export default {
   },
   breadcrumb: {
     home: '首页',
+  },
+  tabs: {
+    label: '已打开的页面',
+    close: '关闭',
+    closeOther: '关闭其他',
+    closeRight: '关闭右侧',
+    closeAll: '关闭所有',
+    closeTab: '关闭标签「{title}」',
   },
   theme: {
     title: '主题设置',

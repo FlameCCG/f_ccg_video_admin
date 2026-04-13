@@ -6,7 +6,6 @@
 import { computed, ref, h } from 'vue'
 import {
   NDropdown,
-  NAvatar,
   NButton,
   NModal,
   NRadioGroup,
@@ -22,6 +21,7 @@ import { useUserStore } from '@/stores/user'
 import { usePermissionStore } from '@/stores/permission'
 import { resetRouter, addDynamicRoutes } from '@/router/guard'
 import router from '@/router'
+import AppAvatar from '@/components/common/AppAvatar.vue'
 
 const { t } = useI18n()
 const dialog = useDialog()
@@ -35,11 +35,6 @@ const showRoleSwitchModal = ref(false)
 const selectedRoleId = ref<number>(0)
 const isSwitchingRole = ref(false)
 
-/** 用户头像显示 */
-const avatarText = computed(() => {
-  return userStore.username.charAt(0).toUpperCase() || 'U'
-})
-
 /** 当前角色名 */
 const currentRoleName = computed(() => {
   const roleId = userStore.currentRoleId
@@ -48,7 +43,7 @@ const currentRoleName = computed(() => {
 
 /** 图标 SVG 映射 */
 const iconSvgs: Record<string, string> = {
-  profile: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  users: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
   settings: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
   permission: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
   switchRole: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
@@ -66,9 +61,9 @@ function renderIcon(type: string) {
 const dropdownOptions = computed<DropdownOption[]>(() => {
   const options: DropdownOption[] = [
     {
-      key: 'profile',
-      label: t('layout.header.profile'),
-      icon: renderIcon('profile'),
+      key: 'users',
+      label: t('layout.header.userManagement'),
+      icon: renderIcon('users'),
     },
     {
       key: 'settings',
@@ -109,8 +104,8 @@ const dropdownOptions = computed<DropdownOption[]>(() => {
 /** 处理下拉菜单选择 */
 function handleSelect(key: string): void {
   switch (key) {
-    case 'profile':
-      void router.push('/profile')
+    case 'users':
+      void router.push('/users/list')
       break
     case 'settings':
       void router.push('/system-config/site')
@@ -194,16 +189,13 @@ function handleLogout(): void {
   >
     <NButton quaternary class="user-trigger">
       <div class="user-info">
-        <NAvatar
-          v-if="userStore.avatar"
+        <AppAvatar
           :src="userStore.avatar"
+          :text="userStore.username || 'U'"
           :size="32"
-          round
+          accent
           class="user-avatar"
         />
-        <NAvatar v-else :size="32" round class="user-avatar">
-          {{ avatarText }}
-        </NAvatar>
         <div class="user-detail">
           <span class="user-name">{{ userStore.username || 'User' }}</span>
           <span class="user-role">{{ currentRoleName }}</span>
@@ -251,7 +243,7 @@ function handleLogout(): void {
 
 <style scoped lang="scss">
 .user-trigger {
-  padding: 4px 8px;
+  padding: var(--spacing-1) var(--spacing-2);
   height: auto;
 
   &:hover {
@@ -262,39 +254,36 @@ function handleLogout(): void {
 .user-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .user-avatar {
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
-  color: white;
-  font-weight: 500;
 }
 
 .user-detail {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: calc(var(--spacing-1) / 2);
 }
 
 .user-name {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
   color: var(--color-text);
   line-height: 1.2;
 }
 
 .user-role {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
   line-height: 1.2;
 }
 
 .dropdown-arrow {
   color: var(--color-text-muted);
-  margin-left: 4px;
+  margin-left: var(--spacing-1);
 }
 
 .role-radio-group {

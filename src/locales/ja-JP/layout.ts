@@ -16,8 +16,8 @@ export default {
     language: '言語',
     fullscreen: 'フルスクリーン',
     exitFullscreen: 'フルスクリーン解除',
-    profile: 'プロフィール',
-    settings: '基本設定',
+    userManagement: 'ユーザー管理',
+    settings: '設定管理',
     permission: '権限管理',
     switchRole: 'ロール切替',
     switchRoleSuccess: 'ロールの切り替えに成功しました',
@@ -25,6 +25,14 @@ export default {
   },
   breadcrumb: {
     home: 'ホーム',
+  },
+  tabs: {
+    label: '開いているページ',
+    close: '閉じる',
+    closeOther: '他を閉じる',
+    closeRight: '右側を閉じる',
+    closeAll: 'すべて閉じる',
+    closeTab: 'タブ「{title}」を閉じる',
   },
   theme: {
     title: 'テーマ設定',
