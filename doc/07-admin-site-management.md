@@ -34,6 +34,10 @@ Base URL：/v1
 | data.daily.visitUsers.x | array<string> | - |
 | data.daily.visitUsers.values | array<integer(int64)> | - |
 | data.daily.visitUsers.rates | array<number(float)> | - |
+| data.daily.loginUsers | TrendSeries | - |
+| data.daily.loginUsers.x | array<string> | - |
+| data.daily.loginUsers.values | array<integer(int64)> | - |
+| data.daily.loginUsers.rates | array<number(float)> | - |
 | data.daily.publishVideos | TrendSeries | - |
 | data.daily.publishVideos.x | array<string> | - |
 | data.daily.publishVideos.values | array<integer(int64)> | - |
@@ -64,6 +68,11 @@ Base URL：/v1
     },
     "daily": {
       "visitUsers": {
+        "x": ["2024-06-01"],
+        "values": [1],
+        "rates": [0.5]
+      },
+      "loginUsers": {
         "x": ["2024-06-01"],
         "values": [1],
         "rates": [0.5]
@@ -268,11 +277,16 @@ name=transcode
     "hardwareScale": false,
     "mp4Enable": true,
     "dashEnable": true,
-    "dashSegDuration": 4
+    "dashSegDuration": 4,
+    "checkpointDir": "",
+    "checkpointDisable": false,
+    "chunkDurationSec": 0
   },
   "msg": "ok"
 }
 ```
+
+> `checkpointDir` 为空时使用系统临时目录。`checkpointDisable` 为 true 时关闭断点续传。`chunkDurationSec` 为 0 时默认 180 秒，小于 0 时关闭分段转码。保存时必须带回这三个字段，否则会被写成零值。
 
 name=thirdLogin
 
@@ -481,7 +495,10 @@ name=transcode
   "hardwareScale": false,
   "mp4Enable": true,
   "dashEnable": true,
-  "dashSegDuration": 4
+  "dashSegDuration": 4,
+  "checkpointDir": "",
+  "checkpointDisable": false,
+  "chunkDurationSec": 0
 }
 ```
 
