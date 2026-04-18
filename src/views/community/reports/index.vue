@@ -8,6 +8,7 @@ import { ref, computed, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
+  NAlert,
   NCard,
   NSpace,
   NButton,
@@ -28,6 +29,7 @@ import type { ReportType, ReportStatus } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppStatusTag } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -43,6 +45,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds } = useTableSelectionAction(checkedRowKeys)
 
 /** 处理弹窗状态 */
 const handleModalVisible = ref(false)
@@ -292,6 +295,20 @@ const batchActions = computed(() => [
   { key: 'reject', label: t('community.report.reject'), type: 'error' as const },
 ])
 
+const handleActionSummary = computed(() => {
+  if (handleReportIds.value.length <= 1) {
+    return ''
+  }
+
+  const actionLabel =
+    handleForm.value.status === 2 ? t('community.report.process') : t('community.report.reject')
+
+  return t('common.tips.selectedActionSummary', {
+    count: handleReportIds.value.length,
+    action: actionLabel,
+  })
+})
+
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
@@ -333,8 +350,7 @@ function handlePageSizeChange(pageSize: number): void {
 /** 处理操作 */
 function handleAction(key: string, row: Record<string, unknown>): void {
   if (key === 'handle') {
-    handleReportIds.value = [row.id as number]
-    handleModalVisible.value = true
+    openHandleModal(resolveTargetIds(row.id as number), 2)
   }
 }
 
@@ -347,14 +363,19 @@ function handleBatchAction(key: string): void {
   }
 
   if (key === 'process') {
-    handleReportIds.value = ids
-    handleForm.value.status = 2
-    handleModalVisible.value = true
+    openHandleModal(ids, 2)
   } else if (key === 'reject') {
-    handleReportIds.value = ids
-    handleForm.value.status = 3
-    handleModalVisible.value = true
+    openHandleModal(ids, 3)
   }
+}
+
+function openHandleModal(reportIds: number[], status: 2 | 3): void {
+  handleReportIds.value = reportIds
+  handleForm.value = {
+    status,
+    handleNote: '',
+  }
+  handleModalVisible.value = true
 }
 
 /** 提交处理 */
@@ -470,6 +491,10 @@ function handleRefresh(): void {
       :loading="handleMutation.isPending.value"
       @positive-click="submitHandle"
     >
+      <n-alert v-if="handleActionSummary" type="info" :show-icon="false">
+        {{ handleActionSummary }}
+      </n-alert>
+
       <n-form label-placement="left" label-width="80">
         <n-form-item :label="t('community.report.handleStatus')">
           <n-radio-group v-model:value="handleForm.status">

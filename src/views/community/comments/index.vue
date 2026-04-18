@@ -25,6 +25,7 @@ import type { CommentSortType } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -43,6 +44,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 获取评论列表 */
 const {
@@ -223,7 +225,7 @@ function handlePageSizeChange(pageSize: number): void {
 /** 处理操作 */
 function handleAction(key: string, row: Record<string, unknown>): void {
   if (key === 'delete') {
-    confirmDelete([row.id as number])
+    confirmDelete(resolveTargetIds(row.id as number))
   }
 }
 
@@ -244,7 +246,11 @@ function handleBatchAction(key: string): void {
 function confirmDelete(commentIds: number[]): void {
   dialog.warning({
     title: t('community.comment.deleteTitle'),
-    content: t('community.comment.confirmDelete', { count: commentIds.length }),
+    content: createDialogContent(
+      t('community.comment.deleteTitle'),
+      commentIds.length,
+      t('community.comment.confirmDelete', { count: commentIds.length })
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {

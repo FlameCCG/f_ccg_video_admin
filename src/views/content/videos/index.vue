@@ -26,6 +26,7 @@ import type { AdminVideoItem, VideoStatus, VideoSortType } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar, AppStatusTag } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
 
 const { t } = useI18n()
@@ -46,6 +47,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 详情抽屉状态 */
 const detailDrawerVisible = ref(false)
@@ -85,6 +87,7 @@ const deleteMutation = useMutation({
     message.success(t('video.delete.deleteSuccess'))
     checkedRowKeys.value = []
     void queryClient.invalidateQueries({ queryKey: ['videoList'] })
+    void queryClient.invalidateQueries({ queryKey: ['recycleVideoList'] })
   },
   onError: (error: Error) => {
     message.error(error.message || t('common.tips.operationFailed'))
@@ -332,7 +335,7 @@ function handleAction(key: string, row: AdminVideoItem): void {
     selectedVideoId.value = row.id
     detailDrawerVisible.value = true
   } else if (key === 'delete') {
-    confirmDelete([row.id], false)
+    confirmDelete(resolveTargetIds(row.id), false)
   }
 }
 
@@ -353,13 +356,14 @@ function handleBatchAction(key: string): void {
 
 /** 确认删除 */
 function confirmDelete(videoIds: number[], hardDelete: boolean): void {
-  const content = hardDelete
+  const detail = hardDelete
     ? t('video.delete.confirmHardDelete')
     : t('video.delete.confirmSoftDelete')
+  const actionLabel = hardDelete ? t('video.delete.hardDelete') : t('video.delete.softDelete')
 
   dialog.warning({
     title: t('video.delete.title'),
-    content,
+    content: createDialogContent(actionLabel, videoIds.length, detail),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {

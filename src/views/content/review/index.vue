@@ -26,6 +26,7 @@ import type { AdminVideoItem, ReviewStatus, VideoSortType } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
 
 const { t } = useI18n()
@@ -44,6 +45,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 详情抽屉状态 */
 const detailDrawerVisible = ref(false)
@@ -78,10 +80,17 @@ const { data: partitionsData } = useQuery({
 /** 审核视频 mutation */
 const reviewMutation = useMutation({
   mutationFn: reviewVideo,
-  onSuccess: () => {
-    message.success(t('video.review.passSuccess'))
+  onSuccess: (_, variables) => {
+    const successMap: Record<ReviewStatus, string> = {
+      1: t('video.review.passSuccess'),
+      2: t('video.review.toPrivateSuccess'),
+      3: t('video.review.rejectSuccess'),
+    }
+    message.success(successMap[variables.status])
     checkedRowKeys.value = []
     void queryClient.invalidateQueries({ queryKey: ['reviewVideoList'] })
+    void queryClient.invalidateQueries({ queryKey: ['videoList'] })
+    void queryClient.invalidateQueries({ queryKey: ['recycleVideoList'] })
   },
   onError: (error: Error) => {
     message.error(error.message || t('common.tips.operationFailed'))
@@ -256,9 +265,9 @@ function handleAction(key: string, row: AdminVideoItem): void {
     selectedVideoId.value = row.id
     detailDrawerVisible.value = true
   } else if (key === 'approve') {
-    confirmReview([row.id], 1)
+    confirmReview(resolveTargetIds(row.id), 1)
   } else if (key === 'reject') {
-    confirmReview([row.id], 3)
+    confirmReview(resolveTargetIds(row.id), 3)
   }
 }
 
@@ -281,7 +290,12 @@ function handleBatchAction(key: string): void {
 
 /** 确认审核 */
 function confirmReview(videoIds: number[], status: ReviewStatus): void {
-  const statusTextMap: Record<ReviewStatus, string> = {
+  const actionLabelMap: Record<ReviewStatus, string> = {
+    1: t('video.review.pass'),
+    2: t('video.review.toPrivate'),
+    3: t('video.review.reject'),
+  }
+  const detailMap: Record<ReviewStatus, string> = {
     1: t('video.review.confirmPass'),
     2: t('video.review.confirmToPrivate'),
     3: t('video.review.confirmReject'),
@@ -289,7 +303,7 @@ function confirmReview(videoIds: number[], status: ReviewStatus): void {
 
   dialog.warning({
     title: t('video.review.title'),
-    content: statusTextMap[status],
+    content: createDialogContent(actionLabelMap[status], videoIds.length, detailMap[status]),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {

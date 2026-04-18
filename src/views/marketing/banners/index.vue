@@ -36,6 +36,7 @@ import type {
   SiteConfig,
   UpdateDefaultUserBannerListAction,
 } from '@/api/types'
+import { useTableSelectionAction } from '@/composables'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppStatusTag } from '@/components/common'
@@ -58,6 +59,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 表单弹窗状态 */
 const formModalVisible = ref(false)
@@ -439,12 +441,12 @@ function handleAction(key: string, row: BannerItem): void {
   if (key === 'setRegisterDefaultBanner') {
     handleSetRegisterDefaultBanner(row)
   } else if (key === 'manageDefaultUserBanners') {
-    handleOpenDefaultBannerDialog([row.id])
+    handleOpenDefaultBannerDialog(resolveTargetIds(row.id))
   } else if (key === 'edit') {
     editingBanner.value = row
     formModalVisible.value = true
   } else if (key === 'delete') {
-    confirmDelete([row.id])
+    confirmDelete(resolveTargetIds(row.id))
   }
 }
 
@@ -534,7 +536,11 @@ function handleBatchAction(key: string): void {
 function confirmDelete(bannerIds: number[]): void {
   dialog.warning({
     title: t('banner.delete.title'),
-    content: t('banner.delete.confirm', { count: bannerIds.length }),
+    content: createDialogContent(
+      t('banner.delete.title'),
+      bannerIds.length,
+      t('banner.delete.confirm', { count: bannerIds.length })
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {

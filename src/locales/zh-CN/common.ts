@@ -78,6 +78,7 @@ export default {
     serverError: '服务器错误，请稍后重试',
     sessionExpired: '会话已过期，请重新登录',
     selectAtLeastOne: '请至少选择一项',
+    selectedActionSummary: '当前已勾选 {count} 项，将执行“{action}”操作。',
     noChanges: '没有变更',
   },
 

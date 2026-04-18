@@ -25,6 +25,7 @@ import type { AdminVideoItem } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
 
 const { t } = useI18n()
@@ -42,6 +43,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 详情抽屉状态 */
 const detailDrawerVisible = ref(false)
@@ -273,9 +275,9 @@ function handleAction(key: string, row: AdminVideoItem): void {
     selectedVideoId.value = row.id
     detailDrawerVisible.value = true
   } else if (key === 'restore') {
-    confirmRestore([row.id])
+    confirmRestore(resolveTargetIds(row.id))
   } else if (key === 'delete') {
-    confirmHardDelete([row.id])
+    confirmHardDelete(resolveTargetIds(row.id))
   }
 }
 
@@ -298,7 +300,11 @@ function handleBatchAction(key: string): void {
 function confirmRestore(videoIds: number[]): void {
   dialog.info({
     title: t('video.restore.title'),
-    content: t('video.restore.confirm'),
+    content: createDialogContent(
+      t('video.restore.title'),
+      videoIds.length,
+      t('video.restore.confirm')
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {
@@ -311,7 +317,11 @@ function confirmRestore(videoIds: number[]): void {
 function confirmHardDelete(videoIds: number[]): void {
   dialog.error({
     title: t('video.delete.title'),
-    content: t('video.delete.confirmHardDelete'),
+    content: createDialogContent(
+      t('video.delete.hardDelete'),
+      videoIds.length,
+      t('video.delete.confirmHardDelete')
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {

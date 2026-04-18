@@ -27,6 +27,7 @@ import type { DanmuPosition } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm } from '@/components/form'
 import { AppAvatar } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -44,6 +45,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 获取弹幕列表 */
 const {
@@ -276,7 +278,7 @@ function handlePageSizeChange(pageSize: number): void {
 /** 处理操作 */
 function handleAction(key: string, row: Record<string, unknown>): void {
   if (key === 'delete') {
-    confirmDelete([row.id as number])
+    confirmDelete(resolveTargetIds(row.id as number))
   }
 }
 
@@ -297,7 +299,11 @@ function handleBatchAction(key: string): void {
 function confirmDelete(danmuIds: number[]): void {
   dialog.warning({
     title: t('community.danmaku.deleteTitle'),
-    content: t('community.danmaku.confirmDelete', { count: danmuIds.length }),
+    content: createDialogContent(
+      t('community.danmaku.deleteTitle'),
+      danmuIds.length,
+      t('community.danmaku.confirmDelete', { count: danmuIds.length })
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {

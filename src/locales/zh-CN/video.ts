@@ -87,6 +87,7 @@ export default {
     confirmToPrivate: '确定将该视频转为私密吗？',
     confirmReject: '确定驳回该视频吗？视频将被删除。',
     passSuccess: '审核通过',
+    toPrivateSuccess: '已转为私密',
     rejectSuccess: '已驳回',
   },
   delete: {

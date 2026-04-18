@@ -87,6 +87,7 @@ export default {
     confirmToPrivate: 'この動画を非公開に設定してもよろしいですか？',
     confirmReject: 'この動画を却下してもよろしいですか？削除されます。',
     passSuccess: '承認しました',
+    toPrivateSuccess: '非公開に設定しました',
     rejectSuccess: '却下しました',
   },
   delete: {

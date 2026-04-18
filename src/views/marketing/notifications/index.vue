@@ -18,6 +18,7 @@ import {
 import type { NotificationItem } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { AppAvatar } from '@/components/common'
+import { useTableSelectionAction } from '@/composables'
 import NotificationFormModal from './components/NotificationFormModal.vue'
 
 const { t } = useI18n()
@@ -33,6 +34,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 表单弹窗状态 */
 const formModalVisible = ref(false)
@@ -224,7 +226,7 @@ function handleAction(key: string, row: NotificationItem): void {
     editingNotification.value = row
     formModalVisible.value = true
   } else if (key === 'delete') {
-    confirmDelete([row.id])
+    confirmDelete(resolveTargetIds(row.id))
   }
 }
 
@@ -245,7 +247,11 @@ function handleBatchAction(key: string): void {
 function confirmDelete(ids: number[]): void {
   dialog.warning({
     title: t('notification.delete.title'),
-    content: t('notification.delete.confirm', { count: ids.length }),
+    content: createDialogContent(
+      t('notification.delete.title'),
+      ids.length,
+      t('notification.delete.confirm', { count: ids.length })
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {

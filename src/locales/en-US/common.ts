@@ -79,6 +79,7 @@ export default {
     serverError: 'Server error, please try again later',
     sessionExpired: 'Session expired, please log in again',
     selectAtLeastOne: 'Please select at least one item',
+    selectedActionSummary: '{count} items selected. This will perform "{action}".',
     noChanges: 'No changes',
   },
 

@@ -24,6 +24,7 @@ import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 import { getDynamicList, deleteDynamic } from '@/api/dynamic'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm } from '@/components/form'
+import { useTableSelectionAction } from '@/composables'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -41,6 +42,7 @@ const searchParams = ref({
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
+const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checkedRowKeys)
 
 /** 获取动态列表 */
 const {
@@ -196,7 +198,7 @@ function handlePageSizeChange(pageSize: number): void {
 /** 处理操作 */
 function handleAction(key: string, row: Record<string, unknown>): void {
   if (key === 'delete') {
-    confirmDelete([row.id as number])
+    confirmDelete(resolveTargetIds(row.id as number))
   }
 }
 
@@ -217,7 +219,11 @@ function handleBatchAction(key: string): void {
 function confirmDelete(dynamicIds: number[]): void {
   dialog.warning({
     title: t('community.dynamic.deleteTitle'),
-    content: t('community.dynamic.confirmDelete', { count: dynamicIds.length }),
+    content: createDialogContent(
+      t('community.dynamic.deleteTitle'),
+      dynamicIds.length,
+      t('community.dynamic.confirmDelete', { count: dynamicIds.length })
+    ),
     positiveText: t('common.confirm'),
     negativeText: t('common.cancel'),
     onPositiveClick: () => {

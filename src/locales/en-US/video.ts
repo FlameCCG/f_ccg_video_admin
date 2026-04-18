@@ -87,6 +87,7 @@ export default {
     confirmToPrivate: 'Are you sure you want to set this video to private?',
     confirmReject: 'Are you sure you want to reject this video? It will be deleted.',
     passSuccess: 'Video approved',
+    toPrivateSuccess: 'Video set to private',
     rejectSuccess: 'Video rejected',
   },
   delete: {
