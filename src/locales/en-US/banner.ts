@@ -37,7 +37,7 @@ export default {
     editTitle: 'Edit Banner',
     cover: 'Image',
     coverRequired: 'Please upload an image',
-    coverTip: 'Recommended size: 1920x480, JPG/PNG supported, max 5MB',
+    coverTip: 'Recommended size: 1920x480, JPG/PNG supported, max 20MB',
     href: 'Link',
     hrefPlaceholder: 'Enter link URL (optional)',
     type: 'Type',
@@ -49,14 +49,14 @@ export default {
   actions: {
     create: 'Create Banner',
     setRegisterDefaultBanner: 'Set as Registration Default Banner',
-    manageDefaultUserBanners: 'Add or Remove Profile Defaults',
+    manageDefaultUserBanners: 'Add or Remove System Default Profile Banners',
   },
   setRegisterDefaultBanner: {
     title: 'Set Registration Default Banner',
     confirm: 'Set this banner as the default homepage banner used during registration?',
   },
   defaultUserBanners: {
-    title: 'Manage Default Profile Banners',
+    title: 'Manage System Default Profile Banners',
     actionLabel: 'Action',
     add: 'Add to default list',
     remove: 'Remove from default list',

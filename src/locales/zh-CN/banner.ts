@@ -37,7 +37,7 @@ export default {
     editTitle: '编辑轮播图',
     cover: '图片',
     coverRequired: '请上传图片',
-    coverTip: '建议尺寸：1920x480，支持 JPG/PNG，最大 5MB',
+    coverTip: '建议尺寸：1920x480，支持 JPG/PNG，最大 20MB',
     href: '跳转链接',
     hrefPlaceholder: '请输入跳转链接（可选）',
     type: '类型',
@@ -49,14 +49,14 @@ export default {
   actions: {
     create: '创建轮播图',
     setRegisterDefaultBanner: '设为注册时主页默认横幅',
-    manageDefaultUserBanners: '添加/删除用户主页默认横幅',
+    manageDefaultUserBanners: '添加/删除系统默认用户主页横幅',
   },
   setRegisterDefaultBanner: {
     title: '设置注册时主页默认横幅',
     confirm: '确定将当前横幅设为用户注册时主页默认横幅吗？',
   },
   defaultUserBanners: {
-    title: '维护用户主页默认横幅',
+    title: '维护系统默认用户主页横幅',
     actionLabel: '操作类型',
     add: '添加到系统默认列表',
     remove: '从系统默认列表移除',

@@ -102,6 +102,7 @@ function getActionLabel(action: ActionItem): string {
         <n-tooltip v-if="action.icon" trigger="hover">
           <template #trigger>
             <n-button
+              class="table-actions__button"
               text
               :type="action.type || 'primary'"
               :size="size"
@@ -115,6 +116,7 @@ function getActionLabel(action: ActionItem): string {
         </n-tooltip>
         <n-button
           v-else
+          class="table-actions__button"
           text
           :type="action.type || 'primary'"
           :size="size"
@@ -132,7 +134,7 @@ function getActionLabel(action: ActionItem): string {
       <template v-if="moreActions.length > 0">
         <span v-if="divider && mainActions.length > 0" class="table-actions__divider" />
         <n-dropdown :options="moreOptions" trigger="hover" @select="handleMoreSelect">
-          <n-button text :size="size" type="primary">
+          <n-button class="table-actions__button" text :size="size" type="primary">
             {{ t('common.more') }}
             <template #icon>
               <n-icon>
@@ -162,6 +164,14 @@ function getActionLabel(action: ActionItem): string {
 .table-actions {
   display: inline-flex;
   align-items: center;
+
+  :deep(.table-actions__button:not(.n-button--disabled)) {
+    cursor: pointer;
+  }
+
+  :deep(.table-actions__button.n-button--disabled) {
+    cursor: not-allowed;
+  }
 
   &__divider {
     display: inline-block;

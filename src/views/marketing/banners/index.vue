@@ -36,7 +36,6 @@ import type {
   SiteConfig,
   UpdateDefaultUserBannerListAction,
 } from '@/api/types'
-import { usePermission } from '@/composables'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppStatusTag } from '@/components/common'
@@ -47,7 +46,6 @@ const { t } = useI18n()
 const message = useMessage()
 const dialog = useDialog()
 const queryClient = useQueryClient()
-const { hasPermission } = usePermission()
 
 /** 搜索参数 */
 const searchParams = ref({
@@ -358,21 +356,29 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     title: t('common.table.operation'),
     key: 'actions',
-    width: 240,
+    width: 300,
     fixed: 'right',
     render: (row) => {
       const banner = row as unknown as BannerItem
       return h(TableActions, {
+        max: 3,
         actions: [
           {
             key: 'setRegisterDefaultBanner',
             label: t('banner.actions.setRegisterDefaultBanner'),
             type: 'success',
-            show: banner.type === 3 && hasPermission('/admin/user/banner', 'PUT'),
+            show: banner.type === 3,
             disabled: !banner.show,
           },
           { key: 'edit', label: t('common.edit') },
           { key: 'delete', label: t('common.delete'), type: 'error' },
+          {
+            key: 'manageDefaultUserBanners',
+            label: t('banner.actions.manageDefaultUserBanners'),
+            type: 'info',
+            show: banner.type === 3,
+            disabled: !banner.show,
+          },
         ],
         onAction: (key: string) => handleAction(key, banner),
       })
@@ -382,6 +388,12 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
 
 /** 批量操作配置 */
 const batchActions = computed(() => [
+  {
+    key: 'manageDefaultUserBanners',
+    label: t('banner.actions.manageDefaultUserBanners'),
+    type: 'info' as const,
+    icon: 'edit' as const,
+  },
   { key: 'delete', label: t('common.delete'), type: 'error' as const, icon: 'delete' as const },
 ])
 
@@ -426,6 +438,8 @@ function handleCreate(): void {
 function handleAction(key: string, row: BannerItem): void {
   if (key === 'setRegisterDefaultBanner') {
     handleSetRegisterDefaultBanner(row)
+  } else if (key === 'manageDefaultUserBanners') {
+    handleOpenDefaultBannerDialog([row.id])
   } else if (key === 'edit') {
     editingBanner.value = row
     formModalVisible.value = true
@@ -477,14 +491,18 @@ function validateDefaultBannerSelection(bannerIds: number[]): boolean {
   return true
 }
 
-function handleOpenDefaultBannerDialog(): void {
-  const bannerIds = checkedBannerIds.value
+function handleOpenDefaultBannerDialog(initialBannerIds?: number[]): void {
+  const bannerIds = initialBannerIds ?? checkedBannerIds.value
   if (!validateDefaultBannerSelection(bannerIds)) {
     return
   }
 
   selectedDefaultBannerIds.value = bannerIds
   defaultBannerDialogVisible.value = true
+}
+
+function handleOpenSelectedDefaultBannerDialog(): void {
+  handleOpenDefaultBannerDialog()
 }
 
 function handleSubmitDefaultBannerDialog(payload: {
@@ -499,6 +517,11 @@ function handleBatchAction(key: string): void {
   const ids = checkedRowKeys.value as number[]
   if (ids.length === 0) {
     message.warning(t('common.tips.selectAtLeastOne'))
+    return
+  }
+
+  if (key === 'manageDefaultUserBanners') {
+    handleOpenDefaultBannerDialog()
     return
   }
 
@@ -615,11 +638,10 @@ function handleRefresh(): void {
               {{ t('banner.actions.create') }}
             </n-button>
             <n-button
-              v-if="hasPermission('/admin/user/banner/defaults', 'PUT')"
               size="small"
               secondary
               :disabled="checkedRowKeys.length === 0"
-              @click="handleOpenDefaultBannerDialog"
+              @click="handleOpenSelectedDefaultBannerDialog"
             >
               {{ t('banner.actions.manageDefaultUserBanners') }}
             </n-button>

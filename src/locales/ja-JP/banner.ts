@@ -37,7 +37,7 @@ export default {
     editTitle: 'バナー編集',
     cover: '画像',
     coverRequired: '画像をアップロードしてください',
-    coverTip: '推奨サイズ：1920x480、JPG/PNG対応、最大5MB',
+    coverTip: '推奨サイズ：1920x480、JPG/PNG対応、最大20MB',
     href: 'リンク',
     hrefPlaceholder: 'リンクURLを入力（任意）',
     type: 'タイプ',
@@ -49,14 +49,14 @@ export default {
   actions: {
     create: 'バナー作成',
     setRegisterDefaultBanner: '登録時の既定ホームバナーに設定',
-    manageDefaultUserBanners: '既定プロフィールバナーを追加/削除',
+    manageDefaultUserBanners: 'システム既定プロフィールバナーを追加/削除',
   },
   setRegisterDefaultBanner: {
     title: '登録時の既定ホームバナー設定',
     confirm: 'このバナーをユーザー登録時の既定ホームバナーに設定しますか？',
   },
   defaultUserBanners: {
-    title: '既定プロフィールバナー管理',
+    title: 'システム既定プロフィールバナー管理',
     actionLabel: '操作タイプ',
     add: '既定リストに追加',
     remove: '既定リストから削除',

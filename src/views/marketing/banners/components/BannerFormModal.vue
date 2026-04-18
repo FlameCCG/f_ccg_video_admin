@@ -215,7 +215,7 @@ async function handleSubmit(): Promise<void> {
           <image-upload
             :value="coverList"
             :max="1"
-            :max-size="5"
+            :max-size="20"
             :image-width="320"
             :image-height="120"
             @change="handleCoverChange"

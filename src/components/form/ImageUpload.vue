@@ -48,7 +48,7 @@ const props = withDefaults(defineProps<Props>(), {
   value: () => [],
   action: '/v1/common/video/image/upload',
   max: 1,
-  maxSize: 5,
+  maxSize: 20,
   accept: 'image/*',
   disabled: false,
   showFileList: true,
