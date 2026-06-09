@@ -29,6 +29,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 type EditableSiteSection = 'contentReview' | 'login' | 'register'
+type EditableSiteRootField = 'defaultUserBannerID' | 'defaultUserBannerIDs'
 
 const formData = computed({
   get: () => props.modelValue,
@@ -51,6 +52,11 @@ function updateField<K extends EditableSiteSection>(
     },
   }
   emit('update:modelValue', updated)
+}
+
+function updateRootField<K extends EditableSiteRootField>(field: K, value: SiteConfig[K]): void {
+  if (!formData.value) return
+  emit('update:modelValue', { ...formData.value, [field]: value })
 }
 
 function updateStorageField(subSection: 'local' | 'minio', field: string, value: unknown): void {
@@ -86,6 +92,14 @@ function handlePublicPrefixesChange(value: string): void {
     .map((s) => s.trim())
     .filter(Boolean)
   updateStorageField('minio', 'publicPrefixes', prefixes)
+}
+
+function handleDefaultBannerIDsChange(value: string): void {
+  const ids = value
+    .split(',')
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isInteger(item) && item > 0)
+  updateRootField('defaultUserBannerIDs', ids)
 }
 </script>
 
@@ -131,6 +145,14 @@ function handlePublicPrefixesChange(value: string): void {
           <n-switch
             :value="formData.login.gitHubLogin"
             @update:value="(v: boolean) => updateField('login', 'gitHubLogin', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.linuxdoLogin')">
+          <n-switch
+            :value="formData.login.linuxdoLogin"
+            @update:value="(v: boolean) => updateField('login', 'linuxdoLogin', v)"
           />
         </n-form-item>
       </n-grid-item>
@@ -183,6 +205,31 @@ function handlePublicPrefixesChange(value: string): void {
             :min="0"
             :max="100"
             @update:value="(v) => updateField('login', 'textClickCaptchaPadding', v ?? 20)"
+          />
+        </n-form-item>
+      </n-grid-item>
+    </n-grid>
+
+    <!-- 用户横幅 -->
+    <n-divider title-placement="left">
+      <n-text strong>{{ t('siteConfig.site.banner.title') }}</n-text>
+    </n-divider>
+    <n-grid :cols="2" :x-gap="24">
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.banner.defaultUserBannerID')">
+          <n-input-number
+            :value="formData.defaultUserBannerID"
+            :min="1"
+            @update:value="(v) => updateRootField('defaultUserBannerID', v ?? 1)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.banner.defaultUserBannerIDs')">
+          <n-input
+            :value="formData.defaultUserBannerIDs.join(', ')"
+            :placeholder="t('siteConfig.site.banner.defaultUserBannerIDsTip')"
+            @update:value="handleDefaultBannerIDsChange"
           />
         </n-form-item>
       </n-grid-item>

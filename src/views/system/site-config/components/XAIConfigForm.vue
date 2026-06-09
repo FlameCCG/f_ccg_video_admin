@@ -87,6 +87,17 @@ function updateField<K extends keyof XAIConfig>(field: K, value: XAIConfig[K]): 
       </n-grid-item>
 
       <n-grid-item>
+        <n-form-item :label="t('siteConfig.xai.maxInputWorks')">
+          <n-input-number
+            :value="formData.maxInputWorks"
+            :min="1"
+            :max="64"
+            @update:value="(v) => updateField('maxInputWorks', v ?? 8)"
+          />
+        </n-form-item>
+      </n-grid-item>
+
+      <n-grid-item>
         <n-form-item :label="t('siteConfig.xai.timeoutSec')">
           <n-input-number
             :value="formData.timeoutSec"

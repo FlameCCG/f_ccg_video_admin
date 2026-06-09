@@ -37,7 +37,7 @@ function updateQQField(field: 'appID' | 'appKey' | 'redirect', value: string): v
 }
 
 function updateOAuthField(
-  provider: 'google' | 'github' | 'x',
+  provider: 'google' | 'github' | 'linuxdo' | 'x',
   field: 'clientID' | 'clientSecret' | 'redirect',
   value: string
 ): void {
@@ -145,6 +145,39 @@ function updateOAuthField(
           <n-input
             :value="formData.github.redirect"
             @update:value="(v) => updateOAuthField('github', 'redirect', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+    </n-grid>
+
+    <!-- Linux.do 登录 -->
+    <n-divider title-placement="left">
+      <n-text strong>{{ t('siteConfig.thirdLogin.linuxdo.title') }}</n-text>
+    </n-divider>
+    <n-grid :cols="2" :x-gap="24">
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.thirdLogin.linuxdo.clientID')">
+          <n-input
+            :value="formData.linuxdo.clientID"
+            @update:value="(v) => updateOAuthField('linuxdo', 'clientID', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.thirdLogin.linuxdo.clientSecret')">
+          <n-input
+            :value="formData.linuxdo.clientSecret"
+            type="password"
+            show-password-on="click"
+            @update:value="(v) => updateOAuthField('linuxdo', 'clientSecret', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item :span="2">
+        <n-form-item :label="t('siteConfig.thirdLogin.linuxdo.redirect')">
+          <n-input
+            :value="formData.linuxdo.redirect"
+            @update:value="(v) => updateOAuthField('linuxdo', 'redirect', v)"
           />
         </n-form-item>
       </n-grid-item>

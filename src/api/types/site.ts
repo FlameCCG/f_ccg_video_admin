@@ -19,6 +19,10 @@ export type SiteConfigName =
 /** 公开登录配置 */
 export interface PublicLoginConfig {
   qqLogin: boolean
+  xLogin: boolean
+  googleLogin: boolean
+  gitHubLogin: boolean
+  linuxdoLogin: boolean
   usernamePwdLogin: boolean
   textGraphicCaptcha: boolean
   textClickCaptcha: boolean
@@ -74,6 +78,7 @@ export interface LoginConfig {
   xLogin: boolean
   googleLogin: boolean
   gitHubLogin: boolean
+  linuxdoLogin: boolean
   usernamePwdLogin: boolean
   textGraphicCaptcha: boolean
   textClickCaptcha: boolean
@@ -164,6 +169,7 @@ export interface XAIConfig {
   textModel: string
   imageModel: string
   videoModel: string
+  maxInputWorks: number
   timeoutSec: number
 }
 
@@ -207,6 +213,7 @@ export interface ThirdLoginConfig {
   qq: QQLoginConfig
   google: OAuthLoginConfig
   github: OAuthLoginConfig
+  linuxdo: OAuthLoginConfig
   x: OAuthLoginConfig
 }
 
