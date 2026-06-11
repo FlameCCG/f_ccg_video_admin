@@ -178,20 +178,26 @@ export interface TranscodeConfig {
   maxWorkers: number
   transcodeResolutions: number[]
   highBitrateThreshold: number
-  highBitrateMediumTarget: number
+  bitrate2160KbpsReduceRatio: number
   bitrate1080KbpsReduceRatio: number
   bitrate720KbpsReduceRatio: number
   bitrate360KbpsReduceRatio: number
   cpuMode: boolean
   crfHigh: number
   crfMedium: number
+  crf720: number
+  crf360: number
   cpuPreset: string
   gpuCQPHigh: number
   gpuCQPMedium: number
+  gpuCQP720: number
+  gpuCQP360: number
   gpuPreset: string
   gpuMode: boolean
   threads: number
   hardwareScale: boolean
+  dashEnable: boolean
+  dashSegDuration: number
 }
 
 /** QQ 登录配置 */

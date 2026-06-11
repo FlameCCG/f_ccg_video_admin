@@ -235,21 +235,27 @@ name=transcode
   "data": {
     "maxWorkers": 2,
     "transcodeResolutions": [360, 720, 1080, 2160],
-    "highBitrateThreshold": 4000,
-    "highBitrateMediumTarget": 5000,
-    "bitrate1080KbpsReduceRatio": 30,
-    "bitrate720KbpsReduceRatio": 50,
-    "bitrate360KbpsReduceRatio": 90,
+    "highBitrateThreshold": 8000,
+    "bitrate2160KbpsReduceRatio": 20,
+    "bitrate1080KbpsReduceRatio": 40,
+    "bitrate720KbpsReduceRatio": 60,
+    "bitrate360KbpsReduceRatio": 80,
     "cpuMode": true,
     "crfHigh": 18,
     "crfMedium": 23,
+    "crf720": 24,
+    "crf360": 28,
     "cpuPreset": "medium",
     "gpuCQPHigh": 18,
     "gpuCQPMedium": 22,
+    "gpuCQP720": 24,
+    "gpuCQP360": 28,
     "gpuPreset": "p4",
     "gpuMode": true,
     "threads": 8,
-    "hardwareScale": false
+    "hardwareScale": false,
+    "dashEnable": true,
+    "dashSegDuration": 4
   },
   "msg": "ok"
 }
@@ -431,21 +437,27 @@ name=transcode
 {
   "maxWorkers": 2,
   "transcodeResolutions": [360, 720, 1080, 2160],
-  "highBitrateThreshold": 4000,
-  "highBitrateMediumTarget": 5000,
-  "bitrate1080KbpsReduceRatio": 30,
-  "bitrate720KbpsReduceRatio": 50,
-  "bitrate360KbpsReduceRatio": 90,
+  "highBitrateThreshold": 8000,
+  "bitrate2160KbpsReduceRatio": 20,
+  "bitrate1080KbpsReduceRatio": 40,
+  "bitrate720KbpsReduceRatio": 60,
+  "bitrate360KbpsReduceRatio": 80,
   "cpuMode": true,
   "crfHigh": 18,
   "crfMedium": 23,
+  "crf720": 24,
+  "crf360": 28,
   "cpuPreset": "medium",
   "gpuCQPHigh": 18,
   "gpuCQPMedium": 22,
+  "gpuCQP720": 24,
+  "gpuCQP360": 28,
   "gpuPreset": "p4",
   "gpuMode": true,
   "threads": 8,
-  "hardwareScale": false
+  "hardwareScale": false,
+  "dashEnable": true,
+  "dashSegDuration": 4
 }
 ```
 

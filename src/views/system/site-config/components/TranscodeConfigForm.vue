@@ -119,14 +119,14 @@ function handleResolutionsChange(values: (string | number)[]): void {
         </n-form-item>
       </n-grid-item>
       <n-grid-item>
-        <n-form-item :label="t('siteConfig.transcode.highBitrateMediumTarget')">
+        <n-form-item :label="t('siteConfig.transcode.bitrate2160KbpsReduceRatio')">
           <n-input-number
-            :value="formData.highBitrateMediumTarget"
-            :min="1000"
-            :max="50000"
-            @update:value="(v) => updateField('highBitrateMediumTarget', v ?? 5000)"
+            :value="formData.bitrate2160KbpsReduceRatio"
+            :min="0"
+            :max="100"
+            @update:value="(v) => updateField('bitrate2160KbpsReduceRatio', v ?? 20)"
           >
-            <template #suffix>Kbps</template>
+            <template #suffix>%</template>
           </n-input-number>
         </n-form-item>
       </n-grid-item>
@@ -206,6 +206,26 @@ function handleResolutionsChange(values: (string | number)[]): void {
           />
         </n-form-item>
       </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.crf720')">
+          <n-input-number
+            :value="formData.crf720"
+            :min="0"
+            :max="51"
+            @update:value="(v) => updateField('crf720', v ?? 24)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.crf360')">
+          <n-input-number
+            :value="formData.crf360"
+            :min="0"
+            :max="51"
+            @update:value="(v) => updateField('crf360', v ?? 28)"
+          />
+        </n-form-item>
+      </n-grid-item>
     </n-grid>
 
     <!-- GPU 模式 -->
@@ -252,6 +272,53 @@ function handleResolutionsChange(values: (string | number)[]): void {
             :max="51"
             @update:value="(v) => updateField('gpuCQPMedium', v ?? 22)"
           />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.gpuCQP720')">
+          <n-input-number
+            :value="formData.gpuCQP720"
+            :min="0"
+            :max="51"
+            @update:value="(v) => updateField('gpuCQP720', v ?? 24)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.gpuCQP360')">
+          <n-input-number
+            :value="formData.gpuCQP360"
+            :min="0"
+            :max="51"
+            @update:value="(v) => updateField('gpuCQP360', v ?? 28)"
+          />
+        </n-form-item>
+      </n-grid-item>
+    </n-grid>
+
+    <!-- DASH 设置 -->
+    <n-divider title-placement="left">
+      <n-text>{{ t('siteConfig.transcode.dashTitle') }}</n-text>
+    </n-divider>
+    <n-grid :cols="2" :x-gap="24">
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.dashEnable')">
+          <n-switch
+            :value="formData.dashEnable"
+            @update:value="(v: boolean) => updateField('dashEnable', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.dashSegDuration')">
+          <n-input-number
+            :value="formData.dashSegDuration"
+            :min="1"
+            :max="30"
+            @update:value="(v) => updateField('dashSegDuration', v ?? 4)"
+          >
+            <template #suffix>秒</template>
+          </n-input-number>
         </n-form-item>
       </n-grid-item>
     </n-grid>
