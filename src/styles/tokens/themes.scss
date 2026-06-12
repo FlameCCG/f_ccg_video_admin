@@ -140,30 +140,4 @@
   }
 }
 
-// 主题元数据
-$theme-meta: (
-  'pearl': (
-    'is-dark': false,
-    'label': 'Pearl',
-    'label-zh': '珍珠白',
-    'label-ja': 'パール',
-  ),
-  'obsidian': (
-    'is-dark': true,
-    'label': 'Obsidian',
-    'label-zh': '黑曜石',
-    'label-ja': 'オブシディアン',
-  ),
-  'cyberpunk': (
-    'is-dark': true,
-    'label': 'Cyberpunk',
-    'label-zh': '赛博朋克',
-    'label-ja': 'サイバーパンク',
-  ),
-  'sakura': (
-    'is-dark': false,
-    'label': 'Sakura',
-    'label-zh': '樱',
-    'label-ja': 'サクラ',
-  ),
-);
+
