@@ -26,6 +26,7 @@ import { getVideoDetail } from '@/api/video'
 import type { VideoStatus } from '@/api/types'
 import { AppAvatar, AppStatusTag } from '@/components/common'
 import { VideoPlayer } from '@/components/video'
+import { formatDateTime } from '@/utils'
 
 interface Props {
   visible: boolean
@@ -40,10 +41,14 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+interface VideoPlayerInstance {
+  switchPart: (index: number) => void
+}
+
 /** 当前播放的分P索引 */
 const currentPartIndex = ref(0)
 /** VideoPlayer 组件引用 */
-const videoPlayerRef = ref<InstanceType<typeof VideoPlayer>>()
+const videoPlayerRef = ref<VideoPlayerInstance | null>(null)
 /** 播放器容器引用，用于滚动定位 */
 const playerContainerRef = ref<HTMLDivElement | null>(null)
 
@@ -111,19 +116,6 @@ function formatDuration(seconds: number): string {
     return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
   return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(date)
 }
 
 function formatNumber(num: number): string {
@@ -315,16 +307,16 @@ const isMultiPart = computed(() => {
                   </n-space>
                 </template>
                 <n-descriptions :column="2" label-placement="left" size="small">
-                  <n-descriptions-item label="文件名">
+                  <n-descriptions-item :label="t('video.detail.fileName')">
                     {{ resource.sourceFileName }}
                   </n-descriptions-item>
-                  <n-descriptions-item label="文件大小">
+                  <n-descriptions-item :label="t('video.detail.fileSize')">
                     {{ formatFileSize(resource.fileSize) }}
                   </n-descriptions-item>
-                  <n-descriptions-item label="码率">
+                  <n-descriptions-item :label="t('video.detail.bitrate')">
                     {{ resource.bitrate }} kbps
                   </n-descriptions-item>
-                  <n-descriptions-item label="编码">
+                  <n-descriptions-item :label="t('video.detail.codec')">
                     {{ resource.codec.toUpperCase() }}
                   </n-descriptions-item>
                 </n-descriptions>
@@ -356,7 +348,7 @@ const isMultiPart = computed(() => {
   }
 
   &__tag {
-    background-color: var(--color-primary-soft);
+    background-color: var(--color-primary-light);
     color: var(--color-primary);
   }
 

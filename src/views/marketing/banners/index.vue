@@ -183,7 +183,7 @@ const { data: partitionData } = useQuery({
 
 /** 分区选项 */
 const partitionOptions = computed(() => {
-  const options = [{ value: 0, label: '首页' }]
+  const options = [{ value: 0, label: t('layout.breadcrumb.home') }]
   if (partitionData.value) {
     options.push(
       ...partitionData.value.map((p) => ({
@@ -198,7 +198,7 @@ const partitionOptions = computed(() => {
 /** 获取分区名称 */
 function getPartitionName(partitionId: number | undefined): string {
   if (partitionId === undefined) return '-'
-  if (partitionId === 0) return '首页'
+  if (partitionId === 0) return t('layout.breadcrumb.home')
   const partition = partitionData.value?.find((p) => p.id === partitionId)
   return partition ? partition.name : String(partitionId)
 }
@@ -569,6 +569,26 @@ function handleFormSubmit(data: {
   }
 }
 
+function onTypeChange(val: unknown): void {
+  searchParams.value.type = val as BannerType | null
+}
+
+function onShowChange(val: unknown): void {
+  searchParams.value.show = val as number | null
+}
+
+function onPartitionIdChange(val: unknown): void {
+  searchParams.value.partitionId = val as number | null
+}
+
+function onCheckedRowKeysChange(keys: DataTableRowKey[]): void {
+  checkedRowKeys.value = keys
+}
+
+function onClearCheckedKeys(): void {
+  checkedRowKeys.value = []
+}
+
 /** 处理刷新 */
 function handleRefresh(): void {
   void refetch()
@@ -587,7 +607,7 @@ function handleRefresh(): void {
               :options="typeOptions"
               :placeholder="t('banner.filter.typePlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.type = val as BannerType | null)"
+              @change="onTypeChange"
             />
           </n-form-item>
         </n-gi>
@@ -598,7 +618,7 @@ function handleRefresh(): void {
               :options="showOptions"
               :placeholder="t('banner.filter.showStatusPlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.show = val as number | null)"
+              @change="onShowChange"
             />
           </n-form-item>
         </n-gi>
@@ -609,7 +629,7 @@ function handleRefresh(): void {
               :options="partitionOptions"
               :placeholder="t('banner.filter.partitionPlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.partitionId = val as number | null)"
+              @change="onPartitionIdChange"
             />
           </n-form-item>
         </n-gi>
@@ -714,7 +734,7 @@ function handleRefresh(): void {
         :selected-count="checkedRowKeys.length"
         :actions="batchActions"
         @action="handleBatchAction"
-        @clear="checkedRowKeys = []"
+        @clear="onClearCheckedKeys"
       />
 
       <data-table
@@ -734,7 +754,7 @@ function handleRefresh(): void {
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
-        @update:checked-row-keys="(keys) => (checkedRowKeys = keys)"
+        @update:checked-row-keys="onCheckedRowKeysChange"
       />
     </n-card>
 

@@ -37,14 +37,13 @@ type SiteConfigResponse<T extends SiteConfigName> = {
 export async function getSiteConfig<T extends SiteConfigName>(name: T): Promise<SiteConfigMap[T]> {
   const response = await request.get<SiteConfigResponse<T>>(`/admin/site/config/${name}`)
   // 后端返回 { site: {...} } 或 { logger: {...} } 等，需要解包
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data = response as any
+  const data = response as unknown as Record<string, unknown>
   // 如果响应中包含配置名作为 key，则解包
   if (data && typeof data === 'object' && name in data) {
     return data[name] as SiteConfigMap[T]
   }
   // 否则直接返回（兼容直接返回配置对象的情况）
-  return data as SiteConfigMap[T]
+  return data as unknown as SiteConfigMap[T]
 }
 
 /**

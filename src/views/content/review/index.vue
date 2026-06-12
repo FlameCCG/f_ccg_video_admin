@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils'
 /**
  * 稿件审核页
  * Submission Review Page
@@ -122,19 +123,6 @@ function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
-/** 格式化日期时间 */
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
 }
 
 /** 表格列配置 */

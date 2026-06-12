@@ -96,3 +96,34 @@ export function clearTokens(): void {
 export function hasToken(): boolean {
   return !!getAccessToken()
 }
+
+/**
+ * 校验 JWT 是否过期
+ */
+export function isTokenExpired(token: string | null): boolean {
+  if (!token) return true
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return true
+    // Decode base64 URL payload
+    const base64Url = parts[1]!
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(
+      window
+        .atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    )
+    interface JwtPayload {
+      exp?: number
+      [key: string]: unknown
+    }
+    const payload = JSON.parse(jsonPayload) as JwtPayload
+    if (typeof payload.exp !== 'number') return false
+    // payload.exp is in seconds, Date.now() is in milliseconds. Add a 5 second buffer.
+    return payload.exp * 1000 < Date.now() + 5000
+  } catch {
+    return true
+  }
+}

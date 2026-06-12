@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils'
 /**
  * 动态管理页
  * Activity Management Page
@@ -81,19 +82,6 @@ const dynamicList = computed(() => {
   return list as unknown as Record<string, unknown>[]
 })
 const total = computed(() => dynamicData.value?.total ?? 0)
-
-/** 格式化日期时间 */
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
 
 /** 表格列配置 */
 const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [

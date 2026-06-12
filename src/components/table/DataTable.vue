@@ -11,7 +11,8 @@ import { NDataTable, NPagination, NSpace, NSpin } from 'naive-ui'
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 
 /** 表格行数据类型 */
-type RowData = Record<string, unknown>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RowData = any
 
 interface Props {
   /** 表格列配置 */

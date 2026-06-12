@@ -7,7 +7,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { usePreferredDark, useStorage } from '@vueuse/core'
 import type { LocaleType } from '@/locales'
-import { localeConfigs, DEFAULT_LOCALE, LOCALE_STORAGE_KEY } from '@/locales'
+import { localeConfigs, LOCALE_STORAGE_KEY, getInitialLocale } from '@/locales'
 
 /**
  * 主题名称类型
@@ -76,29 +76,6 @@ export function getThemeConfig(themeName: ThemeName): ThemeConfig | undefined {
  */
 function applyTheme(themeName: ThemeName): void {
   document.documentElement.setAttribute('data-theme', themeName)
-}
-
-/**
- * 获取浏览器语言
- */
-function getBrowserLocale(): LocaleType {
-  const browserLang = navigator.language
-  if (browserLang.startsWith('zh')) return 'zh-CN'
-  if (browserLang.startsWith('ja')) return 'ja-JP'
-  if (browserLang.startsWith('en')) return 'en-US'
-  return DEFAULT_LOCALE
-}
-
-/**
- * 获取初始语言
- * 优先级: localStorage > 浏览器语言 > 默认语言
- */
-function getInitialLocale(): LocaleType {
-  const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
-  if (stored && localeConfigs.some((c) => c.locale === stored)) {
-    return stored as LocaleType
-  }
-  return getBrowserLocale()
 }
 
 /**

@@ -262,11 +262,12 @@ defineExpose({
       isShaking.value = false
     }, 500)
 
-    // 1.5s 后自动重置，允许重试
+    // 1.5s 后自动重置，允许重试并获取新验证码
     setTimeout(() => {
       verifyStatus.value = 'idle'
       showResult.value = false
       sliderX.value = 0
+      void fetchCaptcha()
     }, 1500)
   },
 })
@@ -557,7 +558,7 @@ defineExpose({
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.9);
+    background: color-mix(in srgb, var(--color-surface) 90%, transparent);
     z-index: 10;
     opacity: 0;
     animation: fade-in 0.2s forwards;

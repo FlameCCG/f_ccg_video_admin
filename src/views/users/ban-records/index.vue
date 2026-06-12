@@ -10,10 +10,11 @@ import { useQuery } from '@tanstack/vue-query'
 import { NCard, NSpace, NButton, NIcon, NGi, NFormItem, NInputNumber } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { getBanRecords } from '@/api/user'
-import type { UserStatus } from '@/api/types'
+import type { UserStatus, BanRecordItem } from '@/api/types'
 import { DataTable } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppStatusTag } from '@/components/common'
+import { formatDateTime } from '@/utils'
 
 const { t } = useI18n()
 
@@ -43,9 +44,8 @@ const {
 })
 
 /** 封禁记录列表数据 */
-const recordList = computed(() => {
-  const list = recordData.value?.list ?? []
-  return list as unknown as Record<string, unknown>[]
+const recordList = computed<BanRecordItem[]>(() => {
+  return recordData.value?.list ?? []
 })
 const total = computed(() => recordData.value?.total ?? 0)
 
@@ -77,7 +77,7 @@ function getStatusText(status: UserStatus): string {
 }
 
 /** 表格列配置 */
-const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
+const columns = computed<DataTableColumns<BanRecordItem>>(() => [
   {
     title: 'ID',
     key: 'id',
@@ -102,8 +102,8 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     width: 120,
     render: (row) =>
       h(AppStatusTag, {
-        type: getStatusType(row.status as UserStatus),
-        text: getStatusText(row.status as UserStatus),
+        type: getStatusType(row.status),
+        text: getStatusText(row.status),
         dot: true,
       }),
   },
@@ -113,8 +113,8 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     width: 100,
     align: 'center',
     render: (row) => {
-      if ((row.status as UserStatus) === 3) return t('user.ban.permanent')
-      if ((row.days as number) === 0) return '-'
+      if (row.status === 3) return t('user.ban.permanent')
+      if (row.days === 0) return '-'
       return `${String(row.days)} ${t('user.ban.durationUnit')}`
     },
   },
@@ -123,7 +123,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     key: 'reason',
     width: 200,
     ellipsis: { tooltip: true },
-    render: (row) => (row.reason as string) || '-',
+    render: (row) => row.reason || '-',
   },
   {
     title: t('user.banRecord.operator'),
@@ -135,36 +135,27 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     title: t('user.banRecord.banTime'),
     key: 'startAt',
     width: 180,
-    render: (row) => formatDateTime(row.startAt as string),
+    render: (row) => formatDateTime(row.startAt),
   },
   {
     title: t('user.banRecord.expireTime'),
     key: 'endAt',
     width: 180,
     render: (row) => {
-      if ((row.status as UserStatus) === 3) return t('user.ban.permanent')
-      return formatDateTime(row.endAt as string)
+      if (row.status === 3) return t('user.ban.permanent')
+      return formatDateTime(row.endAt)
     },
   },
   {
     title: t('common.table.createdAt'),
     key: 'createdAt',
     width: 180,
-    render: (row) => formatDateTime(row.createdAt as string),
+    render: (row) => formatDateTime(row.createdAt),
   },
 ])
 
-/** 格式化日期时间 */
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+function onStatusChange(val: unknown): void {
+  searchParams.value.status = val as UserStatus | null
 }
 
 /** 处理搜索 */
@@ -226,7 +217,7 @@ function handleRefresh(): void {
               :options="statusOptions"
               :placeholder="t('user.filter.statusPlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.status = val as UserStatus | null)"
+              @change="onStatusChange"
             />
           </n-form-item>
         </n-gi>

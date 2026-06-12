@@ -9,7 +9,7 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NUpload, NButton, NIcon, useMessage } from 'naive-ui'
 import type { UploadFileInfo, UploadInst, UploadCustomRequestOptions } from 'naive-ui'
-import { getAccessToken } from '@/utils/storage'
+import { request } from '@/utils/request'
 
 interface Props {
   /** 已上传的图片列表 */
@@ -130,64 +130,41 @@ async function customRequest(options: UploadCustomRequestOptions): Promise<void>
       })
     }
 
-    // 发送请求
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', props.action)
+    // 整理上传路径：如果 action 包含 baseURL 路径前缀（如 '/v1'），则剥离，避免重复拼接路径
+    const actionUrl = props.action.startsWith('/v1') ? props.action.substring(3) : props.action
 
-    // 设置请求头
-    const token = getAccessToken()
-    if (token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-    }
-    if (props.headers) {
-      Object.entries(props.headers).forEach(([key, value]) => {
-        xhr.setRequestHeader(key, value)
+    // 用统一的 request client 上传，实现 token 拦截与刷新
+    request
+      .post(actionUrl, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...props.headers,
+        },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percent = Math.round((progressEvent.loaded / progressEvent.total) * 100)
+            onProgress({ percent })
+          }
+        },
       })
-    }
-
-    // 上传进度
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        onProgress({ percent: Math.round((e.loaded / e.total) * 100) })
-      }
-    }
-
-    // 上传完成
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText) as {
-            code: number
-            data: { imageUrl: string }
-            msg: string
-          }
-          if (response.code === 0 && response.data?.imageUrl) {
-            file.url = response.data.imageUrl
-            onFinish()
-            updateValue()
-            emit('success', response.data.imageUrl, file)
-          } else {
-            message.error(response.msg || t('common.fileUpload.uploadFailed'))
-            onError()
-          }
-        } catch {
+      .then((res: unknown) => {
+        const data = res as { imageUrl?: string } | null
+        if (data && data.imageUrl) {
+          file.url = data.imageUrl
+          onFinish()
+          updateValue()
+          emit('success', data.imageUrl, file)
+        } else {
           message.error(t('common.fileUpload.uploadFailed'))
           onError()
         }
-      } else {
-        message.error(t('common.fileUpload.uploadFailed'))
+      })
+      .catch((err: unknown) => {
+        const error = err as { msg?: string } | null
+        message.error(error?.msg || t('common.fileUpload.uploadFailed'))
         onError()
-      }
-    }
-
-    // 上传错误
-    xhr.onerror = () => {
-      message.error(t('common.fileUpload.uploadFailed'))
-      onError()
-      emit('error', new Error('Upload failed'), file)
-    }
-
-    xhr.send(formData)
+        emit('error', err instanceof Error ? err : new Error(String(err)), file)
+      })
   } catch {
     message.error(t('common.fileUpload.uploadFailed'))
     onError()

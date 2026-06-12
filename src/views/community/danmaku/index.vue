@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils'
 /**
  * 弹幕列表页
  * Danmaku List Page
@@ -99,19 +100,6 @@ function formatNumber(num: number | undefined | null): string {
     return (num / 10000).toFixed(1) + 'w'
   }
   return num.toString()
-}
-
-/** 格式化日期时间 */
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
 }
 
 /** 获取位置标签 */

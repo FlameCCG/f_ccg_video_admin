@@ -64,7 +64,7 @@ import type { Menu } from '@/api/types'
  * @param path 路由路径
  */
 function isWhiteList(path: string): boolean {
-  return WHITE_LIST_ROUTES.some((item) => path.startsWith(item))
+  return WHITE_LIST_ROUTES.includes(path)
 }
 
 /**
