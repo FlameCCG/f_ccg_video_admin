@@ -66,12 +66,12 @@ const {
   isLoading: roleMenusLoading,
   refetch: refetchRoleMenus,
 } = useQuery({
-  queryKey: ['roleMenus', computed(() => props.role?.id)],
+  queryKey: ['roleMenus', () => props.role?.id],
   queryFn: () =>
     props.role
       ? getRoleMenus({ roleId: props.role.id })
       : Promise.resolve({ directMenus: [], inheritMenus: [] } as RoleMenusResponse),
-  enabled: computed(() => !!props.role && props.visible),
+  enabled: () => !!props.role && props.visible,
   staleTime: 30 * 1000,
 })
 
@@ -161,9 +161,11 @@ function convertToTreeOptions(menus: Menu[]): TreeOption[] {
 const treeOptions = computed(() => convertToTreeOptions(allMenus.value ?? []))
 
 /** 获取所有菜单 ID */
-function getAllMenuIds(menus: Menu[]): number[] {
+function getAllMenuIds(menus: Menu[] | null | undefined): number[] {
+  if (!menus) return []
   const ids: number[] = []
-  function traverse(items: Menu[]): void {
+  function traverse(items: Menu[] | null | undefined): void {
+    if (!items) return
     for (const item of items) {
       ids.push(item.id)
       if (item.children) {
@@ -176,9 +178,11 @@ function getAllMenuIds(menus: Menu[]): number[] {
 }
 
 /** 获取菜单 ID 列表 */
-function getMenuIds(menus: Menu[]): number[] {
+function getMenuIds(menus: Menu[] | null | undefined): number[] {
+  if (!menus) return []
   const ids: number[] = []
-  function traverse(items: Menu[]): void {
+  function traverse(items: Menu[] | null | undefined): void {
+    if (!items) return
     for (const item of items) {
       ids.push(item.id)
       if (item.children) {

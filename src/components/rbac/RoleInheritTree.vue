@@ -236,8 +236,8 @@ watch(
 
   &--highlighted {
     border-color: var(--color-primary);
-    background: var(--color-primary-soft);
-    box-shadow: 0 0 0 3px var(--color-primary-soft);
+    background: var(--color-primary-light);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
   }
 
   &__name {
@@ -256,6 +256,23 @@ watch(
     overflow: hidden;
     text-overflow: ellipsis;
   }
+}
+
+// Vue Flow 节点包装器重写，消除默认的主题白边与白底，使其适配自定义主题
+.vue-flow__node-default,
+.vue-flow__node-input,
+.vue-flow__node-output,
+.vue-flow__node {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+}
+
+// 隐藏默认的连接锚点（因为是只读继承树，无需手动拉线）
+.vue-flow__handle {
+  display: none !important;
 }
 
 // Vue Flow 控件样式覆盖
@@ -284,10 +301,20 @@ watch(
 .vue-flow__edge-path {
   stroke: var(--color-border);
   stroke-width: 2;
+  transition: stroke var(--motion-fast) ease;
+}
+
+// Vue Flow 边的动画与高亮样式
+.vue-flow__edge.selected .vue-flow__edge-path,
+.vue-flow__edge.animated .vue-flow__edge-path {
+  stroke: var(--color-primary) !important;
 }
 
 // Vue Flow 背景样式
 .vue-flow__background {
   background-color: var(--color-bg);
+  --vf-pattern-color: var(--color-border);
+
+  opacity: 0.4;
 }
 </style>
