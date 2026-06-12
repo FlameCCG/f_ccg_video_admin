@@ -81,32 +81,26 @@ class TokenRefresher {
       throw new Error('No refresh token available')
     }
 
-    try {
-      // 直接使用 axios 发送请求，绕过拦截器避免循环
-      const response = await axios.post<ApiResponse<RefreshTokenResponse>>(
-        '/v1/common/user/login/refresh',
-        { refreshToken },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      )
-
-      const { code, data, msg } = response.data
-
-      if (code === 0 && data) {
-        setTokens(data.accessToken, data.refreshToken)
-        return data.accessToken
+    // 直接使用 axios 发送请求，绕过拦截器避免循环
+    const response = await axios.post<ApiResponse<RefreshTokenResponse>>(
+      '/v1/common/user/login/refresh',
+      { refreshToken },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
       }
+    )
 
-      // 刷新失败
-      throw new Error(msg || 'Token refresh failed')
-    } catch (error) {
-      // 刷新失败，清除 token
-      clearTokens()
-      throw error
+    const { code, data, msg } = response.data
+
+    if (code === 0 && data) {
+      setTokens(data.accessToken, data.refreshToken)
+      return data.accessToken
     }
+
+    // 刷新失败
+    throw new Error(msg || 'Token refresh failed')
   }
 
   /**
@@ -153,30 +147,6 @@ let redirectToLogin: () => void = () => {
  */
 export function setLoginRedirectHandler(handler: () => void): void {
   redirectToLogin = handler
-}
-
-// ==================== Token 错误检测 ====================
-
-/**
- * 检测是否为 Token 相关错误
- * 通过检测 msg 中的关键词判断
- */
-function isTokenError(msg: string): boolean {
-  const tokenKeywords = [
-    'token',
-    'Token',
-    'TOKEN',
-    '登录',
-    '认证',
-    '授权',
-    '过期',
-    'expired',
-    'unauthorized',
-    'Unauthorized',
-    'invalid',
-    'Invalid',
-  ]
-  return tokenKeywords.some((keyword) => msg.includes(keyword))
 }
 
 // ==================== 创建 Axios 实例 ====================
@@ -247,7 +217,7 @@ async function handleTokenError(config: AxiosRequestConfig): Promise<AxiosRespon
       },
     }
 
-    return axios(retryConfig)
+    return request(retryConfig)
   } catch {
     // 刷新失败，先清除 token 再跳转登录（防止循环刷新）
     clearTokens()
@@ -256,10 +226,6 @@ async function handleTokenError(config: AxiosRequestConfig): Promise<AxiosRespon
   }
 }
 
-/**
- * 响应拦截器
- * 处理 code=0/1 业务状态，业务错误显示 msg 提示
- */
 request.interceptors.response.use(
   async (response: AxiosResponse<ApiResponse>) => {
     const { code, msg, data } = response.data
@@ -268,12 +234,6 @@ request.interceptors.response.use(
     if (code === 0) {
       // 返回 data 部分，简化调用方使用
       return data as AxiosResponse
-    }
-
-    // 业务失败 - 检查是否为 Token 相关错误
-    if (isTokenError(msg)) {
-      // Token 错误 - 尝试刷新并重试
-      return handleTokenError(response.config)
     }
 
     // 普通业务错误 - 显示 msg 提示

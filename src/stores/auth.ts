@@ -6,7 +6,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { adminLogin, refreshToken as refreshTokenApi } from '@/api/auth'
-import { getAccessToken, getRefreshToken, setTokens, clearTokens, hasToken } from '@/utils/storage'
+import {
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+  clearTokens,
+  isTokenExpired,
+} from '@/utils/storage'
 import type { LoginCredentials, JwtToken } from '@/api/types'
 
 /**
@@ -30,7 +36,7 @@ export const useAuthStore = defineStore('auth', () => {
   // ==================== 计算属性 ====================
 
   /** 是否已登录 */
-  const isLoggedIn = computed(() => !!accessToken.value)
+  const isLoggedIn = computed(() => !!accessToken.value && !isTokenExpired(accessToken.value))
 
   // ==================== Actions ====================
 
@@ -112,7 +118,8 @@ export const useAuthStore = defineStore('auth', () => {
    * 检查是否有有效的 Token
    */
   function checkAuth(): boolean {
-    return hasToken()
+    const token = getAccessToken()
+    return !!token && !isTokenExpired(token)
   }
 
   return {

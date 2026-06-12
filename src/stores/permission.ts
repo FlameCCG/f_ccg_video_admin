@@ -488,7 +488,8 @@ export const usePermissionStore = defineStore('permission', () => {
 
     // * 通配符：匹配单层路径
     if (pattern.includes('*')) {
-      const regex = new RegExp('^' + pattern.replace(/\*/g, '[^/]+') + '$')
+      const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+      const regex = new RegExp('^' + escaped.replace(/\*/g, '[^/]+') + '$')
       return regex.test(resource)
     }
 

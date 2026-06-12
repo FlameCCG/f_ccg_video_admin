@@ -13,6 +13,15 @@ vi.mock('@/api/auth', () => ({
   refreshToken: vi.fn(),
 }))
 
+// Mock storage utilities to treat dummy tokens as non-expired in these store tests
+vi.mock('@/utils/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/storage')>()
+  return {
+    ...actual,
+    isTokenExpired: vi.fn().mockReturnValue(false),
+  }
+})
+
 describe('auth store', () => {
   beforeEach(() => {
     // Create a fresh pinia instance for each test
