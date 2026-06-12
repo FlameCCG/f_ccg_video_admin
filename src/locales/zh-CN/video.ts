@@ -62,6 +62,10 @@ export default {
     resources: '资源信息',
     videoPreview: '视频预览',
     danmu: '弹幕',
+    fileName: '文件名',
+    fileSize: '文件大小',
+    bitrate: '码率',
+    codec: '编码',
   },
   player: {
     play: '播放',

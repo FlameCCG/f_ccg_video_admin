@@ -62,6 +62,10 @@ export default {
     resources: 'Resources',
     videoPreview: 'Video Preview',
     danmu: 'Danmaku',
+    fileName: 'File Name',
+    fileSize: 'File Size',
+    bitrate: 'Bitrate',
+    codec: 'Codec',
   },
   player: {
     play: 'Play',

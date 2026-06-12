@@ -43,7 +43,7 @@ export const LOCALE_STORAGE_KEY = 'admin-console-locale'
 /**
  * 获取浏览器语言
  */
-function getBrowserLocale(): LocaleType {
+export function getBrowserLocale(): LocaleType {
   const browserLang = navigator.language
   if (browserLang.startsWith('zh')) return 'zh-CN'
   if (browserLang.startsWith('ja')) return 'ja-JP'
@@ -55,7 +55,7 @@ function getBrowserLocale(): LocaleType {
  * 获取初始语言
  * 优先级: localStorage > 浏览器语言 > 默认语言
  */
-function getInitialLocale(): LocaleType {
+export function getInitialLocale(): LocaleType {
   const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
   if (stored && localeConfigs.some((c) => c.locale === stored)) {
     return stored as LocaleType

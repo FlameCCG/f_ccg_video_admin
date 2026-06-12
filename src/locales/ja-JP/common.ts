@@ -209,4 +209,14 @@ export default {
 
   // その他
   comingSoon: '近日公開予定',
+
+  // ホーム画面デモテキスト
+  home: {
+    themeDemo: 'Design Tokensとテーマシステムのデモ',
+    currentTheme: '現在のテーマ: {theme}',
+    dark: 'ダーク',
+    light: 'ライト',
+    selectTheme: 'テーマを選択:',
+    toggleTheme: 'ダーク/ライトの切り替え',
+  },
 }

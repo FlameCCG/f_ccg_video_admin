@@ -210,4 +210,14 @@ export default {
 
   // Other
   comingSoon: 'Coming soon',
+
+  // Home view demonstration text
+  home: {
+    themeDemo: 'Design Tokens & Theme System Demonstration',
+    currentTheme: 'Current Theme: {theme}',
+    dark: 'Dark',
+    light: 'Light',
+    selectTheme: 'Select Theme:',
+    toggleTheme: 'Toggle Dark/Light',
+  },
 }
