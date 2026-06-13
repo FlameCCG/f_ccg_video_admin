@@ -74,6 +74,7 @@ export default {
     nextPart: '下一P',
     partList: '选集',
     quality: '清晰度',
+    dashAuto: '自动',
     fullscreen: '全屏',
     exitFullscreen: '退出全屏',
     playbackRate: '倍速',

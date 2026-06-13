@@ -74,6 +74,7 @@ export default {
     nextPart: '次のパート',
     partList: 'パート選択',
     quality: '画質',
+    dashAuto: '自動',
     fullscreen: 'フルスクリーン',
     exitFullscreen: 'フルスクリーン解除',
     playbackRate: '再生速度',

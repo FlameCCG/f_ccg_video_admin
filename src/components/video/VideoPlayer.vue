@@ -2,7 +2,7 @@
 /**
  * 高级视频播放器组件
  * Advanced Video Player Component
- * 支持：分P切换、清晰度选择、全屏、音量控制、进度条、快捷键
+ * 支持：分P切换、清晰度选择(DASH优先/MP4兜底)、全屏、音量控制、进度条、快捷键
  */
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, h } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -21,6 +21,18 @@ import {
   ChevronBack,
 } from '@vicons/ionicons5'
 import type { VideoResource, VideoPart } from '@/api/types'
+import type { MediaPlayerClass } from 'dashjs'
+import * as dashjs from 'dashjs'
+import {
+  isDashResource,
+  isDashSupported,
+  attachDashToVideo,
+  destroyDashPlayer,
+  getDashRepresentations,
+  setDashQuality,
+  buildDashLabelMap,
+  type DashQualityOption,
+} from '@/utils/dash'
 
 interface Props {
   resources: VideoResource[]
@@ -61,6 +73,23 @@ const currentQualityIndex = ref(0)
 
 let controlsTimer: ReturnType<typeof setTimeout> | null = null
 
+// ---- DASH 运行时状态 ----
+let dashInstance: MediaPlayerClass | null = null
+// 运行期是否禁用 DASH：致命错误后在「本视频内」降级到 MP4
+let dashDisabled = false
+// 跨「DASH→MP4 兜底」保留的续播位置
+let pendingSeekTime: number | null = null
+// 当前是否在使用 DASH 播放
+const isDashActive = ref(false)
+// DASH 清晰度菜单选项
+const dashQualityOptions = ref<DashQualityOption[]>([])
+// 当前是否为 DASH 自动 ABR 模式
+const isDashAuto = ref(true)
+// 当前 DASH 清晰度标签（用于按钮显示）
+const currentDashLabel = ref('')
+// DASH label map for matching
+let dashLabelMap = new Map<number, string>()
+
 const isMultiPart = computed(() => props.parts.length > 1)
 
 const currentPart = computed(() => {
@@ -70,24 +99,74 @@ const currentPart = computed(() => {
   return null
 })
 
-const availableResources = computed(() => {
+const allResources = computed(() => {
   if (currentPart.value?.resources?.length) {
     return currentPart.value.resources
   }
   return props.resources
 })
 
+// DASH 清单条目：用 format 判断
+const dashResource = computed(() => allResources.value.find(isDashResource))
+
+// 各清晰度直链 MP4（排除 DASH）
+const mp4Resources = computed(() => allResources.value.filter((r) => !isDashResource(r)))
+
+// 本次是否走 DASH：有 DASH 清单 + 浏览器支持 + 未被运行期禁用
+const shouldUseDash = (): boolean => !!dashResource.value && isDashSupported() && !dashDisabled
+
+// MP4 模式使用的资源列表（排除 DASH）
+const availableResources = computed(() => mp4Resources.value)
+
 const currentResource = computed(() => {
   return availableResources.value[currentQualityIndex.value] || availableResources.value[0]
 })
 
-const videoUrl = computed(() => currentResource.value?.fileUrl || '')
+// 取「最佳」MP4：DASH 致命失败兜底用（优先源视频，否则最高码率）
+const pickBestMp4 = (): VideoResource | undefined => {
+  const list = mp4Resources.value
+  if (!list.length) return undefined
+  const source = list.find((r) => r.isSource)
+  if (source) return source
+  return [...list].sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0]
+}
+
+const videoUrl = computed(() => {
+  // DASH 模式下 URL 由 dash.js 管理，不设 src
+  if (isDashActive.value) return ''
+  return currentResource.value?.fileUrl || ''
+})
 
 const qualityOptions = computed(() => {
   return availableResources.value.map((res, index) => ({
     label: res.resolution + (res.isVip ? ' (VIP)' : ''),
     key: index,
   }))
+})
+
+// DASH 模式下的清晰度下拉选项
+const dashDropdownOptions = computed(() => {
+  const autoOption = {
+    label: currentDashLabel.value
+      ? `${t('video.player.dashAuto')}(${currentDashLabel.value})`
+      : t('video.player.dashAuto'),
+    key: -1,
+  }
+  const qualityItems = dashQualityOptions.value.map((opt) => ({
+    label: opt.label,
+    key: opt.dashIndex,
+  }))
+  return [autoOption, ...qualityItems]
+})
+
+// 当前 DASH 清晰度按钮的显示文本
+const dashQualityButtonLabel = computed(() => {
+  if (isDashAuto.value) {
+    return currentDashLabel.value
+      ? `${t('video.player.dashAuto')}(${currentDashLabel.value})`
+      : t('video.player.dashAuto')
+  }
+  return currentDashLabel.value || t('video.player.quality')
 })
 
 const rateOptions = [
@@ -182,6 +261,9 @@ async function toggleFullscreen(): Promise<void> {
 }
 
 function handleQualityChange(key: number): void {
+  // DASH 模式下走 DASH 清晰度切换
+  if (isDashActive.value) return
+
   const savedTime = currentTime.value
   const wasPlaying = isPlaying.value
   currentQualityIndex.value = key
@@ -194,6 +276,16 @@ function handleQualityChange(key: number): void {
       }
     }
   })
+}
+
+function handleDashQualityChange(key: number): void {
+  if (!dashInstance) return
+  setDashQuality(dashInstance, key)
+  isDashAuto.value = key < 0
+  if (key >= 0) {
+    const opt = dashQualityOptions.value.find((o) => o.dashIndex === key)
+    currentDashLabel.value = opt?.label || ''
+  }
 }
 
 function handleRateChange(key: number): void {
@@ -211,6 +303,13 @@ function switchPart(index: number): void {
     videoRef.value.pause()
   }
 
+  // 销毁旧 DASH 实例
+  cleanupDash()
+
+  // 分P切换允许重新尝试 DASH
+  dashDisabled = false
+  pendingSeekTime = null
+
   currentPartIndex.value = index
   currentQualityIndex.value = findBestQuality()
   currentTime.value = 0
@@ -220,18 +319,7 @@ function switchPart(index: number): void {
   emit('partChange', index)
 
   void nextTick(() => {
-    if (videoRef.value) {
-      // 重置视频并加载新源
-      videoRef.value.load()
-      // 监听 canplay 事件后自动播放
-      const onCanPlayOnce = (): void => {
-        if (videoRef.value) {
-          void videoRef.value.play()
-          videoRef.value.removeEventListener('canplay', onCanPlayOnce)
-        }
-      }
-      videoRef.value.addEventListener('canplay', onCanPlayOnce)
-    }
+    initPlayback()
   })
 }
 
@@ -254,6 +342,154 @@ function findBestQuality(): number {
   const idxFree = resources.findIndex((r) => !r.isVip)
   if (idxFree !== -1) return idxFree
   return 0
+}
+
+// ---- DASH 挂载 / 销毁 / 降级 ----
+
+function cleanupDash(): void {
+  if (dashInstance) {
+    destroyDashPlayer(dashInstance)
+    dashInstance = null
+  }
+  isDashActive.value = false
+}
+
+/**
+ * DASH 致命失败兜底：切到最佳 MP4 直链，保留播放进度。
+ */
+function handleDashFatal(): void {
+  const best = pickBestMp4()
+  if (!best) {
+    console.error('[VideoPlayer] DASH 播放失败，且没有可用的 MP4 备用源')
+    return
+  }
+  pendingSeekTime = currentTime.value
+  dashDisabled = true
+  cleanupDash()
+
+  // 找到最佳 MP4 在 availableResources 中的索引
+  const idx = availableResources.value.findIndex((r) => r.id === best.id)
+  currentQualityIndex.value = idx >= 0 ? idx : 0
+
+  // 脱离错误回调栈再重建
+  window.setTimeout(() => {
+    initPlayback()
+  }, 0)
+}
+
+/**
+ * 初始化播放：优先 DASH，不可用时 MP4。
+ * 同时处理续播位置。
+ */
+function initPlayback(): void {
+  if (!videoRef.value) return
+
+  const video = videoRef.value
+
+  if (shouldUseDash() && dashResource.value) {
+    isDashActive.value = true
+    isDashAuto.value = true
+    currentDashLabel.value = ''
+    dashQualityOptions.value = []
+    dashLabelMap = new Map<number, string>()
+
+    dashInstance = attachDashToVideo(video, dashResource.value.fileUrl, {
+      onFatalError: handleDashFatal,
+      onDashCreated: (dash) => {
+        // 等 dash.js 解析完清单后构建清晰度菜单
+        const buildMenu = (): void => {
+          const mp4Labels = mp4Resources.value.map((r) => ({
+            resolution: r.resolution,
+            bitrate: r.bitrate,
+          }))
+          const options = getDashRepresentations(dash, mp4Labels)
+          dashQualityOptions.value = options
+          // 构建 label map 以追踪 ABR 自动切换时的当前清晰度
+          try {
+            const reps = dash.getRepresentationsByType('video')
+            dashLabelMap = buildDashLabelMap(reps, mp4Labels)
+          } catch {
+            // ignore
+          }
+          // 初始化时获取当前渲染清晰度
+          try {
+            const activeRep = dash.getCurrentRepresentationForType('video')
+            if (activeRep) {
+              currentDashLabel.value =
+                dashLabelMap.get(activeRep.index) ??
+                (activeRep.height ? `${activeRep.height}P` : '')
+            }
+          } catch {
+            // ignore
+          }
+        }
+        dash.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, buildMenu)
+        if (dash.isReady()) buildMenu()
+
+        // 监听 ABR 自动切换，更新当前清晰度标签
+        dash.on(
+          dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED,
+          (e: { mediaType: string; newRepresentation?: { index: number; height?: number } }) => {
+            if (e.mediaType !== 'video' || !e.newRepresentation) return
+            const rep = e.newRepresentation
+            const label = dashLabelMap.get(rep.index) ?? (rep.height ? `${rep.height}P` : '')
+            if (isDashAuto.value) {
+              currentDashLabel.value = label
+            }
+          }
+        )
+      },
+    })
+
+    if (!dashInstance) {
+      // attachDashToVideo 返回 null 说明 MSE 不可用，立即降级
+      isDashActive.value = false
+      dashDisabled = true
+      fallbackToMp4()
+      return
+    }
+
+    // 续播
+    const seekTo = pendingSeekTime
+    pendingSeekTime = null
+    if (seekTo && seekTo > 0) {
+      const onCanPlaySeek = (): void => {
+        video.currentTime = seekTo
+        video.removeEventListener('canplay', onCanPlaySeek)
+      }
+      video.addEventListener('canplay', onCanPlaySeek)
+    }
+
+    // DASH 自动 ABR，自动播放
+    const onCanPlayAutoPlay = (): void => {
+      void video.play()
+      video.removeEventListener('canplay', onCanPlayAutoPlay)
+    }
+    video.addEventListener('canplay', onCanPlayAutoPlay)
+  } else {
+    fallbackToMp4()
+  }
+}
+
+function fallbackToMp4(): void {
+  isDashActive.value = false
+  if (!videoRef.value) return
+  const video = videoRef.value
+
+  // 续播
+  const seekTo = pendingSeekTime
+  pendingSeekTime = null
+
+  video.load()
+
+  const onCanPlayOnce = (): void => {
+    if (seekTo && seekTo > 0) {
+      video.currentTime = seekTo
+    }
+    void video.play()
+    video.removeEventListener('canplay', onCanPlayOnce)
+  }
+  video.addEventListener('canplay', onCanPlayOnce)
 }
 
 function showControlsBar(): void {
@@ -364,9 +600,15 @@ function onFullscreenChange(): void {
 onMounted(() => {
   currentQualityIndex.value = findBestQuality()
   document.addEventListener('fullscreenchange', onFullscreenChange)
+
+  // 初始化播放（DASH 优先，MP4 兜底）
+  void nextTick(() => {
+    initPlayback()
+  })
 })
 
 onUnmounted(() => {
+  cleanupDash()
   if (controlsTimer) {
     clearTimeout(controlsTimer)
   }
@@ -376,7 +618,14 @@ onUnmounted(() => {
 watch(
   () => props.resources,
   () => {
+    // 资源变化时重新初始化（允许重新尝试 DASH）
+    cleanupDash()
+    dashDisabled = false
+    pendingSeekTime = null
     currentQualityIndex.value = findBestQuality()
+    void nextTick(() => {
+      initPlayback()
+    })
   },
   { deep: true }
 )
@@ -400,7 +649,7 @@ defineExpose({
     <video
       ref="videoRef"
       class="video-player__video"
-      :src="videoUrl"
+      :src="isDashActive ? undefined : videoUrl"
       :poster="poster"
       :autoplay="autoplay"
       preload="metadata"
@@ -436,10 +685,6 @@ defineExpose({
     <Transition name="slide-up">
       <div v-show="showControls" class="video-player__controls">
         <div class="video-player__progress">
-          <div
-            class="video-player__progress-buffered"
-            :style="{ width: `${(buffered / duration) * 100}%` }"
-          />
           <n-slider
             :value="currentTime"
             :max="duration || 100"
@@ -547,7 +792,12 @@ defineExpose({
               <n-button quaternary size="small"> {{ playbackRate }}x </n-button>
             </n-dropdown>
 
-            <n-dropdown trigger="click" :options="qualityOptions" @select="handleQualityChange">
+            <n-dropdown
+              v-if="!isDashActive"
+              trigger="click"
+              :options="qualityOptions"
+              @select="handleQualityChange"
+            >
               <n-button quaternary size="small">
                 <template #icon>
                   <n-icon :size="18"><Settings /></n-icon>
@@ -555,6 +805,25 @@ defineExpose({
                 {{ currentResource?.resolution || t('video.player.quality') }}
               </n-button>
             </n-dropdown>
+            <n-dropdown
+              v-else-if="dashQualityOptions.length > 0"
+              trigger="click"
+              :options="dashDropdownOptions"
+              @select="handleDashQualityChange"
+            >
+              <n-button quaternary size="small">
+                <template #icon>
+                  <n-icon :size="18"><Settings /></n-icon>
+                </template>
+                {{ dashQualityButtonLabel }}
+              </n-button>
+            </n-dropdown>
+            <n-button v-else quaternary size="small" :disabled="true">
+              <template #icon>
+                <n-icon :size="18"><Settings /></n-icon>
+              </template>
+              {{ t('video.player.dashAuto') }}
+            </n-button>
 
             <n-tooltip>
               <template #trigger>
@@ -648,22 +917,12 @@ defineExpose({
     position: relative;
     height: 4px;
     margin-bottom: var(--spacing-2);
-    background-color: rgb(255 255 255 / 30%);
     border-radius: 2px;
-
-    &-buffered {
-      position: absolute;
-      top: 0;
-      left: 0;
-      height: 100%;
-      background-color: rgb(255 255 255 / 40%);
-      border-radius: 2px;
-    }
 
     :deep(.n-slider) {
       --n-rail-height: 4px;
-      --n-rail-color: transparent;
-      --n-rail-color-hover: transparent;
+      --n-rail-color: rgb(255 255 255 / 30%);
+      --n-rail-color-hover: rgb(255 255 255 / 40%);
       --n-fill-color: var(--color-primary);
       --n-fill-color-hover: var(--color-primary);
       --n-handle-size: 12px;

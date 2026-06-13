@@ -74,6 +74,7 @@ export default {
     nextPart: 'Next Part',
     partList: 'Parts',
     quality: 'Quality',
+    dashAuto: 'Auto',
     fullscreen: 'Fullscreen',
     exitFullscreen: 'Exit Fullscreen',
     playbackRate: 'Playback Rate',
