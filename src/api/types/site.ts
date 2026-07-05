@@ -9,7 +9,7 @@ export type SiteConfigName =
   | 'site'
   | 'logger'
   | 'email'
-  | 'xai'
+  | 'ai'
   | 'transcode'
   | 'thirdLogin'
   | 'jwt'
@@ -161,14 +161,30 @@ export interface EmailConfig {
   isExpire: number
 }
 
-/** xAI 配置 */
-export interface XAIConfig {
-  baseURL: string
-  apiKey: string
+/** AI 配置 */
+export interface AIModelOption {
+  label: string
+  value: string
+}
+
+export interface AIConfig {
+  baseURL?: string
+  apiKey?: string
+  chatModelBaseURL: string
+  chatModelAPIKey: string
+  chatModel: string
+  embeddingModelBaseURL: string
+  embeddingModel: string
+  embeddingDimensions: number
+  doubaoModelAPIKey: string
   systemPrompt: string
-  textModel: string
+  textModel?: string
   imageModel: string
+  imageModels?: AIModelOption[]
   videoModel: string
+  videoModels?: AIModelOption[]
+  vectorIndex: string
+  vectorTopK: number
   maxInputWorks: number
   timeoutSec: number
 }
@@ -236,7 +252,7 @@ export interface SiteConfigMap {
   site: SiteConfig
   logger: LoggerConfig
   email: EmailConfig
-  xai: XAIConfig
+  ai: AIConfig
   transcode: TranscodeConfig
   thirdLogin: ThirdLoginConfig
   jwt: JwtConfig

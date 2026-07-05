@@ -14,7 +14,7 @@ import type {
   SiteConfig,
   LoggerConfig,
   EmailConfig,
-  XAIConfig,
+  AIConfig,
   TranscodeConfig,
   ThirdLoginConfig,
   JwtConfig,
@@ -23,7 +23,7 @@ import {
   SiteConfigForm,
   LoggerConfigForm,
   EmailConfigForm,
-  XAIConfigForm,
+  AIConfigForm,
   TranscodeConfigForm,
   ThirdLoginConfigForm,
   JwtConfigForm,
@@ -41,7 +41,7 @@ const currentTab = computed(() => {
     'site',
     'logger',
     'email',
-    'xai',
+    'ai',
     'transcode',
     'thirdLogin',
     'jwt',
@@ -69,7 +69,7 @@ const configTabs = computed(() => [
   { key: 'site' as const, label: t('siteConfig.tabs.site') },
   { key: 'logger' as const, label: t('siteConfig.tabs.logger') },
   { key: 'email' as const, label: t('siteConfig.tabs.email') },
-  { key: 'xai' as const, label: t('siteConfig.tabs.xai') },
+  { key: 'ai' as const, label: t('siteConfig.tabs.ai') },
   { key: 'transcode' as const, label: t('siteConfig.tabs.transcode') },
   { key: 'thirdLogin' as const, label: t('siteConfig.tabs.thirdLogin') },
   { key: 'jwt' as const, label: t('siteConfig.tabs.jwt') },
@@ -79,7 +79,7 @@ const configTabs = computed(() => [
 const siteFormData = ref<SiteConfig | null>(null)
 const loggerFormData = ref<LoggerConfig | null>(null)
 const emailFormData = ref<EmailConfig | null>(null)
-const xaiFormData = ref<XAIConfig | null>(null)
+const aiFormData = ref<AIConfig | null>(null)
 const transcodeFormData = ref<TranscodeConfig | null>(null)
 const thirdLoginFormData = ref<ThirdLoginConfig | null>(null)
 const jwtFormData = ref<JwtConfig | null>(null)
@@ -101,8 +101,8 @@ const { isLoading, refetch } = useQuery({
       case 'email':
         emailFormData.value = data as EmailConfig
         break
-      case 'xai':
-        xaiFormData.value = data as XAIConfig
+      case 'ai':
+        aiFormData.value = data as AIConfig
         break
       case 'transcode':
         transcodeFormData.value = data as TranscodeConfig
@@ -134,8 +134,8 @@ const updateMutation = useMutation({
       case 'email':
         data = emailFormData.value
         break
-      case 'xai':
-        data = xaiFormData.value
+      case 'ai':
+        data = aiFormData.value
         break
       case 'transcode':
         data = transcodeFormData.value
@@ -244,10 +244,10 @@ watch(currentTab, () => {
                 v-model="emailFormData"
                 :loading="updateMutation.isPending.value"
               />
-              <!-- xAI配置 -->
-              <XAIConfigForm
-                v-else-if="tab.key === 'xai' && xaiFormData"
-                v-model="xaiFormData"
+              <!-- AI配置 -->
+              <AIConfigForm
+                v-else-if="tab.key === 'ai' && aiFormData"
+                v-model="aiFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 转码配置 -->
