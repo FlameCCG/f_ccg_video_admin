@@ -21,12 +21,15 @@ import {
   NCollapse,
   NCollapseItem,
   NTooltip,
+  NProgress,
+  NAlert,
 } from 'naive-ui'
 import { getVideoDetail } from '@/api/video'
-import type { VideoStatus } from '@/api/types'
+import type { VideoStatus, VideoResource } from '@/api/types'
 import { AppAvatar, AppStatusTag } from '@/components/common'
 import { VideoPlayer } from '@/components/video'
 import { formatDateTime } from '@/utils'
+import { useTranscodeProgressSSE } from '@/composables'
 
 interface Props {
   visible: boolean
@@ -62,6 +65,21 @@ const {
   enabled: computed(() => props.visible && props.videoId !== null),
   staleTime: 60 * 1000,
 })
+
+const detailVideoIds = computed(() =>
+  props.visible && props.videoId != null && props.videoId > 0 ? [props.videoId] : []
+)
+const { progressMap } = useTranscodeProgressSSE(detailVideoIds)
+const detailProgress = computed(() =>
+  props.videoId != null ? progressMap.value[props.videoId] : undefined
+)
+
+function stageLabel(stage?: string): string {
+  if (!stage) return ''
+  const key = `video.transcode.stage.${stage}`
+  const label = t(key)
+  return label === key ? stage : label
+}
 
 watch(
   () => props.videoId,
@@ -138,6 +156,13 @@ function formatFileSize(bytes: number): string {
   return bytes + ' B'
 }
 
+function isDashResource(resource: VideoResource): boolean {
+  const fmt = (resource.format || '').toLowerCase()
+  if (fmt === 'dash') return true
+  const url = (resource.fileUrl || '').toLowerCase()
+  return url.includes('.mpd')
+}
+
 const isMultiPart = computed(() => {
   return videoDetail.value?.parts && videoDetail.value.parts.length > 1
 })
@@ -158,6 +183,43 @@ const isMultiPart = computed(() => {
               @part-change="handlePartChange"
             />
           </div>
+
+          <template v-if="detailProgress">
+            <n-divider>{{ t('video.detail.transcodeProgress') }}</n-divider>
+            <n-alert
+              v-if="detailProgress.status === 'failed'"
+              type="error"
+              :title="t('video.transcode.failed')"
+              style="margin-bottom: 12px"
+            >
+              {{ detailProgress.error || detailProgress.message }}
+            </n-alert>
+            <n-space vertical :size="8">
+              <n-tag
+                size="small"
+                :type="
+                  detailProgress.status === 'succeeded'
+                    ? 'success'
+                    : detailProgress.status === 'failed'
+                      ? 'error'
+                      : detailProgress.status === 'queued'
+                        ? 'warning'
+                        : 'info'
+                "
+              >
+                {{ t(`video.transcode.${detailProgress.status}`) }}
+              </n-tag>
+              <n-progress
+                type="line"
+                :percentage="Math.max(0, Math.min(100, Math.round(detailProgress.percent || 0)))"
+                :processing="detailProgress.status === 'running'"
+                indicator-placement="inside"
+              />
+              <div class="video-detail__transcode-msg">
+                {{ detailProgress.message || stageLabel(detailProgress.stage) }}
+              </div>
+            </n-space>
+          </template>
 
           <n-divider>{{ t('video.detail.basicInfo') }}</n-divider>
           <n-descriptions :column="2" label-placement="left">
@@ -304,6 +366,13 @@ const isMultiPart = computed(() => {
                   <n-space :size="8">
                     <n-tag v-if="resource.isVip" size="tiny" type="warning">VIP</n-tag>
                     <n-tag size="tiny">{{ resource.format.toUpperCase() }}</n-tag>
+                    <n-tag
+                      v-if="isDashResource(resource) && resource.variants?.length"
+                      size="tiny"
+                      type="info"
+                    >
+                      {{ t('video.detail.dashStreamCount', { n: resource.variants.length }) }}
+                    </n-tag>
                   </n-space>
                 </template>
                 <n-descriptions :column="2" label-placement="left" size="small">
@@ -314,12 +383,69 @@ const isMultiPart = computed(() => {
                     {{ formatFileSize(resource.fileSize) }}
                   </n-descriptions-item>
                   <n-descriptions-item :label="t('video.detail.bitrate')">
-                    {{ resource.bitrate }} kbps
+                    <template v-if="isDashResource(resource)">
+                      {{ t('video.detail.adaptiveBitrate') }}
+                      <span v-if="resource.bitrate > 0"> （max {{ resource.bitrate }} kbps） </span>
+                    </template>
+                    <template v-else>{{ resource.bitrate }} kbps</template>
                   </n-descriptions-item>
                   <n-descriptions-item :label="t('video.detail.codec')">
-                    {{ resource.codec.toUpperCase() }}
+                    {{ (resource.codec || '—').toUpperCase() }}
                   </n-descriptions-item>
                 </n-descriptions>
+
+                <!-- DASH: 展开 MPD 内各 Representation -->
+                <template v-if="isDashResource(resource) && resource.variants?.length">
+                  <div class="video-detail__dash-streams">
+                    <div class="video-detail__dash-streams-title">
+                      {{ t('video.detail.dashStreams') }}
+                    </div>
+                    <div
+                      v-for="(variant, vIdx) in resource.variants"
+                      :key="`${resource.id}-${variant.id || vIdx}`"
+                      class="video-detail__dash-stream"
+                    >
+                      <div class="video-detail__dash-stream-head">
+                        <n-space :size="6" align="center">
+                          <n-tag
+                            size="tiny"
+                            :type="variant.contentType === 'audio' ? 'success' : 'info'"
+                          >
+                            {{
+                              variant.contentType === 'audio'
+                                ? t('video.detail.audioStream')
+                                : t('video.detail.videoStream')
+                            }}
+                          </n-tag>
+                          <span class="video-detail__dash-stream-label">
+                            {{ variant.resolution || '—' }}
+                          </span>
+                          <n-tag v-if="variant.height" size="tiny" :bordered="false">
+                            {{ variant.width }}×{{ variant.height }}
+                          </n-tag>
+                        </n-space>
+                      </div>
+                      <n-descriptions :column="2" label-placement="left" size="small">
+                        <n-descriptions-item :label="t('video.detail.fileName')">
+                          {{ variant.fileName || variant.baseUrl || '—' }}
+                        </n-descriptions-item>
+                        <n-descriptions-item :label="t('video.detail.fileSize')">
+                          {{ variant.fileSize ? formatFileSize(variant.fileSize) : '—' }}
+                        </n-descriptions-item>
+                        <n-descriptions-item :label="t('video.detail.bitrate')">
+                          <template v-if="variant.bitrate"> {{ variant.bitrate }} kbps </template>
+                          <template v-else-if="variant.bandwidth">
+                            {{ Math.round(variant.bandwidth / 1000) }} kbps
+                          </template>
+                          <template v-else>—</template>
+                        </n-descriptions-item>
+                        <n-descriptions-item :label="t('video.detail.codec')">
+                          {{ (variant.codecs || '—').toUpperCase() }}
+                        </n-descriptions-item>
+                      </n-descriptions>
+                    </div>
+                  </div>
+                </template>
               </n-collapse-item>
             </n-collapse>
           </template>
@@ -361,6 +487,45 @@ const isMultiPart = computed(() => {
     background-color: var(--color-bg);
     border-radius: var(--radius-sm);
     color: var(--color-text-secondary);
+  }
+
+  &__transcode-msg {
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+  }
+
+  &__dash-streams {
+    margin-top: var(--spacing-3);
+    padding: var(--spacing-3);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+  }
+
+  &__dash-streams-title {
+    margin-bottom: var(--spacing-2);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
+
+  &__dash-stream {
+    padding: var(--spacing-2) 0;
+    border-top: 1px dashed var(--color-border);
+
+    &:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+  }
+
+  &__dash-stream-head {
+    margin-bottom: var(--spacing-2);
+  }
+
+  &__dash-stream-label {
+    font-size: var(--text-sm);
+    font-weight: 600;
   }
 
   &__parts {
