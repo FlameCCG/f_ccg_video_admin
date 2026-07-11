@@ -27,6 +27,7 @@ import type {
   ReportListParams,
   HandleReportParams,
   HandleReportResult,
+  TranscodeProgress,
 } from './types'
 import type { PaginationParams } from './types/common'
 
@@ -38,6 +39,27 @@ import type { PaginationParams } from './types/common'
  */
 export function getVideoList(params?: VideoListParams): Promise<PaginatedData<AdminVideoItem>> {
   return request.get('/admin/video/list', { params })
+}
+
+/**
+ * 批量获取转码进度快照（轮询降级）
+ * GET /admin/video/transcode/progress
+ */
+export function getTranscodeProgress(videoIds: number[]): Promise<{ items: TranscodeProgress[] }> {
+  return request.get('/admin/video/transcode/progress', {
+    params: { videoIds: videoIds.join(',') },
+  })
+}
+
+/**
+ * 构建转码进度 SSE URL（EventSource 用 query token）
+ * GET /admin/video/transcode/progress/stream
+ */
+export function buildTranscodeProgressStreamUrl(videoIds: number[], token: string): string {
+  const params = new URLSearchParams()
+  params.set('videoIds', videoIds.join(','))
+  params.set('token', token)
+  return `/v1/admin/video/transcode/progress/stream?${params.toString()}`
 }
 
 /**

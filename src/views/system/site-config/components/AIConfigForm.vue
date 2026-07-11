@@ -36,10 +36,7 @@ function updateField<K extends keyof AIConfig>(field: K, value: AIConfig[K]): vo
     <n-grid :cols="2" :x-gap="24">
       <n-grid-item>
         <n-form-item :label="t('siteConfig.ai.chatModel')">
-          <n-input
-            :value="formData.chatModel"
-            @update:value="(v) => updateField('chatModel', v)"
-          />
+          <n-input :value="formData.chatModel" @update:value="(v) => updateField('chatModel', v)" />
         </n-form-item>
       </n-grid-item>
 

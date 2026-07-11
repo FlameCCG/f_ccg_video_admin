@@ -5,14 +5,7 @@
 // ============ 站点配置类型 ============
 
 /** 配置名称类型 */
-export type SiteConfigName =
-  | 'site'
-  | 'logger'
-  | 'email'
-  | 'ai'
-  | 'transcode'
-  | 'thirdLogin'
-  | 'jwt'
+export type SiteConfigName = 'site' | 'logger' | 'email' | 'ai' | 'transcode' | 'thirdLogin' | 'jwt'
 
 // ============ 公开站点配置类型（无需认证） ============
 
