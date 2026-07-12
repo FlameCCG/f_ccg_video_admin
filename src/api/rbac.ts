@@ -17,6 +17,7 @@ import type {
   UpdateUserRolesParams,
   GetUserPermissionsParams,
   GetRoleInheritsParams,
+  RoleInheritsDetail,
   CreateMenuParams,
   UpdateMenuParams,
   AssignMenuParams,
@@ -27,7 +28,8 @@ import type {
   RemovePermissionParams,
   ReplaceRolePermissionsParams,
   GetRolePermissionsParams,
-  RolePermissionsList,
+  RolePermissionsDetail,
+  WildcardPermissionOption,
   RoleInheritTreeNode,
 } from './types'
 
@@ -98,10 +100,10 @@ export function removeRoleInherit(params: RoleInheritParams): Promise<EmptyData>
 }
 
 /**
- * 获取角色继承列表
+ * 获取角色继承列表（直接 + 间接）
  * GET /admin/rbac/role/inherits
  */
-export function getRoleInherits(params: GetRoleInheritsParams): Promise<string[]> {
+export function getRoleInherits(params: GetRoleInheritsParams): Promise<RoleInheritsDetail> {
   return request.get('/admin/rbac/role/inherits', { params })
 }
 
@@ -248,9 +250,19 @@ export function replaceRolePermissions(params: ReplaceRolePermissionsParams): Pr
 }
 
 /**
- * 获取角色权限列表
+ * 获取角色权限详情（直接权限 + 有效权限 + 覆盖的具体 API）
  * GET /admin/rbac/role/permissions
  */
-export function getRolePermissions(params: GetRolePermissionsParams): Promise<RolePermissionsList> {
+export function getRolePermissions(
+  params: GetRolePermissionsParams
+): Promise<RolePermissionsDetail> {
   return request.get('/admin/rbac/role/permissions', { params })
+}
+
+/**
+ * 获取系统中已配置的通配符权限列表（跨角色去重）
+ * GET /admin/rbac/permission/wildcards
+ */
+export function getWildcardPermissions(): Promise<WildcardPermissionOption[]> {
+  return request.get('/admin/rbac/permission/wildcards')
 }
