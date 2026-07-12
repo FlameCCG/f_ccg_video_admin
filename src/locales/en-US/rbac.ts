@@ -38,6 +38,11 @@ export default {
     noInherit: 'No inheritance relationships',
     addInherit: 'Add Inheritance',
     removeInherit: 'Remove Inheritance',
+    inheritDirect: 'Direct inheritance',
+    inheritIndirect: 'Indirect inheritance',
+    inheritVia: 'Via "{role}"',
+    inheritBlockedHint: 'Roles already inherited (directly or indirectly) are not listed',
+    unlinkIndirectTip: 'Cannot unlink indirect inheritance. Unlink top-level parent "{role}" first',
     inheritTree: {
       title: 'Role Inheritance Tree',
       view: 'View Inheritance Tree',
@@ -113,6 +118,30 @@ export default {
     noWildcard: 'No wildcard permissions',
     confirmRemove: 'Are you sure you want to remove this permission?',
     resourceRequired: 'Please enter resource path',
+    alreadyOwned: 'You already have this permission',
+    wildcardAdded: 'Wildcard permission added; save to apply',
+    roleName: 'Role',
+    source: 'Source',
+    sourceDirect: 'Direct',
+    sourceInherited: 'Inherited',
+    sourceInheritDirect: 'Direct inherit',
+    sourceInheritIndirect: 'Indirect inherit',
+    unlinkIndirectTip: 'Cannot unlink indirect inheritance. Unlink top-level parent "{role}" first',
+    breakInheritTitle: 'Break inheritance and clear wildcards',
+    breakInheritContent:
+      'You are changing a permission covered by a wildcard or inheritance. Continuing will remove all inheritance and wildcard permissions for this role, and keep only the currently checked specific APIs. Continue?',
+    breakInheritApplied:
+      'Switched to specific-API-only mode: inheritance and wildcards will be cleared on save',
+    breakInheritBanner:
+      'Break-inheritance mode: saving will clear all inheritance and wildcards, and write only checked specific APIs',
+    removeInherit: 'Unlink',
+    confirmRemoveInherit:
+      'Remove inheritance from "{role}"? This role will no longer receive permissions from that parent.',
+    removeInheritSuccess: 'Inheritance removed',
+    removeInheritFailed: 'Failed to remove inheritance',
+    wildcardSelectPlaceholder: 'Select or type a wildcard path, e.g. /v1/admin/**',
+    wildcardSelectHint: 'Pick an existing system wildcard, or type a new path and click Add',
+    emptyInheritPolicy: '(No wildcard policies on this role)',
   },
   userRole: {
     title: 'User Roles',

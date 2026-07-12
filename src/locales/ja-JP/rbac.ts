@@ -38,6 +38,12 @@ export default {
     noInherit: '継承関係がありません',
     addInherit: '継承追加',
     removeInherit: '継承削除',
+    inheritDirect: '直接継承',
+    inheritIndirect: '間接継承',
+    inheritVia: '「{role}」経由',
+    inheritBlockedHint: '既に直接/間接継承しているロールは選択肢に出ません',
+    unlinkIndirectTip:
+      '間接継承は直接解除できません。先に最上位の親ロール「{role}」を解除してください',
     inheritTree: {
       title: 'ロール継承ツリー',
       view: '継承ツリーを表示',
@@ -111,6 +117,31 @@ export default {
     noWildcard: 'ワイルドカード権限がありません',
     confirmRemove: 'この権限を削除してもよろしいですか？',
     resourceRequired: 'リソースパスを入力してください',
+    alreadyOwned: 'この権限は既に所持しています',
+    wildcardAdded: 'ワイルドカード権限を追加しました。保存で反映されます',
+    roleName: 'ロール',
+    source: '取得元',
+    sourceDirect: '直接',
+    sourceInherited: '継承',
+    sourceInheritDirect: '直接継承',
+    sourceInheritIndirect: '間接継承',
+    unlinkIndirectTip:
+      '間接継承は直接解除できません。先に最上位の親ロール「{role}」を解除してください',
+    breakInheritTitle: '継承解除とワイルドカード削除',
+    breakInheritContent:
+      'ワイルドカードまたは継承で付与されている権限を変更しようとしています。続行すると、このロールの全継承とワイルドカード権限が削除され、現在チェック中の個別 API 権限のみが残ります。続行しますか？',
+    breakInheritApplied:
+      '個別 API のみモードに切り替えました。保存時に継承とワイルドカードが削除されます',
+    breakInheritBanner:
+      '継承解除モード：保存すると全継承とワイルドカードを削除し、チェック済みの個別 API のみを書き込みます',
+    removeInherit: '解除',
+    confirmRemoveInherit:
+      '「{role}」からの継承を解除しますか？解除後、その親ロール由来の権限は失われます。',
+    removeInheritSuccess: '継承を解除しました',
+    removeInheritFailed: '継承の解除に失敗しました',
+    wildcardSelectPlaceholder: '選択または入力：例 /v1/admin/**',
+    wildcardSelectHint: '既存のシステムワイルドカードを選ぶか、新しいパスを入力して追加できます',
+    emptyInheritPolicy: '（このロールにワイルドカード権限はありません）',
   },
   userRole: {
     title: 'ユーザーロール',
