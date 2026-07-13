@@ -145,11 +145,14 @@ export default {
     gpuPreset: 'GPUプリセット',
     threads: 'スレッド数',
     hardwareScale: 'ハードウェアスケール',
+    mp4Enable: 'MP4 Pipelineを有効化',
+    mp4Title: 'MP4 マルチ解像度 Pipeline',
     dashEnable: 'DASH有効化',
     dashSegDuration: 'DASHセグメント長',
     dashTitle: 'DASH設定',
     kbpsTip: '単位：Kbps',
     percentTip: '単位：%',
+    secondsTip: '秒',
   },
   // サードパーティログイン
   thirdLogin: {

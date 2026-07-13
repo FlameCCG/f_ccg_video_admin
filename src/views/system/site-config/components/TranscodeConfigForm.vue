@@ -296,7 +296,22 @@ function handleResolutionsChange(values: (string | number)[]): void {
       </n-grid-item>
     </n-grid>
 
-    <!-- DASH 设置 -->
+    <!-- MP4 Pipeline 设置 -->
+    <n-divider title-placement="left">
+      <n-text>{{ t('siteConfig.transcode.mp4Title') }}</n-text>
+    </n-divider>
+    <n-grid :cols="2" :x-gap="24">
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.mp4Enable')">
+          <n-switch
+            :value="formData.mp4Enable"
+            @update:value="(v: boolean) => updateField('mp4Enable', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+    </n-grid>
+
+    <!-- DASH Pipeline 设置 -->
     <n-divider title-placement="left">
       <n-text>{{ t('siteConfig.transcode.dashTitle') }}</n-text>
     </n-divider>
@@ -317,7 +332,7 @@ function handleResolutionsChange(values: (string | number)[]): void {
             :max="30"
             @update:value="(v) => updateField('dashSegDuration', v ?? 4)"
           >
-            <template #suffix>秒</template>
+            <template #suffix>{{ t('siteConfig.transcode.secondsTip') }}</template>
           </n-input-number>
         </n-form-item>
       </n-grid-item>

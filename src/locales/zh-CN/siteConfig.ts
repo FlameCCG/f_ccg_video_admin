@@ -145,11 +145,14 @@ export default {
     gpuPreset: 'GPU预设',
     threads: '线程数',
     hardwareScale: '硬件缩放',
+    mp4Enable: '启用 MP4 Pipeline',
+    mp4Title: 'MP4 多分辨率 Pipeline',
     dashEnable: '启用DASH',
     dashSegDuration: 'DASH切片时长',
     dashTitle: 'DASH设置',
     kbpsTip: '单位：Kbps',
     percentTip: '单位：%',
+    secondsTip: '秒',
   },
   // 第三方登录
   thirdLogin: {

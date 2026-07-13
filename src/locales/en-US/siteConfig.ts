@@ -145,11 +145,14 @@ export default {
     gpuPreset: 'GPU Preset',
     threads: 'Threads',
     hardwareScale: 'Hardware Scale',
+    mp4Enable: 'Enable MP4 Pipeline',
+    mp4Title: 'MP4 Multi-resolution Pipeline',
     dashEnable: 'Enable DASH',
     dashSegDuration: 'DASH Segment Duration',
     dashTitle: 'DASH Settings',
     kbpsTip: 'Unit: Kbps',
     percentTip: 'Unit: %',
+    secondsTip: 'sec',
   },
   // Third-party Login
   thirdLogin: {

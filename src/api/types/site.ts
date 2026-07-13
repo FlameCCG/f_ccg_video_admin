@@ -205,6 +205,7 @@ export interface TranscodeConfig {
   gpuMode: boolean
   threads: number
   hardwareScale: boolean
+  mp4Enable: boolean
   dashEnable: boolean
   dashSegDuration: number
 }
