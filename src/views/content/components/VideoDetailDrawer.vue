@@ -21,13 +21,12 @@ import {
   NCollapse,
   NCollapseItem,
   NTooltip,
-  NProgress,
-  NAlert,
 } from 'naive-ui'
 import { getVideoDetail } from '@/api/video'
 import type { VideoStatus, VideoResource } from '@/api/types'
 import { AppAvatar, AppStatusTag } from '@/components/common'
 import { VideoPlayer } from '@/components/video'
+import TranscodePipelineProgress from '@/components/video/TranscodePipelineProgress.vue'
 import { formatDateTime } from '@/utils'
 import { useTranscodeProgressSSE } from '@/composables'
 
@@ -73,13 +72,6 @@ const { progressMap } = useTranscodeProgressSSE(detailVideoIds)
 const detailProgress = computed(() =>
   props.videoId != null ? progressMap.value[props.videoId] : undefined
 )
-
-function stageLabel(stage?: string): string {
-  if (!stage) return ''
-  const key = `video.transcode.stage.${stage}`
-  const label = t(key)
-  return label === key ? stage : label
-}
 
 watch(
   () => props.videoId,
@@ -184,41 +176,9 @@ const isMultiPart = computed(() => {
             />
           </div>
 
-          <template v-if="detailProgress">
+          <template v-if="detailProgress?.length">
             <n-divider>{{ t('video.detail.transcodeProgress') }}</n-divider>
-            <n-alert
-              v-if="detailProgress.status === 'failed'"
-              type="error"
-              :title="t('video.transcode.failed')"
-              style="margin-bottom: 12px"
-            >
-              {{ detailProgress.error || detailProgress.message }}
-            </n-alert>
-            <n-space vertical :size="8">
-              <n-tag
-                size="small"
-                :type="
-                  detailProgress.status === 'succeeded'
-                    ? 'success'
-                    : detailProgress.status === 'failed'
-                      ? 'error'
-                      : detailProgress.status === 'queued'
-                        ? 'warning'
-                        : 'info'
-                "
-              >
-                {{ t(`video.transcode.${detailProgress.status}`) }}
-              </n-tag>
-              <n-progress
-                type="line"
-                :percentage="Math.max(0, Math.min(100, Math.round(detailProgress.percent || 0)))"
-                :processing="detailProgress.status === 'running'"
-                indicator-placement="inside"
-              />
-              <div class="video-detail__transcode-msg">
-                {{ detailProgress.message || stageLabel(detailProgress.stage) }}
-              </div>
-            </n-space>
+            <transcode-pipeline-progress :items="detailProgress" />
           </template>
 
           <n-divider>{{ t('video.detail.basicInfo') }}</n-divider>

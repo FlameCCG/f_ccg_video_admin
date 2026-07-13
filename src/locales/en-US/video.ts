@@ -34,6 +34,28 @@ export default {
     succeeded: 'Done',
     failed: 'Failed',
     idle: '—',
+    part: 'Part {id}',
+    pipeline: {
+      mp4: 'MP4 Outputs',
+      dash: 'DASH Stream',
+    },
+    status: {
+      queued: 'Queued',
+      encoding: 'Encoding',
+      uploading: 'Uploading',
+      running: 'Processing',
+      succeeded: 'Done',
+      failed: 'Failed',
+      skipped: 'Skipped',
+    },
+    quality: {
+      high: 'High',
+      medium: 'Medium',
+    },
+    role: {
+      normalized: 'Normalized',
+      source: 'Source spec',
+    },
     stage: {
       queued: 'Queued',
       prepare: 'Prepare',

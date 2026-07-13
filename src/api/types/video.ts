@@ -58,6 +58,39 @@ export interface VideoAuthorDetail extends VideoAuthor {
  */
 export type TranscodeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
 
+/** 转码 Pipeline 状态 */
+export type TranscodePipelineStatus =
+  | 'queued'
+  | 'encoding'
+  | 'uploading'
+  | 'succeeded'
+  | 'failed'
+  | 'skipped'
+
+/** Pipeline 内单个输出档位的状态 */
+export interface TranscodeOutputProgress {
+  id: string
+  format: string
+  resolution: string
+  quality?: string
+  role?: string
+  status: TranscodePipelineStatus
+  percent: number
+  message?: string
+  error?: string
+}
+
+/** 一条 MP4 或 DASH Pipeline 的实时进度 */
+export interface TranscodePipelineProgress {
+  name: string
+  status: TranscodePipelineStatus
+  percent: number
+  message?: string
+  error?: string
+  outputs: TranscodeOutputProgress[]
+  updatedAt?: string
+}
+
 /**
  * 转码进度（Redis 热状态，管理端展示）
  */
@@ -74,6 +107,7 @@ export interface TranscodeProgress {
   error?: string
   updatedAt?: string
   startedAt?: string
+  pipelines?: TranscodePipelineProgress[]
 }
 
 /**

@@ -18,17 +18,16 @@ import {
   NInput,
   NImage,
   NTag,
-  NProgress,
-  NTooltip,
   useMessage,
   useDialog,
 } from 'naive-ui'
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 import { getVideoList, deleteVideo, getPartitions } from '@/api/video'
-import type { AdminVideoItem, VideoStatus, VideoSortType, TranscodeProgress } from '@/api/types'
+import type { AdminVideoItem, VideoStatus, VideoSortType } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar, AppStatusTag } from '@/components/common'
+import TranscodePipelineProgress from '@/components/video/TranscodePipelineProgress.vue'
 import { useTableSelectionAction, useTranscodeProgressSSE } from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
 
@@ -111,56 +110,6 @@ const pageVideoIds = computed(() =>
     .filter((id): id is number => typeof id === 'number' && id > 0)
 )
 const { progressMap } = useTranscodeProgressSSE(pageVideoIds)
-
-function stageLabel(stage?: string): string {
-  if (!stage) return ''
-  const key = `video.transcode.stage.${stage}`
-  const label = t(key)
-  return label === key ? stage : label
-}
-
-function renderTranscodeCell(progress?: TranscodeProgress) {
-  if (!progress) {
-    return h('span', { class: 'text-gray-400' }, t('video.transcode.idle'))
-  }
-
-  if (progress.status === 'queued') {
-    return h(NTag, { type: 'warning', size: 'small' }, () => t('video.transcode.queued'))
-  }
-
-  if (progress.status === 'succeeded') {
-    return h(NTag, { type: 'success', size: 'small' }, () => t('video.transcode.succeeded'))
-  }
-
-  if (progress.status === 'failed') {
-    return h(
-      NTooltip,
-      {},
-      {
-        trigger: () => h(NTag, { type: 'error', size: 'small' }, () => t('video.transcode.failed')),
-        default: () => progress.error || progress.message || t('video.transcode.failed'),
-      }
-    )
-  }
-
-  // running
-  const pct = Math.max(0, Math.min(100, Math.round(progress.percent || 0)))
-  return h('div', { style: 'min-width: 120px' }, [
-    h(NProgress, {
-      type: 'line',
-      percentage: pct,
-      indicatorPlacement: 'inside',
-      processing: true,
-      height: 16,
-      borderRadius: 4,
-    }),
-    h(
-      'div',
-      { style: 'font-size: 12px; color: var(--n-text-color-3); margin-top: 2px' },
-      progress.message || stageLabel(progress.stage)
-    ),
-  ])
-}
 
 /** 分区选项 */
 const partitionOptions = computed(() => {
@@ -283,10 +232,10 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     title: t('video.list.transcode'),
     key: 'transcode',
-    width: 160,
+    width: 520,
     render: (row) => {
       const id = row.id as number
-      return renderTranscodeCell(progressMap.value[id])
+      return h(TranscodePipelineProgress, { items: progressMap.value[id] ?? [] })
     },
   },
   {

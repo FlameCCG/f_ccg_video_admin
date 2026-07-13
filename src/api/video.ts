@@ -42,7 +42,7 @@ export function getVideoList(params?: VideoListParams): Promise<PaginatedData<Ad
 }
 
 /**
- * 批量获取转码进度快照（轮询降级）
+ * 批量获取转码进度快照（首次加载与 SSE 重连同步）
  * GET /admin/video/transcode/progress
  */
 export function getTranscodeProgress(videoIds: number[]): Promise<{ items: TranscodeProgress[] }> {
