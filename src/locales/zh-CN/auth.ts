@@ -5,6 +5,9 @@ export default {
   login: {
     title: '登录',
     subtitle: '视频网站后台管理系统',
+    brandEyebrow: '内容运营工作台',
+    secureAccess: '安全访问',
+    adminOnly: '仅限授权管理员访问',
     username: '用户名',
     password: '密码',
     usernamePlaceholder: '请输入用户名',

@@ -5,6 +5,9 @@ export default {
   login: {
     title: 'Login',
     subtitle: 'Video Platform Admin Console',
+    brandEyebrow: 'Content operations workspace',
+    secureAccess: 'Secure access',
+    adminOnly: 'Authorized administrators only',
     username: 'Username',
     password: 'Password',
     usernamePlaceholder: 'Enter your username',

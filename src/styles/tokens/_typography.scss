@@ -31,6 +31,16 @@ $font-family-mono: (
   'monospace'
 );
 
+// 编辑感展示字体：仅用于品牌标题等少量英文展示文本
+$font-family-display: (
+  'Iowan Old Style',
+  'Palatino Linotype',
+  'Book Antiqua',
+  'Palatino',
+  'Georgia',
+  'serif'
+);
+
 // 字体大小
 $font-size: (
   'xs': 12px,

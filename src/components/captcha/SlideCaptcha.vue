@@ -305,7 +305,7 @@ defineExpose({
 </script>
 
 <template>
-  <div v-if="visible" ref="containerRef" class="slide-captcha">
+  <div ref="containerRef" class="slide-captcha">
     <div
       class="slide-captcha__image-wrapper"
       :class="{

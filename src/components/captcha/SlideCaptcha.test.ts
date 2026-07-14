@@ -70,6 +70,24 @@ describe('SlideCaptcha', () => {
     vi.restoreAllMocks()
   })
 
+  it('关闭时保留内容结构供弹层完整离场，并且不会提前请求验证码', async () => {
+    const wrapper = mount(SlideCaptcha, {
+      props: { visible: false },
+      global: { plugins: [i18n], stubs: componentStubs },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('.slide-captcha').exists()).toBe(true)
+    expect(getSlideCaptcha).not.toHaveBeenCalled()
+
+    await wrapper.setProps({ visible: true })
+    await flushPromises()
+
+    expect(getSlideCaptcha).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
   it('使用 transform 跟随拖拽，并在释放后进入核验状态', async () => {
     const wrapper = mount(SlideCaptcha, {
       props: { visible: true },

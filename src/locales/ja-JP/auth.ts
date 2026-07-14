@@ -5,6 +5,9 @@ export default {
   login: {
     title: 'ログイン',
     subtitle: '動画サイト管理コンソール',
+    brandEyebrow: 'コンテンツ運用ワークスペース',
+    secureAccess: 'セキュアアクセス',
+    adminOnly: '認証済み管理者のみアクセスできます',
     username: 'ユーザー名',
     password: 'パスワード',
     usernamePlaceholder: 'ユーザー名を入力',

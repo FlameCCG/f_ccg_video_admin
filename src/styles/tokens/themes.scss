@@ -73,6 +73,7 @@
   // 字体族
   --font-sans: #{meta.inspect($font-family-sans)};
   --font-mono: #{meta.inspect($font-family-mono)};
+  --font-display: #{meta.inspect($font-family-display)};
 
   // 字体大小
   @each $size-name, $size-value in $font-size {
@@ -139,5 +140,3 @@
     --duration-slowest: 0ms;
   }
 }
-
-
