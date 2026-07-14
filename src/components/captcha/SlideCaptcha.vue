@@ -1,17 +1,15 @@
 <script setup lang="ts">
 /**
- * 滑块验证码组件
- * 获取验证码、拖动验证、验证结果回调
- * Requirements: 4.1
+ * 管理员登录滑块验证码
+ * 负责验证码获取、拖拽与键盘交互，以及验证状态反馈
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NSpin, NButton, NIcon } from 'naive-ui'
+import { NButton, NIcon, NSpin } from 'naive-ui'
 import { RefreshOutline } from '@vicons/ionicons5'
+
 import { getSlideCaptcha } from '@/api/auth'
 import type { SlideCaptcha } from '@/api/types'
-
-// ==================== Props & Emits ====================
 
 interface Props {
   /** 是否显示验证码 */
@@ -26,6 +24,8 @@ interface CaptchaResult {
   /** 滑块 Y 坐标 */
   y: number
 }
+
+type VerifyStatus = 'idle' | 'verifying' | 'success' | 'fail'
 
 const props = withDefaults(defineProps<Props>(), {
   visible: true,
@@ -42,310 +42,340 @@ const emit = defineEmits<{
   refresh: []
 }>()
 
-// ==================== i18n ====================
-
 const { t } = useI18n()
 
-// ==================== 状态 ====================
+const DEFAULT_SLIDER_WIDTH = 44
+const FAILURE_SHAKE_DURATION = 320
+const FAILURE_RESET_DELAY = 1350
 
-/** 验证码数据 */
 const captchaData = ref<SlideCaptcha | null>(null)
-
-/** 是否正在加载 */
 const loading = ref(false)
-
-/** 是否正在拖动 */
 const isDragging = ref(false)
-
-/** 滑块当前 X 位置 */
 const sliderX = ref(0)
-
-/** 图片缩放比例 */
 const scale = ref(1)
-
-/** 拖动起始 X 位置 */
 const startX = ref(0)
-
-/** 验证状态: idle | success | fail */
-const verifyStatus = ref<'idle' | 'success' | 'fail'>('idle')
-
-/** 是否显示结果覆盖层 */
-const showResult = ref(false)
-
-/** 是否抖动 */
+const verifyStatus = ref<VerifyStatus>('idle')
 const isShaking = ref(false)
-
-/** 容器宽度 */
 const containerWidth = ref(280)
-
-/** 滑块宽度 */
-const sliderWidth = 44
-
-/** 最大滑动距离 */
-const maxSlideDistance = computed(() => containerWidth.value - sliderWidth)
-
-// ==================== Refs ====================
+const sliderWidth = ref(DEFAULT_SLIDER_WIDTH)
+const lastResult = ref<CaptchaResult | null>(null)
 
 const containerRef = ref<HTMLDivElement | null>(null)
+const sliderRef = ref<HTMLDivElement | null>(null)
+const masterImageRef = ref<HTMLImageElement | null>(null)
 
-// ==================== 方法 ====================
+let resizeObserver: ResizeObserver | undefined
+let failureShakeTimer: ReturnType<typeof setTimeout> | undefined
+let failureResetTimer: ReturnType<typeof setTimeout> | undefined
+let captchaRequestId = 0
 
-/**
- * 获取验证码
- */
+const maxSlideDistance = computed(() => Math.max(containerWidth.value - sliderWidth.value, 0))
+const maxSlideDistanceRounded = computed(() => Math.round(maxSlideDistance.value))
+const progressPercentage = computed(() => {
+  if (maxSlideDistance.value <= 0) return 0
+  return Math.round((sliderX.value / maxSlideDistance.value) * 100)
+})
+const fillScale = computed(() => {
+  if (containerWidth.value <= 0) return 0
+  return Math.min((sliderX.value + sliderWidth.value) / containerWidth.value, 1)
+})
+const showResult = computed(() => verifyStatus.value === 'success' || verifyStatus.value === 'fail')
+const isInteractive = computed(
+  () => !loading.value && Boolean(captchaData.value) && verifyStatus.value === 'idle'
+)
+const tipText = computed(() => {
+  switch (verifyStatus.value) {
+    case 'verifying':
+      return t('auth.captcha.verifying')
+    case 'success':
+      return t('auth.captcha.success')
+    case 'fail':
+      return t('auth.captcha.failed')
+    default:
+      return t('auth.captcha.tip')
+  }
+})
+const sliderStyle = computed(() => ({
+  transform: `translate3d(${sliderX.value}px, 0, 0)`,
+}))
+const tileStyle = computed(() => ({
+  transform: `translate3d(${sliderX.value}px, ${(captchaData.value?.thumbY ?? 0) * scale.value}px, 0) scale(${scale.value})`,
+  transformOrigin: 'left top',
+}))
+const fillStyle = computed(() => ({
+  transform: `scaleX(${fillScale.value})`,
+}))
+
+function clearFailureTimers(): void {
+  if (failureShakeTimer) clearTimeout(failureShakeTimer)
+  if (failureResetTimer) clearTimeout(failureResetTimer)
+  failureShakeTimer = undefined
+  failureResetTimer = undefined
+}
+
+function measureCaptcha(): void {
+  if (containerRef.value) {
+    containerWidth.value = containerRef.value.getBoundingClientRect().width
+  }
+  if (sliderRef.value) {
+    sliderWidth.value = sliderRef.value.getBoundingClientRect().width || DEFAULT_SLIDER_WIDTH
+  }
+  if (masterImageRef.value?.naturalWidth) {
+    scale.value =
+      masterImageRef.value.getBoundingClientRect().width / masterImageRef.value.naturalWidth
+  }
+  sliderX.value = Math.min(sliderX.value, maxSlideDistance.value)
+}
+
 async function fetchCaptcha(): Promise<void> {
+  const requestId = ++captchaRequestId
+  clearFailureTimers()
   loading.value = true
   verifyStatus.value = 'idle'
+  isShaking.value = false
+  isDragging.value = false
   sliderX.value = 0
+  lastResult.value = null
 
   try {
-    captchaData.value = await getSlideCaptcha()
+    const data = await getSlideCaptcha()
+    if (requestId !== captchaRequestId) return
+    captchaData.value = data
+    await nextTick()
+    measureCaptcha()
   } catch {
-    // 错误已在 request 层处理
+    // 错误已在 request 层归一化处理
   } finally {
-    loading.value = false
+    if (requestId === captchaRequestId) loading.value = false
   }
 }
 
-/**
- * 刷新验证码
- */
 function handleRefresh(): void {
   emit('refresh')
   void fetchCaptcha()
 }
 
-/**
- * 图片加载完成，计算缩放比例
- */
-function onImageLoad(e: Event): void {
-  const img = e.target as HTMLImageElement
-  if (img && captchaData.value) {
-    // 假设后端返回的图片原始宽度为 320 (通常是标准宽度，或者根据实际情况调整)
-    // 如果后端没返回原始尺寸，这里可能需要约定或者从 masterImage 获取原始尺寸（如果 masterImage 是原图）
-    // 这里我们假设容器宽度即为显示宽度，原始宽度需要根据实际图片 naturalWidth 计算
-    // 但因为我们是 fit width，所以 scale = currentWidth / naturalWidth
-    scale.value = img.width / img.naturalWidth
+function onImageLoad(event: Event): void {
+  const image = event.target as HTMLImageElement
+  if (!image.naturalWidth) return
+  scale.value = image.getBoundingClientRect().width / image.naturalWidth
+}
+
+function moveSliderTo(position: number): void {
+  sliderX.value = Math.max(0, Math.min(position, maxSlideDistance.value))
+}
+
+function handlePointerDown(event: PointerEvent): void {
+  if (!isInteractive.value) return
+
+  isDragging.value = true
+  startX.value = event.clientX - sliderX.value
+  if (event.currentTarget instanceof HTMLElement) {
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+  event.preventDefault()
+}
+
+function handlePointerMove(event: PointerEvent): void {
+  if (!isDragging.value) return
+  moveSliderTo(event.clientX - startX.value)
+  event.preventDefault()
+}
+
+function releasePointer(event: PointerEvent): void {
+  if (
+    event.currentTarget instanceof HTMLElement &&
+    event.currentTarget.hasPointerCapture?.(event.pointerId)
+  ) {
+    event.currentTarget.releasePointerCapture(event.pointerId)
   }
 }
 
-/**
- * 开始拖动
- */
-function handleDragStart(e: MouseEvent | TouchEvent): void {
-  if (loading.value || verifyStatus.value === 'success') return
-
-  isDragging.value = true
-  startX.value = getClientX(e) - sliderX.value
-
-  // 添加全局事件监听
-  document.addEventListener('mousemove', handleDragMove)
-  document.addEventListener('mouseup', handleDragEnd)
-  document.addEventListener('touchmove', handleDragMove, { passive: false })
-  document.addEventListener('touchend', handleDragEnd)
-}
-
-/**
- * 拖动中
- */
-function handleDragMove(e: MouseEvent | TouchEvent): void {
+function handlePointerUp(event: PointerEvent): void {
   if (!isDragging.value) return
-
-  e.preventDefault()
-
-  const currentX = getClientX(e)
-  let newX = currentX - startX.value
-
-  // 限制范围
-  newX = Math.max(0, Math.min(newX, maxSlideDistance.value))
-  sliderX.value = newX
-}
-
-/**
- * 结束拖动
- */
-function handleDragEnd(): void {
-  if (!isDragging.value) return
-
   isDragging.value = false
-
-  // 移除全局事件监听
-  document.removeEventListener('mousemove', handleDragMove)
-  document.removeEventListener('mouseup', handleDragEnd)
-  document.removeEventListener('touchmove', handleDragMove)
-  document.removeEventListener('touchend', handleDragEnd)
-
-  // 验证
+  releasePointer(event)
   verifySlider()
 }
 
-/**
- * 验证滑块位置
- */
-function verifySlider(): void {
-  if (!captchaData.value) return
+function handlePointerCancel(event: PointerEvent): void {
+  if (!isDragging.value) return
+  isDragging.value = false
+  releasePointer(event)
+}
 
-  // 计算实际 X 坐标（相对于图片的位置）
-  // 使用 scale 反向计算原始坐标
+function handleSliderKeydown(event: KeyboardEvent): void {
+  if (!isInteractive.value) return
+
+  const step = Math.max(Math.round(maxSlideDistance.value / 20), 1)
+  let handled = true
+
+  switch (event.key) {
+    case 'ArrowRight':
+    case 'ArrowUp':
+      moveSliderTo(sliderX.value + step)
+      break
+    case 'ArrowLeft':
+    case 'ArrowDown':
+      moveSliderTo(sliderX.value - step)
+      break
+    case 'Home':
+      moveSliderTo(0)
+      break
+    case 'End':
+      moveSliderTo(maxSlideDistance.value)
+      break
+    case 'Enter':
+    case ' ':
+      if (sliderX.value > 0) verifySlider()
+      break
+    default:
+      handled = false
+  }
+
+  if (handled) event.preventDefault()
+}
+
+function verifySlider(): void {
+  if (!captchaData.value || !isInteractive.value) return
+
   const result: CaptchaResult = {
     token: captchaData.value.token,
     x: Math.round(sliderX.value / scale.value),
     y: captchaData.value.thumbY,
   }
 
-  // 触发确认事件，由父组件调用后端验证
+  lastResult.value = result
+  verifyStatus.value = 'verifying'
   emit('confirm', result)
 }
 
-/**
- * 获取鼠标/触摸的 X 坐标
- */
-function getClientX(e: MouseEvent | TouchEvent): number {
-  if ('touches' in e) {
-    return e.touches[0]?.clientX ?? 0
-  }
-  return e.clientX
-}
-
-/**
- * 重置验证码
- */
 function reset(): void {
-  verifyStatus.value = 'idle'
-  sliderX.value = 0
   void fetchCaptcha()
 }
 
-// ==================== 生命周期 ====================
-
 onMounted(() => {
-  if (props.visible) {
-    void fetchCaptcha()
+  measureCaptcha()
+
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(measureCaptcha)
+    if (containerRef.value) resizeObserver.observe(containerRef.value)
+    if (sliderRef.value) resizeObserver.observe(sliderRef.value)
   }
 
-  // 获取容器宽度
-  if (containerRef.value) {
-    containerWidth.value = containerRef.value.offsetWidth
-  }
+  if (props.visible) void fetchCaptcha()
 })
 
-// 监听 visible 变化
+onBeforeUnmount(() => {
+  captchaRequestId += 1
+  resizeObserver?.disconnect()
+  clearFailureTimers()
+})
+
 watch(
   () => props.visible,
-  (newVisible) => {
-    if (newVisible && !captchaData.value) {
-      void fetchCaptcha()
-    }
+  (visible) => {
+    if (visible) void fetchCaptcha()
   }
 )
-
-// ==================== 暴露方法 ====================
 
 defineExpose({
   reset,
   refresh: handleRefresh,
   success: () => {
+    clearFailureTimers()
+    isDragging.value = false
     verifyStatus.value = 'success'
-    showResult.value = true
-    emit('success', {
-      token: captchaData.value?.token || '',
-      x: 0,
-      y: 0,
-    })
+    if (lastResult.value) emit('success', lastResult.value)
   },
   fail: () => {
     verifyStatus.value = 'fail'
-    showResult.value = true
+    isDragging.value = false
     isShaking.value = true
-    // 0.5s 后移除抖动
-    setTimeout(() => {
-      isShaking.value = false
-    }, 500)
 
-    // 1.5s 后自动重置，允许重试并获取新验证码
-    setTimeout(() => {
-      verifyStatus.value = 'idle'
-      showResult.value = false
-      sliderX.value = 0
+    failureShakeTimer = setTimeout(() => {
+      isShaking.value = false
+    }, FAILURE_SHAKE_DURATION)
+
+    failureResetTimer = setTimeout(() => {
       void fetchCaptcha()
-    }, 1500)
+    }, FAILURE_RESET_DELAY)
   },
 })
 </script>
 
 <template>
   <div v-if="visible" ref="containerRef" class="slide-captcha">
-    <!-- 验证码图片区域 -->
-    <div class="slide-captcha__image-wrapper" :class="{ 'slide-captcha--shake': isShaking }">
+    <div
+      class="slide-captcha__image-wrapper"
+      :class="{
+        'slide-captcha__image-wrapper--dragging': isDragging,
+        'slide-captcha--shake': isShaking,
+      }"
+    >
       <n-spin :show="loading">
         <div class="slide-captcha__image-container">
-          <!-- 主图片 -->
           <img
             v-if="captchaData?.masterImage"
+            ref="masterImageRef"
             :src="captchaData.masterImage"
             class="slide-captcha__master-image"
-            alt="captcha"
+            :alt="t('auth.captcha.title')"
             draggable="false"
             @load="onImageLoad"
           />
 
-          <!-- 滑块图片 -->
           <img
             v-if="captchaData?.tileImage"
             :src="captchaData.tileImage"
             class="slide-captcha__tile-image"
-            :style="{
-              left: `${sliderX}px`,
-              top: `${(captchaData.thumbY || 0) * scale}px`,
-              transform: `scale(${scale})`,
-              transformOrigin: 'left top',
-            }"
-            alt="slider"
+            :class="{ 'slide-captcha__tile-image--dragging': isDragging }"
+            :style="tileStyle"
+            alt=""
             draggable="false"
           />
 
-          <!-- 加载占位 -->
           <div v-if="!captchaData && !loading" class="slide-captcha__placeholder">
             {{ t('auth.captcha.loading') }}
           </div>
-          <!-- 结果覆盖层 -->
-          <div
-            v-if="showResult"
-            class="slide-captcha__result"
-            :class="{
-              'slide-captcha__result--success': verifyStatus === 'success',
-              'slide-captcha__result--fail': verifyStatus === 'fail',
-            }"
-          >
-            <div class="slide-captcha__result-icon">
-              <n-icon size="40">
-                <svg v-if="verifyStatus === 'success'" viewBox="0 0 24 24">
-                  <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg>
-                <svg v-else viewBox="0 0 24 24">
-                  <path
-                    fill="currentColor"
-                    d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-                  />
-                </svg>
-              </n-icon>
+
+          <Transition name="captcha-result">
+            <div
+              v-if="showResult"
+              class="slide-captcha__result"
+              :class="{
+                'slide-captcha__result--success': verifyStatus === 'success',
+                'slide-captcha__result--fail': verifyStatus === 'fail',
+              }"
+              :role="verifyStatus === 'fail' ? 'alert' : 'status'"
+              aria-live="polite"
+            >
+              <div class="slide-captcha__result-scan" aria-hidden="true" />
+              <svg class="slide-captcha__result-mark" viewBox="0 0 64 64" aria-hidden="true">
+                <circle class="slide-captcha__result-ring" cx="32" cy="32" r="25" />
+                <path
+                  v-if="verifyStatus === 'success'"
+                  class="slide-captcha__result-symbol slide-captcha__result-symbol--check"
+                  d="M20 33.5 28.5 42 45 23.5"
+                />
+                <path
+                  v-else
+                  class="slide-captcha__result-symbol slide-captcha__result-symbol--cross"
+                  d="m24 24 16 16 M40 24 24 40"
+                />
+              </svg>
+              <span class="slide-captcha__result-text">{{ tipText }}</span>
             </div>
-            <div class="slide-captcha__result-text">
-              {{
-                verifyStatus === 'success' ? t('auth.captcha.success') : t('auth.captcha.failed')
-              }}
-            </div>
-          </div>
+          </Transition>
         </div>
       </n-spin>
 
-      <!-- 刷新按钮 -->
       <n-button
         class="slide-captcha__refresh-btn"
         quaternary
         circle
         size="small"
-        :disabled="loading"
+        :disabled="loading || verifyStatus === 'verifying' || verifyStatus === 'success'"
         @click="handleRefresh"
       >
         <template #icon>
@@ -353,47 +383,70 @@ defineExpose({
             <RefreshOutline />
           </n-icon>
         </template>
+        <span class="sr-only">{{ t('auth.captcha.refresh') }}</span>
       </n-button>
     </div>
 
-    <!-- 滑块轨道 -->
     <div
       class="slide-captcha__track"
       :class="{
+        'slide-captcha__track--dragging': isDragging,
+        'slide-captcha__track--verifying': verifyStatus === 'verifying',
         'slide-captcha__track--success': verifyStatus === 'success',
         'slide-captcha__track--fail': verifyStatus === 'fail',
       }"
     >
-      <!-- 已滑动区域 -->
-      <div class="slide-captcha__track-fill" :style="{ width: `${sliderX + sliderWidth}px` }" />
+      <div class="slide-captcha__track-fill" :style="fillStyle" />
 
-      <!-- 提示文字 -->
-      <span v-if="verifyStatus === 'idle'" class="slide-captcha__tip">
-        {{ t('auth.captcha.tip') }}
-      </span>
-      <span
-        v-else-if="verifyStatus === 'success'"
-        class="slide-captcha__tip slide-captcha__tip--success"
-      >
-        {{ t('auth.captcha.success') }}
-      </span>
-      <span v-else-if="verifyStatus === 'fail'" class="slide-captcha__tip slide-captcha__tip--fail">
-        {{ t('auth.captcha.failed') }}
-      </span>
+      <Transition name="captcha-tip" mode="out-in">
+        <span
+          :key="verifyStatus"
+          class="slide-captcha__tip"
+          :class="`slide-captcha__tip--${verifyStatus}`"
+        >
+          {{ tipText }}
+        </span>
+      </Transition>
 
-      <!-- 滑块 -->
       <div
+        ref="sliderRef"
         class="slide-captcha__slider"
         :class="{
           'slide-captcha__slider--dragging': isDragging,
+          'slide-captcha__slider--verifying': verifyStatus === 'verifying',
           'slide-captcha__slider--success': verifyStatus === 'success',
           'slide-captcha__slider--fail': verifyStatus === 'fail',
         }"
-        :style="{ left: `${sliderX}px` }"
-        @mousedown="handleDragStart"
-        @touchstart="handleDragStart"
+        :style="sliderStyle"
+        role="slider"
+        :tabindex="isInteractive ? 0 : -1"
+        :aria-label="t('auth.captcha.tip')"
+        aria-valuemin="0"
+        :aria-valuemax="maxSlideDistanceRounded"
+        :aria-valuenow="Math.round(sliderX)"
+        :aria-valuetext="`${progressPercentage}% · ${tipText}`"
+        :aria-disabled="!isInteractive"
+        @pointerdown="handlePointerDown"
+        @pointermove="handlePointerMove"
+        @pointerup="handlePointerUp"
+        @pointercancel="handlePointerCancel"
+        @keydown="handleSliderKeydown"
       >
-        <span class="slide-captcha__slider-icon">→</span>
+        <svg class="slide-captcha__slider-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle
+            v-if="verifyStatus === 'verifying'"
+            class="slide-captcha__slider-spinner"
+            cx="12"
+            cy="12"
+            r="8"
+          />
+          <path
+            v-else-if="verifyStatus === 'success'"
+            class="slide-captcha__slider-check"
+            d="m7 12.5 3.25 3.25L17.5 8.5"
+          />
+          <path v-else class="slide-captcha__slider-arrow" d="M6.5 12h11m-4-4 4 4-4 4" />
+        </svg>
       </div>
     </div>
   </div>
@@ -401,34 +454,63 @@ defineExpose({
 
 <style lang="scss" scoped>
 .slide-captcha {
+  --captcha-slider-size: calc(var(--spacing-10) + var(--spacing-1));
+
   width: 100%;
-  max-width: 320px;
+  max-width: 20rem;
   user-select: none;
 
   &__image-wrapper {
     position: relative;
     margin-bottom: var(--spacing-3);
+    animation: captcha-stage-enter var(--duration-slower) var(--easing-out-expo) both;
   }
 
   &__image-container {
     position: relative;
     width: 100%;
     overflow: hidden;
-    background-color: var(--color-surface-alt);
-    border-radius: var(--radius-md);
+    isolation: isolate;
+    background-color: var(--color-surface-hover);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-elev-1);
+    transform: translateZ(0);
+    transition:
+      border-color var(--duration-normal) var(--easing-out-quart),
+      box-shadow var(--duration-normal) var(--easing-out-quart),
+      transform var(--duration-normal) var(--easing-out-quart);
+  }
+
+  &__image-wrapper--dragging &__image-container {
+    border-color: color-mix(in srgb, var(--color-primary) 62%, var(--color-border));
+    box-shadow: var(--shadow-elev-2);
+    transform: translateZ(0) scale(1.004);
   }
 
   &__master-image {
+    display: block;
     width: 100%;
     height: auto;
-    display: block;
+    animation: captcha-image-reveal var(--duration-slow) var(--easing-out-quart) both;
   }
 
   &__tile-image {
     position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
     object-fit: contain;
     pointer-events: none;
-    filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3));
+    filter: drop-shadow(
+      0 var(--spacing-1) var(--spacing-2) color-mix(in srgb, var(--color-text) 28%, transparent)
+    );
+    transition: transform var(--duration-fast) var(--easing-out-expo);
+
+    &--dragging {
+      will-change: transform;
+      transition: none;
+    }
   }
 
   &__placeholder {
@@ -436,7 +518,7 @@ defineExpose({
     align-items: center;
     justify-content: center;
     width: 100%;
-    height: 100%;
+    min-height: calc(var(--spacing-20) * 2);
     color: var(--color-text-muted);
     font-size: var(--text-sm);
   }
@@ -445,54 +527,112 @@ defineExpose({
     position: absolute;
     top: var(--spacing-2);
     right: var(--spacing-2);
-    background-color: rgba(0, 0, 0, 0.3);
-    color: #fff;
+    z-index: 12;
+    color: var(--color-surface);
+    background-color: color-mix(in srgb, var(--color-text) 52%, transparent);
+    box-shadow: var(--shadow-elev-1);
+    transition:
+      background-color var(--duration-fast) var(--easing-out-quart),
+      opacity var(--duration-fast) var(--easing-out-quart),
+      transform var(--duration-fast) var(--easing-out-quart);
 
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.5);
+    &:hover:not(:disabled) {
+      background-color: color-mix(in srgb, var(--color-text) 72%, transparent);
+      transform: rotate(18deg) scale(1.04);
+    }
+
+    &:active:not(:disabled) {
+      transform: rotate(18deg) scale(0.94);
     }
   }
 
   &__track {
     position: relative;
-    height: 44px;
-    background-color: var(--color-surface-alt);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
+    height: var(--captcha-slider-size);
     overflow: hidden;
-    transition: border-color var(--duration-fast) var(--easing-ease-out);
+    background-color: var(--color-surface-hover);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-surface) 55%, transparent);
+    animation: captcha-stage-enter var(--duration-slower) var(--duration-fast)
+      var(--easing-out-expo) both;
+    transition:
+      background-color var(--duration-normal) var(--easing-out-quart),
+      border-color var(--duration-normal) var(--easing-out-quart),
+      box-shadow var(--duration-normal) var(--easing-out-quart);
+
+    &--dragging,
+    &--verifying {
+      border-color: color-mix(in srgb, var(--color-primary) 68%, var(--color-border));
+      box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--color-surface) 55%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent);
+    }
 
     &--success {
+      background-color: color-mix(in srgb, var(--color-success-light) 68%, var(--color-surface));
       border-color: var(--color-success);
     }
 
     &--fail {
+      background-color: color-mix(in srgb, var(--color-danger-light) 68%, var(--color-surface));
       border-color: var(--color-danger);
     }
   }
 
   &__track-fill {
     position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    background-color: var(--color-primary);
-    opacity: 0.1;
-    transition: width 0s;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-primary) 10%, transparent),
+      color-mix(in srgb, var(--color-primary) 22%, transparent)
+    );
+    pointer-events: none;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition:
+      background-color var(--duration-normal) var(--easing-out-quart),
+      transform var(--duration-fast) var(--easing-out-expo);
+  }
+
+  &__track--dragging &__track-fill {
+    will-change: transform;
+    transition: none;
+  }
+
+  &__track--success &__track-fill {
+    background: color-mix(in srgb, var(--color-success) 16%, transparent);
+  }
+
+  &__track--fail &__track-fill {
+    background: color-mix(in srgb, var(--color-danger) 14%, transparent);
   }
 
   &__tip {
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    max-width: calc(100% - var(--spacing-16));
+    overflow: hidden;
     color: var(--color-text-muted);
     font-size: var(--text-sm);
+    line-height: var(--leading-tight);
+    text-overflow: ellipsis;
     white-space: nowrap;
     pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition:
+      color var(--duration-normal) var(--easing-out-quart),
+      opacity var(--duration-fast) var(--easing-out-quart);
+
+    &--verifying {
+      color: var(--color-primary);
+    }
 
     &--success {
       color: var(--color-success);
+      font-weight: var(--font-semibold);
     }
 
     &--fail {
@@ -500,68 +640,124 @@ defineExpose({
     }
   }
 
+  &__track--dragging &__tip {
+    opacity: 0.42;
+  }
+
   &__slider {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 44px;
-    height: 44px;
+    top: -1px;
+    left: -1px;
+    z-index: 3;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: var(--color-surface);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
+    width: var(--captcha-slider-size);
+    height: var(--captcha-slider-size);
+    color: var(--color-primary);
+    touch-action: none;
     cursor: grab;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-elev-1);
+    transform: translate3d(0, 0, 0);
     transition:
-      background-color var(--duration-fast) var(--easing-ease-out),
-      border-color var(--duration-fast) var(--easing-ease-out),
-      box-shadow var(--duration-fast) var(--easing-ease-out);
+      color var(--duration-fast) var(--easing-out-quart),
+      background-color var(--duration-fast) var(--easing-out-quart),
+      border-color var(--duration-fast) var(--easing-out-quart),
+      box-shadow var(--duration-fast) var(--easing-out-quart),
+      transform var(--duration-fast) var(--easing-out-expo);
 
-    &:hover {
+    &:hover:not([aria-disabled='true']) {
+      color: var(--color-surface);
       background-color: var(--color-primary);
       border-color: var(--color-primary);
-      color: #fff;
-    }
-
-    &--dragging {
-      cursor: grabbing;
-      background-color: var(--color-primary);
-      border-color: var(--color-primary);
-      color: #fff;
       box-shadow: var(--shadow-elev-2);
     }
 
+    &:active:not([aria-disabled='true']) {
+      box-shadow: var(--shadow-elev-1);
+    }
+
+    &--dragging {
+      color: var(--color-surface);
+      cursor: grabbing;
+      background-color: var(--color-primary);
+      border-color: var(--color-primary);
+      box-shadow: var(--shadow-elev-2);
+      will-change: transform;
+      transition:
+        color var(--duration-fast) var(--easing-out-quart),
+        background-color var(--duration-fast) var(--easing-out-quart),
+        border-color var(--duration-fast) var(--easing-out-quart),
+        box-shadow var(--duration-fast) var(--easing-out-quart);
+    }
+
+    &--verifying {
+      color: var(--color-surface);
+      cursor: wait;
+      background-color: var(--color-primary);
+      border-color: var(--color-primary);
+    }
+
     &--success {
+      color: var(--color-surface);
+      cursor: default;
       background-color: var(--color-success);
       border-color: var(--color-success);
-      color: #fff;
-      cursor: default;
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-success) 14%, transparent);
     }
 
     &--fail {
+      color: var(--color-surface);
+      cursor: default;
       background-color: var(--color-danger);
       border-color: var(--color-danger);
-      color: #fff;
     }
   }
 
   &__slider-icon {
-    font-size: 18px;
-    font-weight: bold;
+    width: var(--spacing-6);
+    height: var(--spacing-6);
+    overflow: visible;
+    fill: none;
+    stroke: currentcolor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+  }
+
+  &__slider-arrow,
+  &__slider-check {
+    transition:
+      opacity var(--duration-fast) var(--easing-out-quart),
+      transform var(--duration-fast) var(--easing-out-quart);
+  }
+
+  &__slider-check {
+    stroke-dasharray: 18;
+    stroke-dashoffset: 18;
+    animation: captcha-draw-symbol var(--duration-slow) var(--easing-out-quart) forwards;
+  }
+
+  &__slider-spinner {
+    stroke-dasharray: 34 18;
+    transform-origin: center;
+    animation: captcha-spin var(--duration-slowest) linear infinite;
   }
 
   &__result {
     position: absolute;
     inset: 0;
+    z-index: 10;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: color-mix(in srgb, var(--color-surface) 90%, transparent);
-    z-index: 10;
-    opacity: 0;
-    animation: fade-in 0.2s forwards;
+    overflow: hidden;
+    background-color: color-mix(in srgb, var(--color-surface) 91%, transparent);
+    backdrop-filter: blur(2px);
 
     &--success {
       color: var(--color-success);
@@ -572,39 +768,226 @@ defineExpose({
     }
   }
 
+  &__result-scan {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 28%;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, currentcolor 22%, transparent),
+      transparent
+    );
+  }
+
+  &__result--success &__result-scan {
+    animation: captcha-security-scan var(--duration-slowest) var(--easing-out-quart) both;
+  }
+
+  &__result-mark {
+    width: var(--spacing-16);
+    height: var(--spacing-16);
+    overflow: visible;
+    fill: none;
+    stroke: currentcolor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &__result-ring {
+    opacity: 0.34;
+    stroke-width: 1.5;
+    stroke-dasharray: 158;
+    stroke-dashoffset: 158;
+    transform: rotate(-90deg);
+    transform-origin: center;
+    animation: captcha-draw-ring var(--duration-slower) var(--easing-out-quint) forwards;
+  }
+
+  &__result-symbol {
+    stroke-width: 3;
+    stroke-dasharray: 42;
+    stroke-dashoffset: 42;
+    animation: captcha-draw-symbol var(--duration-slow) var(--duration-normal)
+      var(--easing-out-quart) forwards;
+  }
+
+  &__result-symbol--cross {
+    animation-delay: var(--duration-fast);
+  }
+
   &__result-text {
     margin-top: var(--spacing-2);
-    font-weight: bold;
-    font-size: var(--text-lg);
+    font-size: var(--text-base);
+    font-weight: var(--font-semibold);
+    letter-spacing: var(--tracking-wide);
+    opacity: 0;
+    transform: translateY(var(--spacing-1));
+    animation: captcha-result-copy var(--duration-slow) var(--duration-normal)
+      var(--easing-out-quart) forwards;
   }
 
   &--shake {
-    animation: shake 0.5s;
+    animation: captcha-shake var(--duration-slow) var(--easing-out-quart);
   }
 }
 
-@keyframes shake {
+.captcha-result-enter-active {
+  transition:
+    opacity var(--duration-normal) var(--easing-out-quart),
+    transform var(--duration-normal) var(--easing-out-quart);
+}
+
+.captcha-result-leave-active {
+  transition: opacity var(--duration-fast) var(--easing-ease-in);
+}
+
+.captcha-result-enter-from {
+  opacity: 0;
+  transform: scale(0.985);
+}
+
+.captcha-result-leave-to {
+  opacity: 0;
+}
+
+.captcha-tip-enter-active,
+.captcha-tip-leave-active {
+  transition:
+    opacity var(--duration-fast) var(--easing-out-quart),
+    transform var(--duration-fast) var(--easing-out-quart);
+}
+
+.captcha-tip-enter-from {
+  opacity: 0;
+  transform: translate(-50%, calc(-50% + var(--spacing-1)));
+}
+
+.captcha-tip-leave-to {
+  opacity: 0;
+  transform: translate(-50%, calc(-50% - var(--spacing-1)));
+}
+
+@keyframes captcha-stage-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--spacing-3));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes captcha-image-reveal {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes captcha-security-scan {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+
+  24% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(460%);
+  }
+}
+
+@keyframes captcha-draw-ring {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes captcha-draw-symbol {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes captcha-result-copy {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes captcha-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes captcha-shake {
   0%,
   100% {
     transform: translateX(0);
   }
 
-  25% {
-    transform: translateX(-5px);
+  28% {
+    transform: translateX(calc(var(--spacing-1) * -1));
   }
 
-  75% {
-    transform: translateX(5px);
+  58% {
+    transform: translateX(var(--spacing-1));
+  }
+
+  78% {
+    transform: translateX(calc(var(--spacing-1) * -0.5));
   }
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .slide-captcha {
+    &__image-wrapper,
+    &__master-image,
+    &__track,
+    &__slider-check,
+    &__slider-spinner,
+    &__result-ring,
+    &__result-symbol,
+    &__result-text,
+    &--shake {
+      animation: none;
+    }
 
-  to {
-    opacity: 1;
+    &__tile-image,
+    &__slider,
+    &__result,
+    &__tip {
+      transition: none;
+    }
+
+    &__result-scan {
+      display: none;
+    }
+
+    &__result-ring,
+    &__result-symbol {
+      stroke-dashoffset: 0;
+    }
+
+    &__result-text {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
 </style>

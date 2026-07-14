@@ -17,6 +17,7 @@ export default {
   captcha: {
     title: 'Security Verification',
     tip: 'Drag the slider to complete verification',
+    verifying: 'Verifying security credentials',
     loading: 'Loading...',
     success: 'Verification successful',
     failed: 'Verification failed, please try again',

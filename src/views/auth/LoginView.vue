@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
@@ -53,6 +53,12 @@ const captchaData = reactive({
 
 const showCaptchaModal = ref(false)
 
+/** 验证成功后等待签名动效完成，再退出弹层并进入控制台 */
+const shouldNavigateAfterCaptcha = ref(false)
+
+const CAPTCHA_SUCCESS_FEEDBACK_DURATION = 500
+let captchaSuccessTimer: ReturnType<typeof setTimeout> | undefined
+
 /** 滑块验证码是否启用（默认 true，安全优先） */
 const slideCaptchaEnabled = ref(true)
 
@@ -80,6 +86,10 @@ const rules: FormRules = {
 // ==================== 生命周期 ====================
 onMounted(() => {
   void fetchPublicSiteConfig()
+})
+
+onBeforeUnmount(() => {
+  if (captchaSuccessTimer) clearTimeout(captchaSuccessTimer)
 })
 
 // ==================== 方法 ====================
@@ -121,8 +131,9 @@ async function handleLoginClick(): Promise<void> {
 
     if (slideCaptchaEnabled.value) {
       // 滑块验证码启用：弹出验证码弹窗
+      shouldNavigateAfterCaptcha.value = false
+      if (captchaSuccessTimer) clearTimeout(captchaSuccessTimer)
       showCaptchaModal.value = true
-      captchaRef.value?.refresh()
     } else {
       // 滑块验证码关闭：直接登录
       captchaData.verified = true
@@ -152,19 +163,19 @@ async function doLogin(): Promise<void> {
 
     await authStore.login(loginParams)
 
-    message.success(t('auth.tips.loginSuccess'))
-
     if (slideCaptchaEnabled.value) {
+      shouldNavigateAfterCaptcha.value = true
       captchaRef.value?.success()
-      setTimeout(() => {
+      captchaSuccessTimer = setTimeout(() => {
         showCaptchaModal.value = false
-        void router.push({ path: '/' })
-      }, 500)
+      }, CAPTCHA_SUCCESS_FEEDBACK_DURATION)
     } else {
+      message.success(t('auth.tips.loginSuccess'))
       void router.push({ path: '/' })
     }
   } catch (error: unknown) {
     if (slideCaptchaEnabled.value) {
+      shouldNavigateAfterCaptcha.value = false
       captchaRef.value?.fail()
     }
     captchaData.verified = false
@@ -172,6 +183,14 @@ async function doLogin(): Promise<void> {
       message.error(error.message)
     }
   }
+}
+
+function handleCaptchaAfterLeave(): void {
+  if (!shouldNavigateAfterCaptcha.value) return
+
+  shouldNavigateAfterCaptcha.value = false
+  message.success(t('auth.tips.loginSuccess'))
+  void router.push({ path: '/' })
 }
 
 function handleEnterSubmit(): void {
@@ -288,9 +307,15 @@ function handleEnterSubmit(): void {
     <n-modal
       v-model:show="showCaptchaModal"
       preset="card"
+      class="captcha-modal"
+      header-class="captcha-modal__header"
+      content-class="captcha-modal__content"
       :title="t('auth.captcha.title')"
-      :style="{ width: '360px' }"
+      :style="{ width: 'min(22.5rem, calc(100vw - var(--spacing-8)))' }"
+      :bordered="false"
       :mask-closable="false"
+      :close-on-esc="!isLoading"
+      @after-leave="handleCaptchaAfterLeave"
     >
       <SlideCaptcha
         ref="captchaRef"
@@ -917,6 +942,66 @@ function handleEnterSubmit(): void {
   }
 }
 
+// ============================================
+// 安全验证弹层：克制的层级入场与更清晰的退出关系
+// ============================================
+:global(.captcha-modal) {
+  overflow: hidden;
+  background-color: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 76%, transparent);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-2xl);
+}
+
+:global(.captcha-modal.fade-in-scale-up-transition-enter-active) {
+  transition:
+    opacity var(--duration-slower) var(--easing-out-expo),
+    transform var(--duration-slower) var(--easing-out-expo) !important;
+}
+
+:global(.captcha-modal.fade-in-scale-up-transition-leave-active) {
+  transition:
+    opacity var(--duration-normal) var(--easing-ease-in),
+    transform var(--duration-normal) var(--easing-ease-in) !important;
+}
+
+:global(.captcha-modal.fade-in-scale-up-transition-enter-from) {
+  opacity: 0;
+  transform: translateY(var(--spacing-6)) scale(0.965);
+}
+
+:global(.captcha-modal.fade-in-scale-up-transition-enter-to),
+:global(.captcha-modal.fade-in-scale-up-transition-leave-from) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+:global(.captcha-modal.fade-in-scale-up-transition-leave-to) {
+  opacity: 0;
+  transform: translateY(var(--spacing-2)) scale(0.985);
+}
+
+:global(.captcha-modal__header) {
+  padding: var(--spacing-6) var(--spacing-6) var(--spacing-3);
+  border-bottom: 0;
+}
+
+:global(.captcha-modal__header .n-card-header__main) {
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+:global(.captcha-modal__content) {
+  padding: var(--spacing-3) var(--spacing-6) var(--spacing-6);
+}
+
+:global(.n-modal-scroll-content:has(.captcha-modal) > .n-modal-mask) {
+  background-color: color-mix(in srgb, var(--color-overlay) 88%, transparent);
+  backdrop-filter: blur(4px) saturate(0.82);
+}
+
 @keyframes cyber-grid {
   0% {
     transform: perspective(500px) rotateX(60deg) translateY(0);
@@ -1197,6 +1282,16 @@ function handleEnterSubmit(): void {
 
   [data-theme='cyberpunk'] .login-page__brand::before {
     animation: none;
+  }
+
+  :global(.captcha-modal.fade-in-scale-up-transition-enter-active),
+  :global(.captcha-modal.fade-in-scale-up-transition-leave-active) {
+    transition: opacity var(--duration-fast) linear !important;
+  }
+
+  :global(.captcha-modal.fade-in-scale-up-transition-enter-from),
+  :global(.captcha-modal.fade-in-scale-up-transition-leave-to) {
+    transform: none;
   }
 }
 </style>

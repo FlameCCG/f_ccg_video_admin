@@ -17,6 +17,7 @@ export default {
   captcha: {
     title: '安全验证',
     tip: '请拖动滑块完成验证',
+    verifying: '正在核验安全凭证',
     loading: '加载中...',
     success: '验证成功',
     failed: '验证失败，请重试',
