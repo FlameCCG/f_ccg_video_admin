@@ -27,32 +27,36 @@ function normalizeModelList(list: AIModelOption[] | undefined | null): AIModelOp
   }))
 }
 
-/** 剥离后端已删除的 AI URL 字段，并补齐可选列表 */
+/** 剥离后端已删除的 AI 旧字段，并补齐可选列表 */
 export function normalizeAIConfig(raw: AIConfig): AIConfig {
   // 丢弃已移除字段，避免 PUT 时写回 yaml
   const legacy = { ...(raw as unknown as Record<string, unknown>) }
   delete legacy.embeddingModelBaseURL
   delete legacy.doubaoBaseURL
+  delete legacy.baseURL
+  delete legacy.apiKey
+  delete legacy.textModel
+  delete legacy.maxInputWorks
   const rest = legacy as unknown as AIConfig
 
   return {
-    baseURL: rest.baseURL ?? '',
-    apiKey: rest.apiKey ?? '',
     chatModelBaseURL: rest.chatModelBaseURL ?? '',
     chatModelAPIKey: rest.chatModelAPIKey ?? '',
     chatModel: rest.chatModel ?? '',
+    chatModels: normalizeModelList(rest.chatModels),
+    thinkingEnabled: rest.thinkingEnabled ?? false,
+    thinkingEffort: rest.thinkingEffort ?? '',
+    thinkingEfforts: normalizeModelList(rest.thinkingEfforts),
     embeddingModel: rest.embeddingModel ?? '',
     embeddingDimensions: rest.embeddingDimensions ?? 0,
     doubaoModelAPIKey: rest.doubaoModelAPIKey ?? '',
     systemPrompt: rest.systemPrompt ?? '',
-    textModel: rest.textModel ?? '',
     imageModel: rest.imageModel ?? '',
     imageModels: normalizeModelList(rest.imageModels),
     videoModel: rest.videoModel ?? '',
     videoModels: normalizeModelList(rest.videoModels),
     vectorIndex: rest.vectorIndex ?? '',
     vectorTopK: rest.vectorTopK ?? 0,
-    maxInputWorks: rest.maxInputWorks ?? 0,
     timeoutSec: rest.timeoutSec ?? 0,
   }
 }

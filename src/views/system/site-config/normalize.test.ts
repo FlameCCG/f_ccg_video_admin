@@ -8,7 +8,7 @@ import {
 import type { AIConfig, SiteConfig, ThirdLoginConfig, TranscodeConfig } from '@/api/types'
 
 describe('site-config normalize', () => {
-  it('strips removed AI URL fields and fills model lists', () => {
+  it('strips removed AI legacy fields and fills model lists', () => {
     const raw = {
       chatModelBaseURL: 'https://chat.example',
       chatModelAPIKey: 'k',
@@ -21,20 +21,35 @@ describe('site-config normalize', () => {
       videoModel: 'vid',
       vectorIndex: 'idx',
       vectorTopK: 8,
-      maxInputWorks: 8,
       timeoutSec: 60,
       embeddingModelBaseURL: 'https://should-drop',
       doubaoBaseURL: 'https://should-drop-too',
+      baseURL: 'https://legacy-base',
+      apiKey: 'legacy-key',
+      textModel: 'legacy-text',
+      maxInputWorks: 8,
     } as AIConfig & {
       embeddingModelBaseURL?: string
       doubaoBaseURL?: string
+      baseURL?: string
+      apiKey?: string
+      textModel?: string
+      maxInputWorks?: number
     }
 
     const next = normalizeAIConfig(raw)
     expect(next).not.toHaveProperty('embeddingModelBaseURL')
     expect(next).not.toHaveProperty('doubaoBaseURL')
+    expect(next).not.toHaveProperty('baseURL')
+    expect(next).not.toHaveProperty('apiKey')
+    expect(next).not.toHaveProperty('textModel')
+    expect(next).not.toHaveProperty('maxInputWorks')
     expect(next.imageModels).toEqual([])
     expect(next.videoModels).toEqual([])
+    expect(next.chatModels).toEqual([])
+    expect(next.thinkingEnabled).toBe(false)
+    expect(next.thinkingEffort).toBe('')
+    expect(next.thinkingEfforts).toEqual([])
     expect(next.chatModelBaseURL).toBe('https://chat.example')
   })
 

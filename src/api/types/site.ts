@@ -154,33 +154,34 @@ export interface EmailConfig {
   isExpire: number
 }
 
-/** AI 配置（与后端 conf.AI 对齐；豆包图/视频/Embedding 走方舟默认 BaseURL，无 doubaoBaseURL / embeddingModelBaseURL） */
+/** AI 配置（与后端 conf.AI 对齐；豆包图/视频/Embedding 走方舟默认 BaseURL） */
 export interface AIModelOption {
   label: string
   value: string
 }
 
 export interface AIConfig {
-  /** 可选兼容 Base URL */
-  baseURL?: string
-  /** 可选兼容 API Key */
-  apiKey?: string
   chatModelBaseURL: string
   chatModelAPIKey: string
   chatModel: string
+  chatModels?: AIModelOption[]
+  /** 是否开启思考模式（开启后前台可选择思考强度） */
+  thinkingEnabled: boolean
+  /** 默认思考强度 */
+  thinkingEffort: string
+  /** 可选思考强度列表 */
+  thinkingEfforts?: AIModelOption[]
   embeddingModel: string
   embeddingDimensions: number
   doubaoModelAPIKey: string
   systemPrompt: string
-  /** 可选默认文本模型 */
-  textModel?: string
   imageModel: string
   imageModels?: AIModelOption[]
   videoModel: string
   videoModels?: AIModelOption[]
   vectorIndex: string
+  /** 向量召回 TopK，同时作为 AI 找视频注入候选上限 */
   vectorTopK: number
-  maxInputWorks: number
   timeoutSec: number
 }
 

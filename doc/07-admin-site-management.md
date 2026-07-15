@@ -222,14 +222,13 @@ name=ai
     "embeddingDimensions": 2048,
     "doubaoModelAPIKey": "******",
     "systemPrompt": "你是一个严谨的多模态助手。",
-    "textModel": "",
     "imageModel": "doubao-seedream-5-0-lite-260128",
     "imageModels": [],
     "videoModel": "doubao-seedance-1-5-pro-251215",
     "videoModels": [],
     "vectorIndex": "search_videos_vector",
     "vectorTopK": 8,
-    "maxInputWorks": 8,
+
     "timeoutSec": 90
   },
   "msg": "ok"
@@ -442,14 +441,13 @@ name=ai
   "embeddingDimensions": 2048,
   "doubaoModelAPIKey": "******",
   "systemPrompt": "你是一个严谨的多模态助手。",
-  "textModel": "",
   "imageModel": "doubao-seedream-5-0-lite-260128",
   "imageModels": [],
   "videoModel": "doubao-seedance-1-5-pro-251215",
   "videoModels": [],
   "vectorIndex": "search_videos_vector",
   "vectorTopK": 8,
-  "maxInputWorks": 8,
+
   "timeoutSec": 90
 }
 ```
