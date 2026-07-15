@@ -105,7 +105,7 @@ Base URL：/v1
 请求参数:
 | 名称 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| name | path | string | 是 | 配置名称（site/logger/email/xai/transcode/thirdLogin/jwt） |
+| name | query | string | 是 | 配置名称（site/logger/email/ai/transcode/thirdLogin/jwt） |
 
 响应字段:
 | 字段 | 类型 | 说明 |
@@ -128,7 +128,7 @@ name=site
     "login": {
       "qqLogin": true,
       "googleLogin": true,
-      "githubLogin": true,
+      "gitHubLogin": true,
       "linuxdoLogin": true,
       "xLogin": true,
       "usernamePwdLogin": true,
@@ -209,23 +209,34 @@ name=email
 }
 ```
 
-name=xai
+name=ai
 
 ```json
 {
   "code": 0,
   "data": {
-    "baseURL": "https://api.x.ai",
-    "apiKey": "xai-******",
+    "chatModelBaseURL": "https://api.deepseek.com/anthropic",
+    "chatModelAPIKey": "******",
+    "chatModel": "deepseek-v4-flash",
+    "embeddingModel": "doubao-embedding-vision-251215",
+    "embeddingDimensions": 2048,
+    "doubaoModelAPIKey": "******",
     "systemPrompt": "你是一个严谨的多模态助手。",
-    "textModel": "grok-4.20",
-    "imageModel": "grok-imagine-image",
-    "videoModel": "grok-imagine-video",
-    "timeoutSec": 60
+    "textModel": "",
+    "imageModel": "doubao-seedream-5-0-lite-260128",
+    "imageModels": [],
+    "videoModel": "doubao-seedance-1-5-pro-251215",
+    "videoModels": [],
+    "vectorIndex": "search_videos_vector",
+    "vectorTopK": 8,
+    "maxInputWorks": 8,
+    "timeoutSec": 90
   },
   "msg": "ok"
 }
 ```
+
+> 说明：豆包图/视频/Embedding 走方舟默认 BaseURL，无 `doubaoBaseURL` / `embeddingModelBaseURL`。
 
 name=transcode
 
@@ -236,10 +247,12 @@ name=transcode
     "maxWorkers": 2,
     "transcodeResolutions": [360, 720, 1080, 2160],
     "highBitrateThreshold": 8000,
-    "bitrate2160KbpsReduceRatio": 20,
+    "bitrate2160HighKbpsReduceRatio": 12,
+    "bitrate1080HighKbpsReduceRatio": 15,
+    "bitrate2160KbpsReduceRatio": 25,
     "bitrate1080KbpsReduceRatio": 40,
-    "bitrate720KbpsReduceRatio": 60,
-    "bitrate360KbpsReduceRatio": 80,
+    "bitrate720KbpsReduceRatio": 55,
+    "bitrate360KbpsReduceRatio": 75,
     "cpuMode": true,
     "crfHigh": 18,
     "crfMedium": 23,
@@ -254,6 +267,7 @@ name=transcode
     "gpuMode": true,
     "threads": 8,
     "hardwareScale": false,
+    "mp4Enable": true,
     "dashEnable": true,
     "dashSegDuration": 4
   },
@@ -326,7 +340,7 @@ name=jwt
 请求参数:
 | 名称 | 位置 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- | --- |
-| name | path | string | 是 | 配置名称（site/logger/email/xai/transcode/thirdLogin/jwt） |
+| name | query | string | 是 | 配置名称（site/logger/email/ai/transcode/thirdLogin/jwt） |
 
 请求体:
 
@@ -346,7 +360,7 @@ name=site
   "login": {
     "qqLogin": true,
     "googleLogin": true,
-    "githubLogin": true,
+    "gitHubLogin": true,
     "linuxdoLogin": true,
     "xLogin": true,
     "usernamePwdLogin": true,
@@ -417,17 +431,26 @@ name=email
 }
 ```
 
-name=xai
+name=ai
 
 ```json
 {
-  "baseURL": "https://api.x.ai",
-  "apiKey": "xai-your-api-key",
+  "chatModelBaseURL": "https://api.deepseek.com/anthropic",
+  "chatModelAPIKey": "******",
+  "chatModel": "deepseek-v4-flash",
+  "embeddingModel": "doubao-embedding-vision-251215",
+  "embeddingDimensions": 2048,
+  "doubaoModelAPIKey": "******",
   "systemPrompt": "你是一个严谨的多模态助手。",
-  "textModel": "grok-4.20",
-  "imageModel": "grok-imagine-image",
-  "videoModel": "grok-imagine-video",
-  "timeoutSec": 60
+  "textModel": "",
+  "imageModel": "doubao-seedream-5-0-lite-260128",
+  "imageModels": [],
+  "videoModel": "doubao-seedance-1-5-pro-251215",
+  "videoModels": [],
+  "vectorIndex": "search_videos_vector",
+  "vectorTopK": 8,
+  "maxInputWorks": 8,
+  "timeoutSec": 90
 }
 ```
 
@@ -438,10 +461,12 @@ name=transcode
   "maxWorkers": 2,
   "transcodeResolutions": [360, 720, 1080, 2160],
   "highBitrateThreshold": 8000,
-  "bitrate2160KbpsReduceRatio": 20,
+  "bitrate2160HighKbpsReduceRatio": 12,
+  "bitrate1080HighKbpsReduceRatio": 15,
+  "bitrate2160KbpsReduceRatio": 25,
   "bitrate1080KbpsReduceRatio": 40,
-  "bitrate720KbpsReduceRatio": 60,
-  "bitrate360KbpsReduceRatio": 80,
+  "bitrate720KbpsReduceRatio": 55,
+  "bitrate360KbpsReduceRatio": 75,
   "cpuMode": true,
   "crfHigh": 18,
   "crfMedium": 23,
@@ -456,6 +481,7 @@ name=transcode
   "gpuMode": true,
   "threads": 8,
   "hardwareScale": false,
+  "mp4Enable": true,
   "dashEnable": true,
   "dashSegDuration": 4
 }
