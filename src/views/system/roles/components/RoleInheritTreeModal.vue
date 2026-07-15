@@ -53,7 +53,8 @@ const {
   refetch,
 } = useQuery({
   queryKey: ['roleInheritTree'],
-  queryFn: getRoleInheritTree,
+  // 包装为无参 queryFn，避免与 API 可选 roleId 参数签名冲突
+  queryFn: () => getRoleInheritTree(),
   staleTime: 30 * 1000,
   enabled: computed(() => props.visible),
   // 失败时不要静默重试多次刷屏「无权限访问」

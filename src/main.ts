@@ -6,6 +6,9 @@ import App from './App.vue'
 import router from './router'
 import { i18n, initI18n } from './locales'
 import { setupPermissionDirective } from './directives'
+import { createAppQueryClient } from '@/utils/queryClient'
+
+const queryClient = createAppQueryClient()
 
 const app = createApp(App as unknown as Component)
 const pinia = createPinia()
@@ -13,7 +16,7 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 app.use(i18n)
-app.use(VueQueryPlugin)
+app.use(VueQueryPlugin, { queryClient })
 
 // Register custom directives
 setupPermissionDirective(app)

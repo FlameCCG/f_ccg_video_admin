@@ -2,6 +2,7 @@
 import { NConfigProvider, NMessageProvider, NDialogProvider, NNotificationProvider } from 'naive-ui'
 import { useNaiveTheme, useLocale } from '@/composables'
 import { useAppStore } from '@/stores/app'
+import AppApiBridge from '@/components/common/AppApiBridge.vue'
 
 // 初始化应用
 const appStore = useAppStore()
@@ -24,6 +25,8 @@ const { naiveLocale, naiveDateLocale } = useLocale()
     <NMessageProvider>
       <NDialogProvider>
         <NNotificationProvider>
+          <!-- 注入 API 错误 toast / 登录跳转（须在 MessageProvider 内） -->
+          <AppApiBridge />
           <router-view />
         </NNotificationProvider>
       </NDialogProvider>

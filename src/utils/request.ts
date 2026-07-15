@@ -236,9 +236,10 @@ request.interceptors.response.use(
       return data as AxiosResponse
     }
 
-    // 普通业务错误 - 显示 msg 提示
-    showErrorMessage(msg)
-    return Promise.reject(new BusinessError(code, msg))
+    // 普通业务错误（含无权限等）- 展示后端 msg，并 reject 供调用方结束 loading
+    const errorMsg = (typeof msg === 'string' && msg.trim()) || '请求失败'
+    showErrorMessage(errorMsg)
+    return Promise.reject(new BusinessError(code, errorMsg))
   },
   async (error: unknown) => {
     // 网络错误或非 200 状态码
@@ -248,6 +249,14 @@ request.interceptors.response.use(
       // 401 状态码 - 尝试刷新 Token
       if (status === 401 && error.config) {
         return handleTokenError(error.config)
+      }
+
+      // 业务体可能挂在 HTTP 4xx 上（部分网关/中间层）
+      const body = error.response?.data as ApiResponse | undefined
+      if (body && typeof body === 'object' && body.code === 1 && body.msg) {
+        const bizMsg = body.msg.trim() || '请求失败'
+        showErrorMessage(bizMsg)
+        return Promise.reject(new BusinessError(1, bizMsg))
       }
 
       // 其他网络错误
