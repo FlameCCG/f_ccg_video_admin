@@ -164,6 +164,18 @@ function getActionLabel(action: ActionItem): string {
 .table-actions {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
+
+  :deep(.n-space) {
+    justify-content: center;
+    flex-wrap: nowrap;
+  }
+
+  :deep(.table-actions__button) {
+    padding: 0 4px;
+    white-space: nowrap;
+  }
 
   :deep(.table-actions__button:not(.n-button--disabled)) {
     cursor: pointer;

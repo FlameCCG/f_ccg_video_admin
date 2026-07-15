@@ -224,10 +224,14 @@ export function useNaiveTheme() {
       },
       DataTable: {
         borderRadius: radiusLg,
+        // 不透明表头，避免赛博朋克半透明叠出鬼影文字
+        thColor: surface,
+        thColorHover: surfaceHover || surface,
+        tdColor: surface,
+        tdColorHover: surfaceHover || surface,
+        borderColor: border,
         ...(theme === 'cyberpunk'
           ? {
-              thColor: 'rgba(0, 217, 255, 0.05)',
-              thColorHover: 'rgba(0, 217, 255, 0.08)',
               borderColor: 'rgba(0, 217, 255, 0.15)',
             }
           : {}),
