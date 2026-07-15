@@ -141,4 +141,29 @@ describe('SlideCaptcha', () => {
 
     wrapper.unmount()
   })
+
+  it('验证失败时只保留一次滑轨反馈并同步归位', async () => {
+    const wrapper = mount(SlideCaptcha, {
+      props: { visible: true },
+      global: { plugins: [i18n], stubs: componentStubs },
+    })
+
+    await flushPromises()
+
+    const slider = wrapper.get('[role="slider"]')
+    await slider.trigger('pointerdown', { clientX: 0, pointerId: 3 })
+    await slider.trigger('pointermove', { clientX: 132, pointerId: 3 })
+    await slider.trigger('pointerup', { clientX: 132, pointerId: 3 })
+
+    const exposed = wrapper.vm as unknown as CaptchaExposed
+    exposed.fail()
+    await nextTick()
+
+    expect(wrapper.find('.slide-captcha__track--fail').exists()).toBe(true)
+    expect(wrapper.find('.slide-captcha__result').exists()).toBe(false)
+    expect(slider.attributes('style')).toContain('translate3d(0px, 0, 0)')
+    expect(wrapper.text()).toContain('验证失败，请重试')
+
+    wrapper.unmount()
+  })
 })

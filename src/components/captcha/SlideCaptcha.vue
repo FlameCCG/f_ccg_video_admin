@@ -45,8 +45,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const DEFAULT_SLIDER_WIDTH = 44
-const FAILURE_SHAKE_DURATION = 320
-const FAILURE_RESET_DELAY = 1350
+const FAILURE_RESET_DELAY = 1100
 
 const captchaData = ref<SlideCaptcha | null>(null)
 const loading = ref(false)
@@ -55,7 +54,6 @@ const sliderX = ref(0)
 const scale = ref(1)
 const startX = ref(0)
 const verifyStatus = ref<VerifyStatus>('idle')
-const isShaking = ref(false)
 const containerWidth = ref(280)
 const sliderWidth = ref(DEFAULT_SLIDER_WIDTH)
 const lastResult = ref<CaptchaResult | null>(null)
@@ -65,7 +63,6 @@ const sliderRef = ref<HTMLDivElement | null>(null)
 const masterImageRef = ref<HTMLImageElement | null>(null)
 
 let resizeObserver: ResizeObserver | undefined
-let failureShakeTimer: ReturnType<typeof setTimeout> | undefined
 let failureResetTimer: ReturnType<typeof setTimeout> | undefined
 let captchaRequestId = 0
 
@@ -79,7 +76,7 @@ const fillScale = computed(() => {
   if (containerWidth.value <= 0) return 0
   return Math.min((sliderX.value + sliderWidth.value) / containerWidth.value, 1)
 })
-const showResult = computed(() => verifyStatus.value === 'success' || verifyStatus.value === 'fail')
+const showSuccessResult = computed(() => verifyStatus.value === 'success')
 const isInteractive = computed(
   () => !loading.value && Boolean(captchaData.value) && verifyStatus.value === 'idle'
 )
@@ -107,9 +104,7 @@ const fillStyle = computed(() => ({
 }))
 
 function clearFailureTimers(): void {
-  if (failureShakeTimer) clearTimeout(failureShakeTimer)
   if (failureResetTimer) clearTimeout(failureResetTimer)
-  failureShakeTimer = undefined
   failureResetTimer = undefined
 }
 
@@ -132,7 +127,6 @@ async function fetchCaptcha(): Promise<void> {
   clearFailureTimers()
   loading.value = true
   verifyStatus.value = 'idle'
-  isShaking.value = false
   isDragging.value = false
   sliderX.value = 0
   lastResult.value = null
@@ -289,13 +283,10 @@ defineExpose({
     if (lastResult.value) emit('success', lastResult.value)
   },
   fail: () => {
+    clearFailureTimers()
     verifyStatus.value = 'fail'
     isDragging.value = false
-    isShaking.value = true
-
-    failureShakeTimer = setTimeout(() => {
-      isShaking.value = false
-    }, FAILURE_SHAKE_DURATION)
+    sliderX.value = 0
 
     failureResetTimer = setTimeout(() => {
       void fetchCaptcha()
@@ -310,7 +301,6 @@ defineExpose({
       class="slide-captcha__image-wrapper"
       :class="{
         'slide-captcha__image-wrapper--dragging': isDragging,
-        'slide-captcha--shake': isShaking,
       }"
     >
       <n-spin :show="loading">
@@ -341,27 +331,17 @@ defineExpose({
 
           <Transition name="captcha-result">
             <div
-              v-if="showResult"
-              class="slide-captcha__result"
-              :class="{
-                'slide-captcha__result--success': verifyStatus === 'success',
-                'slide-captcha__result--fail': verifyStatus === 'fail',
-              }"
-              :role="verifyStatus === 'fail' ? 'alert' : 'status'"
+              v-if="showSuccessResult"
+              class="slide-captcha__result slide-captcha__result--success"
+              role="status"
               aria-live="polite"
             >
               <div class="slide-captcha__result-scan" aria-hidden="true" />
               <svg class="slide-captcha__result-mark" viewBox="0 0 64 64" aria-hidden="true">
                 <circle class="slide-captcha__result-ring" cx="32" cy="32" r="25" />
                 <path
-                  v-if="verifyStatus === 'success'"
                   class="slide-captcha__result-symbol slide-captcha__result-symbol--check"
                   d="M20 33.5 28.5 42 45 23.5"
-                />
-                <path
-                  v-else
-                  class="slide-captcha__result-symbol slide-captcha__result-symbol--cross"
-                  d="m24 24 16 16 M40 24 24 40"
                 />
               </svg>
               <span class="slide-captcha__result-text">{{ tipText }}</span>
@@ -403,6 +383,8 @@ defineExpose({
           :key="verifyStatus"
           class="slide-captcha__tip"
           :class="`slide-captcha__tip--${verifyStatus}`"
+          :role="verifyStatus === 'fail' ? 'alert' : undefined"
+          :aria-live="verifyStatus === 'fail' ? 'assertive' : undefined"
         >
           {{ tipText }}
         </span>
@@ -577,6 +559,7 @@ defineExpose({
     &--fail {
       background-color: color-mix(in srgb, var(--color-danger-light) 68%, var(--color-surface));
       border-color: var(--color-danger);
+      animation: captcha-error-recoil var(--duration-normal) var(--easing-out-quart);
     }
   }
 
@@ -762,10 +745,6 @@ defineExpose({
     &--success {
       color: var(--color-success);
     }
-
-    &--fail {
-      color: var(--color-danger);
-    }
   }
 
   &__result-scan {
@@ -814,10 +793,6 @@ defineExpose({
       var(--easing-out-quart) forwards;
   }
 
-  &__result-symbol--cross {
-    animation-delay: var(--duration-fast);
-  }
-
   &__result-text {
     margin-top: var(--spacing-2);
     font-size: var(--text-base);
@@ -827,10 +802,6 @@ defineExpose({
     transform: translateY(var(--spacing-1));
     animation: captcha-result-copy var(--duration-slow) var(--duration-normal)
       var(--easing-out-quart) forwards;
-  }
-
-  &--shake {
-    animation: captcha-shake var(--duration-slow) var(--easing-out-quart);
   }
 }
 
@@ -935,22 +906,18 @@ defineExpose({
   }
 }
 
-@keyframes captcha-shake {
+@keyframes captcha-error-recoil {
   0%,
   100% {
     transform: translateX(0);
   }
 
-  28% {
-    transform: translateX(calc(var(--spacing-1) * -1));
+  36% {
+    transform: translateX(calc(var(--spacing-1) * -0.75));
   }
 
-  58% {
-    transform: translateX(var(--spacing-1));
-  }
-
-  78% {
-    transform: translateX(calc(var(--spacing-1) * -0.5));
+  72% {
+    transform: translateX(calc(var(--spacing-1) * 0.4));
   }
 }
 
@@ -963,8 +930,11 @@ defineExpose({
     &__slider-spinner,
     &__result-ring,
     &__result-symbol,
-    &__result-text,
-    &--shake {
+    &__result-text {
+      animation: none;
+    }
+
+    &__track--fail {
       animation: none;
     }
 
