@@ -103,7 +103,7 @@ function handleResolutionsChange(values: (string | number)[]): void {
 
     <!-- 码率设置 -->
     <n-divider title-placement="left">
-      <n-text>{{ t('siteConfig.transcode.highBitrateThreshold') }}</n-text>
+      <n-text>{{ t('siteConfig.transcode.bitrateTitle') }}</n-text>
     </n-divider>
     <n-grid :cols="2" :x-gap="24">
       <n-grid-item>
@@ -115,6 +115,30 @@ function handleResolutionsChange(values: (string | number)[]): void {
             @update:value="(v) => updateField('highBitrateThreshold', v ?? 4000)"
           >
             <template #suffix>Kbps</template>
+          </n-input-number>
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.bitrate2160HighKbpsReduceRatio')">
+          <n-input-number
+            :value="formData.bitrate2160HighKbpsReduceRatio"
+            :min="0"
+            :max="100"
+            @update:value="(v) => updateField('bitrate2160HighKbpsReduceRatio', v ?? 12)"
+          >
+            <template #suffix>%</template>
+          </n-input-number>
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.transcode.bitrate1080HighKbpsReduceRatio')">
+          <n-input-number
+            :value="formData.bitrate1080HighKbpsReduceRatio"
+            :min="0"
+            :max="100"
+            @update:value="(v) => updateField('bitrate1080HighKbpsReduceRatio', v ?? 15)"
+          >
+            <template #suffix>%</template>
           </n-input-number>
         </n-form-item>
       </n-grid-item>

@@ -28,6 +28,12 @@ import {
   ThirdLoginConfigForm,
   JwtConfigForm,
 } from './components'
+import {
+  normalizeAIConfig,
+  normalizeSiteConfig,
+  normalizeThirdLoginConfig,
+  normalizeTranscodeConfig,
+} from './normalize'
 
 const route = useRoute()
 const router = useRouter()
@@ -90,10 +96,10 @@ const { isLoading, refetch } = useQuery({
   queryFn: async () => {
     const name = currentTab.value
     const data = await getSiteConfig(name)
-    // 根据类型设置对应的表单数据
+    // 根据类型设置对应的表单数据（归一化后写入，避免缺字段 / 已删字段）
     switch (name) {
       case 'site':
-        siteFormData.value = data as SiteConfig
+        siteFormData.value = normalizeSiteConfig(data as SiteConfig)
         break
       case 'logger':
         loggerFormData.value = data as LoggerConfig
@@ -102,13 +108,13 @@ const { isLoading, refetch } = useQuery({
         emailFormData.value = data as EmailConfig
         break
       case 'ai':
-        aiFormData.value = data as AIConfig
+        aiFormData.value = normalizeAIConfig(data as AIConfig)
         break
       case 'transcode':
-        transcodeFormData.value = data as TranscodeConfig
+        transcodeFormData.value = normalizeTranscodeConfig(data as TranscodeConfig)
         break
       case 'thirdLogin':
-        thirdLoginFormData.value = data as ThirdLoginConfig
+        thirdLoginFormData.value = normalizeThirdLoginConfig(data as ThirdLoginConfig)
         break
       case 'jwt':
         jwtFormData.value = data as JwtConfig

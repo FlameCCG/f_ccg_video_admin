@@ -154,23 +154,25 @@ export interface EmailConfig {
   isExpire: number
 }
 
-/** AI 配置 */
+/** AI 配置（与后端 conf.AI 对齐；豆包图/视频/Embedding 走方舟默认 BaseURL，无 doubaoBaseURL / embeddingModelBaseURL） */
 export interface AIModelOption {
   label: string
   value: string
 }
 
 export interface AIConfig {
+  /** 可选兼容 Base URL */
   baseURL?: string
+  /** 可选兼容 API Key */
   apiKey?: string
   chatModelBaseURL: string
   chatModelAPIKey: string
   chatModel: string
-  embeddingModelBaseURL: string
   embeddingModel: string
   embeddingDimensions: number
   doubaoModelAPIKey: string
   systemPrompt: string
+  /** 可选默认文本模型 */
   textModel?: string
   imageModel: string
   imageModels?: AIModelOption[]
@@ -182,11 +184,15 @@ export interface AIConfig {
   timeoutSec: number
 }
 
-/** 转码配置 */
+/** 转码配置（与后端 conf.Transcode 对齐） */
 export interface TranscodeConfig {
   maxWorkers: number
   transcodeResolutions: number[]
   highBitrateThreshold: number
+  /** 高码率档：4K 源片规范化 / DASH 2160 High */
+  bitrate2160HighKbpsReduceRatio: number
+  /** 高码率档：1080 High / 1080 源片规范化 */
+  bitrate1080HighKbpsReduceRatio: number
   bitrate2160KbpsReduceRatio: number
   bitrate1080KbpsReduceRatio: number
   bitrate720KbpsReduceRatio: number
