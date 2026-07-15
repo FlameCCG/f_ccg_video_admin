@@ -286,9 +286,9 @@ function handlePageSizeChange(pageSize: number): void {
     :deep(.n-data-table-base-table-body) {
       flex: 1;
       min-height: 0;
+
       // 仅纵向滚动；横向由列宽自适应吃掉，避免底部横条与叠字
-      overflow-x: hidden;
-      overflow-y: auto;
+      overflow: hidden auto;
       scrollbar-width: thin;
       scrollbar-color: color-mix(in srgb, var(--color-border) 70%, transparent) transparent;
 
@@ -356,12 +356,20 @@ function handlePageSizeChange(pageSize: number): void {
 
     :deep(.n-data-table-tr:hover .n-data-table-td--fixed-left),
     :deep(.n-data-table-tr:hover .n-data-table-td--fixed-right) {
-      background-color: color-mix(in srgb, var(--color-surface) 97%, var(--color-primary) 3%) !important;
+      background-color: color-mix(
+        in srgb,
+        var(--color-surface) 97%,
+        var(--color-primary) 3%
+      ) !important;
     }
 
     :deep(.n-data-table-tr--selected .n-data-table-td--fixed-left),
     :deep(.n-data-table-tr--selected .n-data-table-td--fixed-right) {
-      background-color: color-mix(in srgb, var(--color-surface) 92%, var(--color-primary) 8%) !important;
+      background-color: color-mix(
+        in srgb,
+        var(--color-surface) 92%,
+        var(--color-primary) 8%
+      ) !important;
     }
 
     // 选中行样式
