@@ -31,11 +31,13 @@ type SiteConfigResponse<T extends SiteConfigName> = {
 
 /**
  * 获取站点配置
- * GET /admin/site/config/{name}
- * 注意：后端返回 { [name]: config }，需要解包
+ * GET /admin/site/config?name=
+ * 注意：后端返回配置对象本身；历史版本可能包一层 { [name]: config }
  */
 export async function getSiteConfig<T extends SiteConfigName>(name: T): Promise<SiteConfigMap[T]> {
-  const response = await request.get<SiteConfigResponse<T>>(`/admin/site/config/${name}`)
+  const response = await request.get<SiteConfigResponse<T>>('/admin/site/config', {
+    params: { name },
+  })
   // 后端返回 { site: {...} } 或 { logger: {...} } 等，需要解包
   const data = response as unknown as Record<string, unknown>
   // 如果响应中包含配置名作为 key，则解包
@@ -48,11 +50,11 @@ export async function getSiteConfig<T extends SiteConfigName>(name: T): Promise<
 
 /**
  * 更新站点配置
- * PUT /admin/site/config/{name}
+ * PUT /admin/site/config?name=
  */
 export function updateSiteConfig<T extends SiteConfigName>(
   name: T,
   data: SiteConfigMap[T]
 ): Promise<void> {
-  return request.put(`/admin/site/config/${name}`, data)
+  return request.put('/admin/site/config', data, { params: { name } })
 }

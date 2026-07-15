@@ -1,4 +1,4 @@
-# 后台-站点管理
+﻿# 后台-站点管理
 
 分类说明：站点统计与配置管理
 
@@ -93,7 +93,7 @@ Base URL：/v1
 
 ## [GET] 站点配置（按名称）
 
-- 接口路径: GET /admin/site/config/{name}
+- 接口路径: GET /admin/site/config
 - 认证: 需要登录（客户端全局自动携带 Token）
 - 权限: 需要 RBAC 权限
 - 依赖接口: 无
@@ -314,7 +314,7 @@ name=jwt
 
 ## [PUT] 更新站点配置（按名称）
 
-- 接口路径: PUT /admin/site/config/{name}
+- 接口路径: PUT /admin/site/config
 - 认证: 需要登录（客户端全局自动携带 Token）
 - 权限: 需要 RBAC 权限
 - 依赖接口: 无
@@ -518,3 +518,4 @@ name=jwt
   "msg": "更新成功"
 }
 ```
+
