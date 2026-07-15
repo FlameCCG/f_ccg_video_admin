@@ -3,12 +3,15 @@
  * 角色继承树弹窗
  * Role Inheritance Tree Modal
  * Requirements: 16.2 - 角色继承管理
+ *
+ * 统一走系统继承树接口 GET /admin/rbac/role/inherit/tree，
+ * 通过 highlightRoleId 高亮指定角色（可选 roleId query 由 getRoleInheritTreeById 使用）。
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery } from '@tanstack/vue-query'
 import { NModal, NButton, NIcon } from 'naive-ui'
-import { getRoleInheritTree, getRoleInheritTreeById } from '@/api/rbac'
+import { getRoleInheritTree } from '@/api/rbac'
 import { RoleInheritTree } from '@/components/rbac'
 
 interface Props {
@@ -16,7 +19,10 @@ interface Props {
   visible: boolean
   /** 高亮的角色 ID */
   highlightRoleId?: number | null
-  /** 指定角色 ID（如果提供，则只显示该角色的继承树分支） */
+  /**
+   * 指定角色 ID（兼容旧调用）
+   * 仅用于高亮与标题，不再单独请求 by-id 接口
+   */
   roleId?: number | null
 }
 
@@ -31,50 +37,37 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-/** 是否为指定角色模式 */
-const isSpecificRole = computed(() => props.roleId !== null && props.roleId !== undefined)
+const isSpecificRole = computed(() => {
+  const id = props.roleId ?? props.highlightRoleId
+  return id !== null && id !== undefined
+})
 
-/** 获取角色继承树（系统整体） */
+const activeHighlightId = computed(() => props.highlightRoleId ?? props.roleId ?? null)
+
+/** 系统整体继承树 */
 const {
   data: systemTreeData,
-  isLoading: systemLoading,
-  refetch: refetchSystem,
+  isLoading,
+  isError,
+  error,
+  refetch,
 } = useQuery({
   queryKey: ['roleInheritTree'],
   queryFn: getRoleInheritTree,
   staleTime: 30 * 1000,
-  enabled: computed(() => props.visible && !isSpecificRole.value),
+  enabled: computed(() => props.visible),
+  // 失败时不要静默重试多次刷屏「无权限访问」
+  retry: 1,
 })
 
-/** 获取指定角色继承树 */
-const {
-  data: specificTreeData,
-  isLoading: specificLoading,
-  refetch: refetchSpecific,
-} = useQuery({
-  queryKey: ['roleInheritTreeById', computed(() => props.roleId)],
-  queryFn: () => getRoleInheritTreeById(props.roleId!),
-  staleTime: 30 * 1000,
-  enabled: computed(() => props.visible && isSpecificRole.value && !!props.roleId),
+const treeData = computed(() => systemTreeData.value ?? [])
+
+const errorMessage = computed(() => {
+  if (!isError.value) return null
+  const msg = error.value instanceof Error ? error.value.message : String(error.value ?? '')
+  return msg || t('common.tips.operationFailed')
 })
 
-/** 当前显示的树数据 */
-const treeData = computed(() => {
-  if (isSpecificRole.value) {
-    return specificTreeData.value ?? []
-  }
-  return systemTreeData.value ?? []
-})
-
-/** 加载状态 */
-const isLoading = computed(() => {
-  if (isSpecificRole.value) {
-    return specificLoading.value
-  }
-  return systemLoading.value
-})
-
-/** 弹窗标题 */
 const modalTitle = computed(() => {
   if (isSpecificRole.value) {
     return t('rbac.role.inheritTree.view')
@@ -82,18 +75,12 @@ const modalTitle = computed(() => {
   return t('rbac.role.inheritTree.title')
 })
 
-/** 处理关闭 */
-function handleClose(): void {
-  emit('update:visible', false)
+function handleShowUpdate(show: boolean): void {
+  emit('update:visible', show)
 }
 
-/** 处理刷新 */
 function handleRefresh(): void {
-  if (isSpecificRole.value) {
-    void refetchSpecific()
-  } else {
-    void refetchSystem()
-  }
+  void refetch()
 }
 </script>
 
@@ -102,13 +89,13 @@ function handleRefresh(): void {
     :show="visible"
     preset="card"
     :title="modalTitle"
-    :style="{ width: '800px', maxWidth: '90vw' }"
+    :style="{ width: '860px', maxWidth: '92vw' }"
     :mask-closable="true"
     :close-on-esc="true"
-    @update:show="handleClose"
+    @update:show="handleShowUpdate"
   >
     <template #header-extra>
-      <n-button size="small" quaternary circle @click="handleRefresh">
+      <n-button size="small" quaternary circle :loading="isLoading" @click="handleRefresh">
         <template #icon>
           <n-icon>
             <svg
@@ -138,7 +125,8 @@ function handleRefresh(): void {
       <role-inherit-tree
         :data="treeData"
         :loading="isLoading"
-        :highlight-role-id="props.highlightRoleId"
+        :highlight-role-id="activeHighlightId"
+        :error-message="errorMessage"
       />
     </div>
   </n-modal>

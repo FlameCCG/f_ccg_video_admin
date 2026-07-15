@@ -61,10 +61,10 @@ export function updateRole(params: UpdateRoleParams): Promise<EmptyData> {
 
 /**
  * 删除角色
- * DELETE /admin/rbac/role/{id}
+ * DELETE /admin/rbac/role?id=
  */
 export function deleteRole(id: number): Promise<EmptyData> {
-  return request.delete(`/admin/rbac/role/${id}`)
+  return request.delete('/admin/rbac/role', { params: { id } })
 }
 
 /**
@@ -110,17 +110,20 @@ export function getRoleInherits(params: GetRoleInheritsParams): Promise<RoleInhe
 /**
  * 获取角色继承树
  * GET /admin/rbac/role/inherit/tree
+ * @param roleId 可选；有值时只返回该角色相关子树
  */
-export function getRoleInheritTree(): Promise<RoleInheritTreeNode[]> {
-  return request.get('/admin/rbac/role/inherit/tree')
+export function getRoleInheritTree(roleId?: number): Promise<RoleInheritTreeNode[]> {
+  return request.get('/admin/rbac/role/inherit/tree', {
+    params: roleId != null ? { roleId } : undefined,
+  })
 }
 
 /**
  * 获取指定角色继承树
- * GET /admin/rbac/role/{id}/inherit/tree
+ * GET /admin/rbac/role/inherit/tree?roleId=
  */
 export function getRoleInheritTreeById(roleId: number): Promise<RoleInheritTreeNode[]> {
-  return request.get(`/admin/rbac/role/${roleId}/inherit/tree`)
+  return request.get('/admin/rbac/role/inherit/tree', { params: { roleId } })
 }
 
 // ============ 用户角色管理 ============
@@ -135,10 +138,10 @@ export function updateUserRoles(params: UpdateUserRolesParams): Promise<EmptyDat
 
 /**
  * 获取用户角色列表
- * GET /admin/rbac/user/{id}/roles
+ * GET /admin/rbac/user/roles?userId=
  */
 export function getUserRoles(userId: number): Promise<Role[]> {
-  return request.get(`/admin/rbac/user/${userId}/roles`)
+  return request.get('/admin/rbac/user/roles', { params: { userId } })
 }
 
 /**
@@ -185,10 +188,10 @@ export function updateMenu(params: UpdateMenuParams): Promise<EmptyData> {
 
 /**
  * 删除菜单
- * DELETE /admin/rbac/menu/{id}
+ * DELETE /admin/rbac/menu?id=
  */
 export function deleteMenu(id: number): Promise<EmptyData> {
-  return request.delete(`/admin/rbac/menu/${id}`)
+  return request.delete('/admin/rbac/menu', { params: { id } })
 }
 
 /**

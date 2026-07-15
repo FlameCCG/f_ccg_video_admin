@@ -1,4 +1,4 @@
-# 权限管理
+﻿# 权限管理
 
 分类说明：角色、菜单、权限与资源同步
 
@@ -108,7 +108,7 @@ Base URL：/v1
 
 ## [DELETE] 删除角色
 
-- 接口路径: DELETE /admin/rbac/role/{id}
+- 接口路径: DELETE /admin/rbac/role
 - 认证: 需要登录（客户端全局自动携带 Token）
 - 权限: 需要RBAC权限
 - 依赖接口: 无
@@ -340,7 +340,7 @@ Base URL：/v1
 
 ## [GET] 指定角色继承树
 
-- 接口路径: GET /admin/rbac/role/{id}/inherit/tree
+- 接口路径: GET /admin/rbac/role/inherit/tree
 - 认证: 需要登录（客户端全局自动携带 Token）
 - 权限: 需要RBAC权限
 - 依赖接口: 无
@@ -423,7 +423,7 @@ Base URL：/v1
 
 ## [GET] 获取用户角色
 
-- 接口路径: GET /admin/rbac/user/{id}/roles
+- 接口路径: GET /admin/rbac/user/roles
 - 认证: 需要登录（客户端全局自动携带 Token）
 - 权限: 需要RBAC权限
 - 依赖接口: 无
@@ -614,7 +614,7 @@ Base URL：/v1
 
 ## [DELETE] 删除菜单
 
-- 接口路径: DELETE /admin/rbac/menu/{id}
+- 接口路径: DELETE /admin/rbac/menu
 - 认证: 需要登录（客户端全局自动携带 Token）
 - 权限: 需要RBAC权限
 - 依赖接口: 无
@@ -1072,3 +1072,4 @@ Base URL：/v1
   "msg": "获取成功"
 }
 ```
+

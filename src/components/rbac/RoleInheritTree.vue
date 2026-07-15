@@ -4,9 +4,9 @@
  * Role Inheritance Tree Visualization with Vue Flow
  * Requirements: 16.2 - 角色继承管理
  */
-import { computed, watch } from 'vue'
+import { computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { VueFlow, useVueFlow } from '@vue-flow/core'
+import { VueFlow, useVueFlow, MarkerType, Position } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { NEmpty, NSpin, NTag } from 'naive-ui'
@@ -20,15 +20,18 @@ interface Props {
   loading?: boolean
   /** 高亮的角色 ID */
   highlightRoleId?: number | null
+  /** 加载/请求错误信息（有值时优先展示错误态） */
+  errorMessage?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   highlightRoleId: null,
+  errorMessage: null,
 })
 
 const { t } = useI18n()
-const { fitView } = useVueFlow()
+const { fitView } = useVueFlow({ id: 'role-inherit-tree' })
 
 /** 是否有数据 */
 const hasData = computed(() => props.data && props.data.length > 0)
@@ -41,7 +44,6 @@ function convertTreeToFlow(
   const nodes: Node[] = []
   const edges: Edge[] = []
 
-  // 递归处理节点
   function processNode(
     node: RoleInheritTreeNode,
     level: number,
@@ -51,14 +53,16 @@ function convertTreeToFlow(
     const nodeId = `node-${node.id}`
     const isHighlighted = node.id === highlightId
 
-    // 计算节点位置（水平布局）
-    const x = level * 250
-    const y = index * 120
+    const x = level * 260
+    const y = index * 130
 
     nodes.push({
       id: nodeId,
       type: 'default',
       position: { x, y },
+      // 边方向为「子 → 父」（继承自），故出边在左、入边在右
+      sourcePosition: Position.Left,
+      targetPosition: Position.Right,
       data: {
         label: node.name,
         desc: node.desc,
@@ -68,19 +72,30 @@ function convertTreeToFlow(
       class: isHighlighted ? 'role-node role-node--highlighted' : 'role-node',
     })
 
-    // 添加边（从父节点到子节点）
+    // 子 → 父：表示「继承自 / inherits from」
+    // 后端树：parent.children 含 child（child 在 Casbin g 中继承 parent）
+    // 箭头指向被继承角色（父），流动方向 = 谁去继承谁
     if (parentId) {
       edges.push({
-        id: `edge-${parentId}-${nodeId}`,
-        source: parentId,
-        target: nodeId,
+        id: `edge-${nodeId}-${parentId}`,
+        source: nodeId,
+        target: parentId,
         type: 'smoothstep',
-        animated: isHighlighted,
-        style: { stroke: isHighlighted ? 'var(--color-primary)' : 'var(--color-border)' },
+        animated: true,
+        style: {
+          stroke: 'var(--color-primary)',
+          strokeWidth: isHighlighted ? 2.5 : 2,
+          opacity: isHighlighted ? 1 : 0.75,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: 'var(--color-primary)',
+          width: 16,
+          height: 16,
+        },
       })
     }
 
-    // 处理子节点
     if (node.children && node.children.length > 0) {
       node.children.forEach((child, childIndex) => {
         processNode(child, level + 1, index + childIndex, nodeId)
@@ -88,7 +103,6 @@ function convertTreeToFlow(
     }
   }
 
-  // 处理所有根节点
   let currentIndex = 0
   treeData.forEach((rootNode) => {
     processNode(rootNode, 0, currentIndex)
@@ -98,7 +112,6 @@ function convertTreeToFlow(
   return { nodes, edges }
 }
 
-/** 计算节点及其后代的数量 */
 function countDescendants(node: RoleInheritTreeNode): number {
   let count = 1
   if (node.children) {
@@ -109,7 +122,6 @@ function countDescendants(node: RoleInheritTreeNode): number {
   return count
 }
 
-/** 计算节点总数 */
 const totalNodes = computed(() => {
   let count = 0
   props.data.forEach((node) => {
@@ -118,16 +130,20 @@ const totalNodes = computed(() => {
   return count
 })
 
-/** 转换后的流程图数据 */
 const flowData = computed(() => convertTreeToFlow(props.data, props.highlightRoleId ?? null))
 
-/** 监听数据变化，自动适应视图 */
-watch(
-  () => props.data,
-  () => {
+function scheduleFitView(): void {
+  void nextTick(() => {
     setTimeout(() => {
-      void fitView({ padding: 0.2 })
-    }, 100)
+      void fitView({ padding: 0.2, duration: 200 })
+    }, 80)
+  })
+}
+
+watch(
+  () => [props.data, props.highlightRoleId] as const,
+  () => {
+    if (hasData.value) scheduleFitView()
   },
   { deep: true }
 )
@@ -136,8 +152,14 @@ watch(
 <template>
   <div class="role-inherit-tree">
     <n-spin :show="loading">
-      <template v-if="hasData">
-        <!-- 统计信息 -->
+      <!-- 请求失败：明确展示原因（如无权限），不要伪装成「暂无继承关系」 -->
+      <n-empty
+        v-if="errorMessage"
+        :description="errorMessage"
+        class="role-inherit-tree__empty role-inherit-tree__empty--error"
+      />
+
+      <template v-else-if="hasData">
         <div class="role-inherit-tree__stats">
           <n-tag size="small" :bordered="false">
             {{ t('rbac.role.inheritTree.totalRoles', { count: totalNodes }) }}
@@ -147,20 +169,23 @@ watch(
           </span>
         </div>
 
-        <!-- Vue Flow 画布 -->
         <div class="role-inherit-tree__canvas">
           <VueFlow
+            id="role-inherit-tree"
             :nodes="flowData.nodes"
             :edges="flowData.edges"
-            :default-viewport="{ x: 50, y: 50, zoom: 1 }"
+            :default-viewport="{ x: 40, y: 40, zoom: 0.95 }"
             :min-zoom="0.2"
             :max-zoom="2"
+            :nodes-draggable="true"
+            :nodes-connectable="false"
+            :elements-selectable="false"
             fit-view-on-init
+            @nodes-initialized="scheduleFitView"
           >
             <Background />
             <Controls />
 
-            <!-- 自定义节点模板 -->
             <template #node-default="{ data: nodeData }">
               <div
                 class="role-flow-node"
@@ -212,10 +237,17 @@ watch(
 
   &__empty {
     padding: var(--spacing-8) 0;
+
+    &--error {
+      :deep(.n-empty__description) {
+        color: var(--color-danger);
+        max-width: 420px;
+        text-align: center;
+      }
+    }
   }
 }
 
-// Vue Flow 节点样式
 .role-flow-node {
   display: flex;
   flex-direction: column;
@@ -227,7 +259,9 @@ watch(
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: grab;
-  transition: all var(--motion-fast) ease;
+  transition:
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
 
   &:hover {
     border-color: var(--color-primary);
@@ -236,8 +270,8 @@ watch(
 
   &--highlighted {
     border-color: var(--color-primary);
-    background: var(--color-primary-light);
-    box-shadow: 0 0 0 3px var(--color-primary-light);
+    background: color-mix(in srgb, var(--color-surface) 88%, var(--color-primary) 12%);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 22%, transparent);
   }
 
   &__name {
@@ -258,7 +292,7 @@ watch(
   }
 }
 
-// Vue Flow 节点包装器重写，消除默认的主题白边与白底，使其适配自定义主题
+// 去掉默认白边，保留自定义节点外观
 .vue-flow__node-default,
 .vue-flow__node-input,
 .vue-flow__node-output,
@@ -270,12 +304,45 @@ watch(
   color: inherit !important;
 }
 
-// 隐藏默认的连接锚点（因为是只读继承树，无需手动拉线）
+/**
+ * 关键：连接锚点不能 display:none！
+ * Vue Flow 需要 handle 参与边路径计算，display:none 会导致继承关系虚线完全不渲染。
+ * 只读树：视觉隐藏 + 禁用交互即可。
+ */
 .vue-flow__handle {
-  display: none !important;
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  opacity: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  pointer-events: none !important;
 }
 
-// Vue Flow 控件样式覆盖
+// 流动虚线（Vue Flow animated edge 默认 dash 动画）
+.vue-flow__edge-path {
+  stroke: var(--color-primary);
+  stroke-width: 2;
+  fill: none;
+}
+
+.vue-flow__edge.animated .vue-flow__edge-path {
+  stroke: var(--color-primary) !important;
+  stroke-dasharray: 6 4 !important;
+  animation: role-inherit-edge-flow 0.8s linear infinite;
+}
+
+@keyframes role-inherit-edge-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.vue-flow__arrowhead {
+  fill: var(--color-primary);
+}
+
 .vue-flow__controls {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -297,24 +364,9 @@ watch(
   }
 }
 
-// Vue Flow 边样式
-.vue-flow__edge-path {
-  stroke: var(--color-border);
-  stroke-width: 2;
-  transition: stroke var(--motion-fast) ease;
-}
-
-// Vue Flow 边的动画与高亮样式
-.vue-flow__edge.selected .vue-flow__edge-path,
-.vue-flow__edge.animated .vue-flow__edge-path {
-  stroke: var(--color-primary) !important;
-}
-
-// Vue Flow 背景样式
 .vue-flow__background {
   background-color: var(--color-bg);
   --vf-pattern-color: var(--color-border);
-
-  opacity: 0.4;
+  opacity: 0.45;
 }
 </style>

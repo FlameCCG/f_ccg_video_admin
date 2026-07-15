@@ -185,6 +185,7 @@ function handleAction(key: string, row: Role): void {
     inheritingRole.value = row
     inheritDrawerVisible.value = true
   } else if (key === 'viewTree') {
+    // 统一走系统继承树 + 高亮当前角色（避免 by-id 接口单独鉴权失败）
     viewTreeRoleId.value = row.id
     highlightRoleId.value = row.id
     inheritTreeModalVisible.value = true

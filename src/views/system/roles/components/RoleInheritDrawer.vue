@@ -79,6 +79,7 @@ const addInheritMutation = useMutation({
     message.success(t('rbac.role.inheritSuccess'))
     selectedParentRoleId.value = null
     void queryClient.invalidateQueries({ queryKey: ['roleInherits'] })
+    void queryClient.invalidateQueries({ queryKey: ['roleInheritTree'] })
   },
   // 业务错误由 request 拦截器弹出
 })
@@ -88,6 +89,7 @@ const removeInheritMutation = useMutation({
   onSuccess: () => {
     message.success(t('rbac.role.removeInheritSuccess'))
     void queryClient.invalidateQueries({ queryKey: ['roleInherits'] })
+    void queryClient.invalidateQueries({ queryKey: ['roleInheritTree'] })
   },
 })
 

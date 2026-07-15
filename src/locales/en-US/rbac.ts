@@ -47,7 +47,7 @@ export default {
       title: 'Role Inheritance Tree',
       view: 'View Inheritance Tree',
       viewSystem: 'System Role Inheritance Tree',
-      hint: 'The inheritance tree shows the relationships between roles. Child roles inherit all permissions from parent roles.',
+      hint: 'Dashed arrows mean "inherits from": child → parent (the child receives all permissions of the parent).',
       empty: 'No inheritance relationships',
       totalRoles: '{count} roles in total',
       dragHint: 'Drag to move, scroll to zoom',
