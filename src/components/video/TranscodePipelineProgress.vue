@@ -10,7 +10,7 @@ const props = withDefaults(
     /** compact：列表单元格；detail：详情抽屉 */
     density?: 'compact' | 'detail'
   }>(),
-  { density: 'compact' }
+  { items: () => [], density: 'compact' }
 )
 
 const { t } = useI18n()
@@ -91,11 +91,7 @@ function resChips(resolutions?: number[]): string {
 </script>
 
 <template>
-  <div
-    v-if="entries.length"
-    class="tc"
-    :class="isDetail ? 'tc--detail' : 'tc--compact'"
-  >
+  <div v-if="entries.length" class="tc" :class="isDetail ? 'tc--detail' : 'tc--compact'">
     <section v-for="entry in entries" :key="entry.partId ?? 0" class="tc-entry">
       <div v-if="entries.length > 1" class="tc-part">
         {{ t('video.transcode.part', { id: entry.partId ?? 0 }) }}
