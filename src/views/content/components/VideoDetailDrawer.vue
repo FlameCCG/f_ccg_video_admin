@@ -178,7 +178,7 @@ const isMultiPart = computed(() => {
 
           <template v-if="detailProgress?.length">
             <n-divider>{{ t('video.detail.transcodeProgress') }}</n-divider>
-            <transcode-pipeline-progress :items="detailProgress" />
+            <transcode-pipeline-progress :items="detailProgress" density="detail" />
           </template>
 
           <n-divider>{{ t('video.detail.basicInfo') }}</n-divider>

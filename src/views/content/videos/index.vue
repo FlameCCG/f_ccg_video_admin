@@ -171,21 +171,25 @@ function formatNumber(num: number): string {
   return num.toString()
 }
 
-/** 表格列配置 */
+/**
+ * 表格列配置
+ * - 不用 fixed / scroll-x：整表随容器自适应，无横向滚动条、无固定列阴影/叠字
+ * - 头像并入作者列，转码列可收缩，保证所有字段同一屏可见
+ */
 const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     type: 'selection',
-    fixed: 'left',
+    width: 40,
   },
   {
     title: t('video.list.cover'),
     key: 'cover',
-    width: 120,
+    width: 88,
     render: (row) =>
       h(NImage, {
         src: row.cover as string,
-        width: 100,
-        height: 56,
+        width: 72,
+        height: 40,
         objectFit: 'cover',
         lazy: true,
         previewDisabled: false,
@@ -195,33 +199,49 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     title: t('video.list.videoTitle'),
     key: 'title',
-    minWidth: 200,
+    minWidth: 140,
     ellipsis: { tooltip: true },
-  },
-  {
-    title: t('video.list.authorAvatar'),
-    key: 'authorAvatar',
-    width: 80,
-    align: 'center',
-    render: (row) => {
-      const author = row.author as { id: number; username: string; avatar: string }
-      return h(AppAvatar, { src: author.avatar, text: author.username, size: 32 })
-    },
   },
   {
     title: t('video.list.author'),
     key: 'author',
-    width: 120,
+    width: 132,
     ellipsis: { tooltip: true },
     render: (row) => {
       const author = row.author as { id: number; username: string; avatar: string }
-      return author.username
+      return h(
+        'div',
+        {
+          style: {
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            maxWidth: '100%',
+            minWidth: 0,
+          },
+        },
+        [
+          h(AppAvatar, { src: author.avatar, text: author.username, size: 28 }),
+          h(
+            'span',
+            {
+              style: {
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              },
+            },
+            author.username
+          ),
+        ]
+      )
     },
   },
   {
     title: t('video.list.status'),
     key: 'status',
-    width: 100,
+    width: 96,
+    align: 'center',
     render: (row) =>
       h(AppStatusTag, {
         type: getStatusType(row.status as VideoStatus),
@@ -232,42 +252,49 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     title: t('video.list.transcode'),
     key: 'transcode',
-    width: 520,
+    minWidth: 200,
+    width: 260,
     render: (row) => {
       const id = row.id as number
-      return h(TranscodePipelineProgress, { items: progressMap.value[id] ?? [] })
+      return h(TranscodePipelineProgress, {
+        items: progressMap.value[id] ?? [],
+        density: 'compact',
+      })
     },
   },
   {
     title: t('video.list.partition'),
     key: 'partitionName',
-    width: 100,
+    width: 80,
+    ellipsis: { tooltip: true },
   },
   {
     title: t('video.list.duration'),
     key: 'duration',
-    width: 80,
+    width: 72,
     align: 'center',
     render: (row) => formatDuration(row.duration as number),
   },
   {
     title: t('video.list.views'),
     key: 'views',
-    width: 90,
-    align: 'right',
+    width: 80,
+    align: 'center',
+    ellipsis: { tooltip: true },
     render: (row) => formatNumber(row.views as number),
   },
   {
     title: t('video.list.likes'),
     key: 'likes',
-    width: 90,
-    align: 'right',
+    width: 80,
+    align: 'center',
+    ellipsis: { tooltip: true },
     render: (row) => formatNumber(row.likes as number),
   },
   {
     title: t('video.list.isOriginal'),
     key: 'isOriginal',
-    width: 80,
+    width: 72,
     align: 'center',
     render: (row) =>
       h(NTag, { type: (row.isOriginal as boolean) ? 'success' : 'default', size: 'small' }, () =>
@@ -277,14 +304,15 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     title: t('video.list.createdAt'),
     key: 'createdAt',
-    width: 160,
+    width: 148,
+    ellipsis: { tooltip: true },
     render: (row) => formatDateTime(row.createdAt as string),
   },
   {
     title: t('common.table.operation'),
     key: 'actions',
-    width: 150,
-    fixed: 'right',
+    width: 120,
+    align: 'center',
     render: (row) =>
       h(TableActions, {
         actions: [

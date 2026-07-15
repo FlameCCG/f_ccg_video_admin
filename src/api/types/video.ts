@@ -63,31 +63,20 @@ export type TranscodePipelineStatus =
   | 'queued'
   | 'encoding'
   | 'uploading'
+  | 'running'
   | 'succeeded'
   | 'failed'
   | 'skipped'
 
-/** Pipeline 内单个输出档位的状态 */
-export interface TranscodeOutputProgress {
-  id: string
-  format: string
-  resolution: string
-  quality?: string
-  role?: string
-  status: TranscodePipelineStatus
-  percent: number
-  message?: string
-  error?: string
-}
-
-/** 一条 MP4 或 DASH Pipeline 的实时进度 */
+/** 一条 MP4 或 DASH Pipeline 的实时进度（共享时间轴，无 per-output 进度） */
 export interface TranscodePipelineProgress {
   name: string
   status: TranscodePipelineStatus
   percent: number
   message?: string
   error?: string
-  outputs: TranscodeOutputProgress[]
+  /** 目标分辨率列表，如 [360, 720, 1080] */
+  resolutions?: number[]
   updatedAt?: string
 }
 

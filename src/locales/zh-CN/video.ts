@@ -34,10 +34,11 @@ export default {
     succeeded: '已完成',
     failed: '失败',
     idle: '—',
+    overall: '总进度',
     part: '分P {id}',
     pipeline: {
-      mp4: 'MP4 输出',
-      dash: 'DASH 流',
+      mp4: 'MP4',
+      dash: 'DASH',
     },
     status: {
       queued: '等待',
@@ -47,14 +48,6 @@ export default {
       succeeded: '完成',
       failed: '失败',
       skipped: '已跳过',
-    },
-    quality: {
-      high: '高码率',
-      medium: '中码率',
-    },
-    role: {
-      normalized: '规范化',
-      source: '源规格',
     },
     stage: {
       queued: '排队',

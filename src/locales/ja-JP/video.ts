@@ -34,10 +34,11 @@ export default {
     succeeded: '完了',
     failed: '失敗',
     idle: '—',
+    overall: '全体',
     part: 'パート {id}',
     pipeline: {
-      mp4: 'MP4 出力',
-      dash: 'DASH ストリーム',
+      mp4: 'MP4',
+      dash: 'DASH',
     },
     status: {
       queued: '待機中',
@@ -47,14 +48,6 @@ export default {
       succeeded: '完了',
       failed: '失敗',
       skipped: 'スキップ',
-    },
-    quality: {
-      high: '高ビットレート',
-      medium: '中ビットレート',
-    },
-    role: {
-      normalized: '正規化',
-      source: 'ソース仕様',
     },
     stage: {
       queued: '待機',

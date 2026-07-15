@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NProgress, NTag, NTooltip } from 'naive-ui'
-import type {
-  TranscodePipelineProgress,
-  TranscodePipelineStatus,
-  TranscodeProgress,
-} from '@/api/types'
+import { NProgress, NTooltip } from 'naive-ui'
+import type { TranscodePipelineProgress, TranscodeProgress } from '@/api/types'
 
-const props = defineProps<{
-  items?: TranscodeProgress[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    items?: TranscodeProgress[]
+    /** compact：列表单元格；detail：详情抽屉 */
+    density?: 'compact' | 'detail'
+  }>(),
+  { density: 'compact' }
+)
 
 const { t } = useI18n()
 
 const entries = computed(() => props.items ?? [])
+const isDetail = computed(() => props.density === 'detail')
 
 function clampPercent(percent?: number): number {
   return Math.max(0, Math.min(100, Math.round(percent ?? 0)))
@@ -33,31 +35,37 @@ function statusLabel(status: string): string {
   return translated === key ? status : translated
 }
 
-function qualityLabel(quality?: string): string {
-  if (!quality) return ''
-  const key = `video.transcode.quality.${quality.toLowerCase()}`
+function stageLabel(stage?: string): string {
+  if (!stage) return ''
+  const key = `video.transcode.stage.${stage}`
   const translated = t(key)
-  return translated === key ? quality : translated
+  return translated === key ? stage : translated
 }
 
-function roleLabel(role?: string): string {
-  if (!role) return ''
-  const key = `video.transcode.role.${role.toLowerCase()}`
-  const translated = t(key)
-  return translated === key ? role : translated
-}
-
-function statusType(status: string): 'default' | 'info' | 'success' | 'warning' | 'error' {
+function statusTone(status: string): 'idle' | 'active' | 'ok' | 'warn' | 'err' {
   switch (status) {
     case 'encoding':
     case 'uploading':
     case 'running':
-      return 'info'
+      return 'active'
     case 'succeeded':
-      return 'success'
+      return 'ok'
     case 'failed':
-      return 'error'
+      return 'err'
     case 'queued':
+      return 'warn'
+    default:
+      return 'idle'
+  }
+}
+
+function progressStatus(status: string): 'default' | 'success' | 'error' | 'warning' {
+  switch (statusTone(status)) {
+    case 'ok':
+      return 'success'
+    case 'err':
+      return 'error'
+    case 'warn':
       return 'warning'
     default:
       return 'default'
@@ -68,258 +76,313 @@ function isProcessing(status: string): boolean {
   return status === 'encoding' || status === 'uploading' || status === 'running'
 }
 
-function pipelineError(pipeline: TranscodePipelineProgress): string {
+function pipelineHint(pipeline: TranscodePipelineProgress): string {
   return pipeline.error || pipeline.message || statusLabel(pipeline.status)
 }
 
-function legacyStatus(entry: TranscodeProgress): TranscodePipelineStatus | 'running' {
-  return entry.status
+function overallHint(entry: TranscodeProgress): string {
+  return entry.error || entry.message || stageLabel(entry.stage) || statusLabel(entry.status)
+}
+
+function resChips(resolutions?: number[]): string {
+  if (!resolutions?.length) return ''
+  return resolutions.map((r) => `${r}p`).join(' · ')
 }
 </script>
 
 <template>
-  <div v-if="entries.length" class="transcode-stack">
-    <section v-for="entry in entries" :key="entry.partId ?? 0" class="transcode-entry">
-      <div v-if="entries.length > 1" class="part-heading">
+  <div
+    v-if="entries.length"
+    class="tc"
+    :class="isDetail ? 'tc--detail' : 'tc--compact'"
+  >
+    <section v-for="entry in entries" :key="entry.partId ?? 0" class="tc-entry">
+      <div v-if="entries.length > 1" class="tc-part">
         {{ t('video.transcode.part', { id: entry.partId ?? 0 }) }}
       </div>
 
-      <div
-        v-if="entry.pipelines?.length"
-        class="pipeline-grid"
-        :class="{ 'pipeline-grid--dual': entry.pipelines.length > 1 }"
-      >
-        <article
-          v-for="pipeline in entry.pipelines"
-          :key="pipeline.name"
-          class="pipeline-card"
-          :class="`pipeline-card--${pipeline.name.toLowerCase()}`"
-        >
-          <header class="pipeline-header">
-            <div class="pipeline-identity">
-              <span class="pipeline-mark" aria-hidden="true" />
-              <span class="pipeline-name">{{ pipelineLabel(pipeline.name) }}</span>
-              <span class="pipeline-percent">{{ clampPercent(pipeline.percent) }}%</span>
-            </div>
-            <n-tooltip v-if="pipeline.status === 'failed'">
-              <template #trigger>
-                <n-tag :type="statusType(pipeline.status)" size="tiny" round>
-                  {{ statusLabel(pipeline.status) }}
-                </n-tag>
-              </template>
-              {{ pipelineError(pipeline) }}
-            </n-tooltip>
-            <n-tag v-else :type="statusType(pipeline.status)" size="tiny" round>
-              {{ statusLabel(pipeline.status) }}
-            </n-tag>
-          </header>
-
-          <div class="output-list">
-            <div v-for="output in pipeline.outputs" :key="output.id" class="output-row">
-              <div class="output-meta">
-                <div class="output-name">
-                  <span>{{ output.resolution }}</span>
-                  <span v-if="output.quality" class="quality-chip">
-                    {{ qualityLabel(output.quality) }}
-                  </span>
-                  <span v-else-if="output.role" class="quality-chip">
-                    {{ roleLabel(output.role) }}
-                  </span>
-                </div>
-                <span class="output-status">{{ statusLabel(output.status) }}</span>
-              </div>
-              <n-progress
-                type="line"
-                :percentage="clampPercent(output.percent)"
-                :show-indicator="false"
-                :processing="isProcessing(output.status)"
-                :status="statusType(output.status)"
-                :height="6"
-                :border-radius="3"
-              />
-            </div>
-          </div>
-        </article>
-      </div>
-
-      <div v-else class="legacy-progress">
-        <div class="legacy-heading">
-          <n-tag :type="statusType(legacyStatus(entry))" size="small" round>
-            {{ statusLabel(legacyStatus(entry)) }}
-          </n-tag>
-          <span v-if="entry.status === 'running'">{{ clampPercent(entry.percent) }}%</span>
+      <!-- 总进度 -->
+      <div class="tc-overall" :class="`tc-overall--${statusTone(entry.status)}`">
+        <div class="tc-overall__head">
+          <span class="tc-overall__label">{{ t('video.transcode.overall') }}</span>
+          <n-tooltip :disabled="!entry.error && !entry.message && !entry.stage">
+            <template #trigger>
+              <span class="tc-overall__meta">
+                <span class="tc-overall__status">{{ statusLabel(entry.status) }}</span>
+                <span v-if="entry.message || entry.stage" class="tc-overall__msg">
+                  {{ entry.message || stageLabel(entry.stage) }}
+                </span>
+                <span class="tc-overall__pct">{{ clampPercent(entry.percent) }}%</span>
+              </span>
+            </template>
+            {{ overallHint(entry) }}
+          </n-tooltip>
         </div>
         <n-progress
-          v-if="entry.status === 'running'"
           type="line"
           :percentage="clampPercent(entry.percent)"
           :show-indicator="false"
-          processing
-          :height="6"
-          :border-radius="3"
+          :processing="isProcessing(entry.status)"
+          :status="progressStatus(entry.status)"
+          :height="isDetail ? 6 : 4"
+          :border-radius="99"
         />
       </div>
+
+      <!-- Pipeline 明细：仅名称 / 状态 / 百分比 / 分辨率 chips，无重复进度条 -->
+      <ul v-if="entry.pipelines?.length" class="tc-pipes">
+        <li
+          v-for="pipeline in entry.pipelines"
+          :key="pipeline.name"
+          class="tc-pipe"
+          :class="[
+            `tc-pipe--${pipeline.name.toLowerCase()}`,
+            `tc-pipe--${statusTone(pipeline.status)}`,
+          ]"
+        >
+          <n-tooltip :disabled="!pipeline.error && !pipeline.message">
+            <template #trigger>
+              <div class="tc-pipe__row">
+                <span class="tc-pipe__name">{{ pipelineLabel(pipeline.name) }}</span>
+                <span class="tc-pipe__status">{{ statusLabel(pipeline.status) }}</span>
+                <span class="tc-pipe__pct">{{ clampPercent(pipeline.percent) }}%</span>
+              </div>
+            </template>
+            {{ pipelineHint(pipeline) }}
+          </n-tooltip>
+          <div v-if="pipeline.resolutions?.length" class="tc-pipe__res">
+            {{ resChips(pipeline.resolutions) }}
+          </div>
+        </li>
+      </ul>
     </section>
   </div>
-  <span v-else class="empty-progress">{{ t('video.transcode.idle') }}</span>
+  <span v-else class="tc-empty">{{ t('video.transcode.idle') }}</span>
 </template>
 
 <style scoped lang="scss">
-.transcode-stack {
-  display: grid;
-  gap: var(--spacing-2);
+.tc {
   min-width: 0;
+  width: 100%;
 }
 
-.transcode-entry {
-  display: grid;
-  gap: var(--spacing-1);
+.tc--compact {
+  max-width: 260px;
 }
 
-.part-heading {
+.tc--detail {
+  max-width: 100%;
+}
+
+.tc-entry + .tc-entry {
+  margin-top: var(--spacing-2);
+}
+
+.tc-part {
+  margin-bottom: 4px;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
-  letter-spacing: var(--tracking-wide);
 }
 
-.pipeline-grid {
-  display: grid;
-  gap: var(--spacing-2);
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.pipeline-grid--dual {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.pipeline-card {
+.tc-overall {
   min-width: 0;
-  padding: var(--spacing-2);
-  overflow: hidden;
+  margin-bottom: 6px;
+  padding: 6px 8px;
   background: var(--color-surface-hover);
   border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
-  transition:
-    border-color var(--duration-fast) var(--easing-standard),
-    box-shadow var(--duration-fast) var(--easing-standard);
+  border-radius: var(--radius-md);
 }
 
-.pipeline-card:hover {
-  border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-sm);
-}
-
-.pipeline-header,
-.pipeline-identity,
-.output-meta,
-.output-name,
-.legacy-heading {
-  display: flex;
-  align-items: center;
-}
-
-.pipeline-header,
-.output-meta,
-.legacy-heading {
-  justify-content: space-between;
-}
-
-.pipeline-header {
-  gap: var(--spacing-2);
+.tc--detail .tc-overall {
+  padding: 10px 12px;
   margin-bottom: var(--spacing-2);
 }
 
-.pipeline-identity {
-  min-width: 0;
-  gap: var(--spacing-1);
+.tc-overall--ok {
+  border-color: color-mix(in srgb, var(--color-success) 28%, var(--color-border-light));
 }
 
-.pipeline-mark {
-  width: var(--spacing-2);
-  height: var(--spacing-2);
+.tc-overall--active {
+  border-color: color-mix(in srgb, var(--color-info) 32%, var(--color-border-light));
+}
+
+.tc-overall--err {
+  border-color: color-mix(in srgb, var(--color-error) 36%, var(--color-border-light));
+  background: color-mix(in srgb, var(--color-error) 6%, var(--color-surface-hover));
+}
+
+.tc-overall--warn {
+  border-color: color-mix(in srgb, var(--color-warning) 32%, var(--color-border-light));
+}
+
+.tc-overall__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.tc-overall__label {
   flex: 0 0 auto;
-  background: var(--color-primary);
-  border-radius: var(--radius-full);
-  box-shadow: 0 0 0 var(--spacing-1) var(--color-primary-light);
-}
-
-.pipeline-card--dash .pipeline-mark {
-  background: var(--color-info);
-  box-shadow: 0 0 0 var(--spacing-1) var(--color-info-light);
-}
-
-.pipeline-name {
-  overflow: hidden;
   color: var(--color-text);
-  font-size: var(--text-sm);
+  font-size: 12px;
   font-weight: var(--font-semibold);
+}
+
+.tc-overall__meta {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.tc-overall__status {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.tc-overall--ok .tc-overall__status {
+  color: var(--color-success);
+}
+
+.tc-overall--active .tc-overall__status {
+  color: var(--color-info);
+}
+
+.tc-overall--err .tc-overall__status {
+  color: var(--color-error);
+}
+
+.tc-overall--warn .tc-overall__status {
+  color: var(--color-warning);
+}
+
+.tc-overall__msg {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.pipeline-percent {
-  color: var(--color-text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
-
-.output-list {
-  display: grid;
-  gap: var(--spacing-2);
-}
-
-.output-row {
-  display: grid;
-  gap: var(--spacing-1);
-}
-
-.output-meta {
-  min-width: 0;
-  gap: var(--spacing-2);
-  color: var(--color-text-secondary);
-  font-size: var(--text-xs);
-}
-
-.output-name {
-  min-width: 0;
-  gap: var(--spacing-1);
-  font-weight: var(--font-medium);
-}
-
-.quality-chip {
-  padding: 0 var(--spacing-1);
-  color: var(--color-primary);
-  font-size: var(--text-xs);
-  background: var(--color-primary-light);
-  border-radius: var(--radius-full);
-}
-
-.output-status {
+.tc-overall__pct {
   flex: 0 0 auto;
-  color: var(--color-text-muted);
+  min-width: 2.5em;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-.legacy-progress {
+.tc-pipes {
   display: grid;
-  gap: var(--spacing-1);
-  min-width: 0;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.legacy-heading {
+.tc--detail .tc-pipes {
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.tc-pipe {
+  min-width: 0;
+  padding: 5px 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+.tc-pipe--dash {
+  border-left-color: var(--color-info);
+}
+
+.tc-pipe--mp4 {
+  border-left-color: var(--color-primary);
+}
+
+.tc-pipe--ok {
+  border-color: color-mix(in srgb, var(--color-success) 22%, var(--color-border-light));
+}
+
+.tc-pipe--active {
+  border-color: color-mix(in srgb, var(--color-info) 26%, var(--color-border-light));
+}
+
+.tc-pipe--err {
+  border-color: color-mix(in srgb, var(--color-error) 30%, var(--color-border-light));
+}
+
+.tc-pipe--warn {
+  border-color: color-mix(in srgb, var(--color-warning) 26%, var(--color-border-light));
+}
+
+.tc-pipe__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: default;
+}
+
+.tc-pipe__name {
+  color: var(--color-text);
+  font-weight: var(--font-semibold);
+}
+
+.tc-pipe__status {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tc-pipe--ok .tc-pipe__status {
+  color: var(--color-success);
+}
+
+.tc-pipe--active .tc-pipe__status {
+  color: var(--color-info);
+}
+
+.tc-pipe--err .tc-pipe__status {
+  color: var(--color-error);
+}
+
+.tc-pipe--warn .tc-pipe__status {
+  color: var(--color-warning);
+}
+
+.tc-pipe__pct {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tc-pipe__res {
+  margin-top: 2px;
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: 10px;
+  letter-spacing: 0.02em;
 }
 
-.empty-progress {
+.tc-empty {
   color: var(--color-text-muted);
-}
-
-@media (width <= 1280px) {
-  .pipeline-grid--dual {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  font-size: var(--text-sm);
 }
 </style>
