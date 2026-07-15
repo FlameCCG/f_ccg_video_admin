@@ -367,6 +367,7 @@ watch(
 .vue-flow__background {
   background-color: var(--color-bg);
   --vf-pattern-color: var(--color-border);
+
   opacity: 0.45;
 }
 </style>
