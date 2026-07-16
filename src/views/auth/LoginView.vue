@@ -103,6 +103,20 @@ async function fetchPublicSiteConfig(): Promise<void> {
   }
 }
 
+/** 仅滑块验证码校验失败（不含账号密码等业务错误） */
+function isCaptchaBusinessError(messageText: string): boolean {
+  const lower = messageText.toLowerCase()
+  return (
+    lower.includes('验证码错误') ||
+    lower.includes('验证码验证失败') ||
+    lower.includes('验证码已过期') ||
+    lower.includes('captcha verification') ||
+    lower.includes('captcha expired') ||
+    lower.includes('slide captcha') ||
+    lower.includes('invalid slide captcha')
+  )
+}
+
 function handleCaptchaConfirm(result: { token: string; x: number; y: number }): void {
   captchaData.token = result.token
   captchaData.x = result.x
@@ -112,8 +126,8 @@ function handleCaptchaConfirm(result: { token: string; x: number; y: number }): 
 }
 
 function handleCaptchaFail(): void {
+  // 失败反馈只在滑块内部展示，不弹 toast
   captchaData.verified = false
-  message.error(t('auth.captcha.failed'))
 }
 
 function handleCaptchaRefresh(): void {
@@ -157,7 +171,8 @@ async function doLogin(): Promise<void> {
           password: formData.password,
         }
 
-    await authStore.login(loginParams)
+    // 开启滑块时静默请求：验证码失败只在滑块内反馈，避免与拦截器双重 toast
+    await authStore.login(loginParams, { silent: slideCaptchaEnabled.value })
 
     if (slideCaptchaEnabled.value) {
       shouldNavigateAfterCaptcha.value = true
@@ -170,13 +185,21 @@ async function doLogin(): Promise<void> {
       void router.push({ path: '/' })
     }
   } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : ''
+    captchaData.verified = false
+
     if (slideCaptchaEnabled.value) {
       shouldNavigateAfterCaptcha.value = false
       captchaRef.value?.fail()
+      // 滑块验证码错误：仅滑块内部提示；其它业务错误（如密码错误）保留一次 toast
+      if (errorMessage && !isCaptchaBusinessError(errorMessage)) {
+        message.error(errorMessage)
+      }
+      return
     }
-    captchaData.verified = false
-    if (error instanceof Error) {
-      message.error(error.message)
+
+    if (errorMessage) {
+      message.error(errorMessage)
     }
   }
 }
