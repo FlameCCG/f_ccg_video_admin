@@ -43,13 +43,17 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * 登录
    * @param credentials 登录凭证（包含滑块验证码信息）
+   * @param options.silent 为 true 时不自动弹出错误 toast（滑块失败由组件内反馈）
    * @returns JWT Token
    */
-  async function login(credentials: LoginCredentials): Promise<JwtToken> {
+  async function login(
+    credentials: LoginCredentials,
+    options?: { silent?: boolean }
+  ): Promise<JwtToken> {
     isLoggingIn.value = true
 
     try {
-      const result = await adminLogin(credentials)
+      const result = await adminLogin(credentials, options?.silent ? { silent: true } : undefined)
 
       // 存储 Token
       accessToken.value = result.accessToken

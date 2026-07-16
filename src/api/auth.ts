@@ -2,6 +2,7 @@
  * 认证相关 API
  * Requirements: 4.1
  */
+import type { AxiosRequestConfig } from 'axios'
 import request from '@/utils/request'
 import type { SlideCaptcha, LoginCredentials, JwtToken, RefreshTokenParams } from './types'
 
@@ -17,8 +18,11 @@ export function getSlideCaptcha(): Promise<SlideCaptcha> {
  * 管理员登录
  * POST /admin/user/login/pwd
  */
-export function adminLogin(params: LoginCredentials): Promise<JwtToken> {
-  return request.post('/admin/user/login/pwd', params)
+export function adminLogin(
+  params: LoginCredentials,
+  config?: AxiosRequestConfig
+): Promise<JwtToken> {
+  return request.post('/admin/user/login/pwd', params, config)
 }
 
 /**
