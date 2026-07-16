@@ -149,6 +149,15 @@ export function setLoginRedirectHandler(handler: () => void): void {
   redirectToLogin = handler
 }
 
+// ==================== Axios 扩展配置 ====================
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /** 为 true 时不自动弹出业务错误 toast，由调用方自行处理 */
+    silent?: boolean
+  }
+}
+
 // ==================== 创建 Axios 实例 ====================
 
 /**
@@ -238,13 +247,16 @@ request.interceptors.response.use(
 
     // 普通业务错误（含无权限等）- 展示后端 msg，并 reject 供调用方结束 loading
     const errorMsg = (typeof msg === 'string' && msg.trim()) || '请求失败'
-    showErrorMessage(errorMsg)
+    if (!response.config?.silent) {
+      showErrorMessage(errorMsg)
+    }
     return Promise.reject(new BusinessError(code, errorMsg))
   },
   async (error: unknown) => {
     // 网络错误或非 200 状态码
     if (axios.isAxiosError(error)) {
       const status = error.response?.status
+      const silent = Boolean(error.config?.silent)
 
       // 401 状态码 - 尝试刷新 Token
       if (status === 401 && error.config) {
@@ -255,15 +267,19 @@ request.interceptors.response.use(
       const body = error.response?.data as ApiResponse | undefined
       if (body && typeof body === 'object' && body.code === 1 && body.msg) {
         const bizMsg = body.msg.trim() || '请求失败'
-        showErrorMessage(bizMsg)
+        if (!silent) {
+          showErrorMessage(bizMsg)
+        }
         return Promise.reject(new BusinessError(1, bizMsg))
       }
 
       // 其他网络错误
       const errorMsg = error.response ? `请求失败: ${status}` : '网络连接失败，请检查网络'
 
-      showErrorMessage(errorMsg)
-    } else {
+      if (!silent) {
+        showErrorMessage(errorMsg)
+      }
+    } else if (!(error instanceof BusinessError)) {
       showErrorMessage('请求发生未知错误')
     }
 
