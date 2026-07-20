@@ -37,7 +37,7 @@ export default {
     editTitle: '编辑轮播图',
     cover: '图片',
     coverRequired: '请上传图片',
-    coverTip: '建议尺寸：1920x480，支持 JPG/PNG，最大 20MB',
+    coverTip: '建议尺寸：{size}（比例 {ratio}），支持 JPG/PNG，最大 {maxSize}MB。{safeZone}',
     href: '跳转链接',
     hrefPlaceholder: '请输入跳转链接（可选）',
     type: '类型',

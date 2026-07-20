@@ -3,6 +3,8 @@
  * 轮播图表单弹窗
  * Banner Form Modal
  * Requirements: 14.2-14.4 - 创建/更新轮播图
+ *
+ * 制图规格与安全区来自 `@/constants/banner`（与客户端一致）。
  */
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -21,6 +23,7 @@ import {
 } from 'naive-ui'
 import type { FormInst, FormRules } from 'naive-ui'
 import type { BannerItem, BannerType } from '@/api/types'
+import { BannerArtSpec } from '@/constants/banner'
 import { getCommonPartitions } from '@/api/video'
 import { ImageUpload } from '@/components/form'
 
@@ -77,6 +80,23 @@ const typeOptions = computed(() => [
   { value: 2, label: t('banner.type.header') },
   { value: 3, label: t('banner.type.profile') },
 ])
+
+/** 当前类型对应的制图规格（与客户端 BannerArtSpec 同源语义） */
+const currentSizeMeta = computed(() => BannerArtSpec[formData.value.type] ?? BannerArtSpec[1])
+
+/** 建议尺寸文案：像素 + 比例 + 安全区 */
+const coverTipText = computed(() =>
+  t('banner.form.coverTip', {
+    size: currentSizeMeta.value.sizeLabel,
+    ratio: currentSizeMeta.value.ratioLabel,
+    maxSize: 20,
+    safeZone: currentSizeMeta.value.safeZone,
+  })
+)
+
+/** 上传预览框宽高 */
+const uploadPreviewWidth = computed(() => currentSizeMeta.value.previewWidth)
+const uploadPreviewHeight = computed(() => currentSizeMeta.value.previewHeight)
 
 /** 获取分区列表 */
 const { data: partitionData } = useQuery({
@@ -199,7 +219,8 @@ async function handleSubmit(): Promise<void> {
       :bordered="false"
       size="medium"
       role="dialog"
-      style="width: 500px"
+      class="banner-form-modal"
+      style="width: 560px"
       :closable="!loading"
       @close="handleClose"
     >
@@ -211,29 +232,7 @@ async function handleSubmit(): Promise<void> {
         label-width="100"
         require-mark-placement="right-hanging"
       >
-        <n-form-item :label="t('banner.form.cover')" path="cover" required>
-          <image-upload
-            :value="coverList"
-            :max="1"
-            :max-size="20"
-            :image-width="320"
-            :image-height="120"
-            @change="handleCoverChange"
-          >
-            <template #tip>
-              {{ t('banner.form.coverTip') }}
-            </template>
-          </image-upload>
-        </n-form-item>
-
-        <n-form-item :label="t('banner.form.href')" path="href">
-          <n-input
-            v-model:value="formData.href"
-            :placeholder="t('banner.form.hrefPlaceholder')"
-            clearable
-          />
-        </n-form-item>
-
+        <!-- 先选类型，再按类型展示对应上传框比例与建议尺寸 -->
         <n-form-item :label="t('banner.form.type')" path="type">
           <n-select
             v-model:value="formData.type"
@@ -251,6 +250,29 @@ async function handleSubmit(): Promise<void> {
             v-model:value="formData.partitionId"
             :options="partitionOptions"
             :placeholder="t('banner.form.partitionPlaceholder')"
+          />
+        </n-form-item>
+
+        <n-form-item :label="t('banner.form.cover')" path="cover" required>
+          <image-upload
+            :value="coverList"
+            :max="1"
+            :max-size="20"
+            :image-width="uploadPreviewWidth"
+            :image-height="uploadPreviewHeight"
+            @change="handleCoverChange"
+          >
+            <template #tip>
+              {{ coverTipText }}
+            </template>
+          </image-upload>
+        </n-form-item>
+
+        <n-form-item :label="t('banner.form.href')" path="href">
+          <n-input
+            v-model:value="formData.href"
+            :placeholder="t('banner.form.hrefPlaceholder')"
+            clearable
           />
         </n-form-item>
 

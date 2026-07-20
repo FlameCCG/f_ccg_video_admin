@@ -37,7 +37,7 @@ export default {
     editTitle: 'バナー編集',
     cover: '画像',
     coverRequired: '画像をアップロードしてください',
-    coverTip: '推奨サイズ：1920x480、JPG/PNG対応、最大20MB',
+    coverTip: '推奨サイズ：{size}（比率 {ratio}）、JPG/PNG対応、最大{maxSize}MB。{safeZone}',
     href: 'リンク',
     hrefPlaceholder: 'リンクURLを入力（任意）',
     type: 'タイプ',

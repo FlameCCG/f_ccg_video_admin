@@ -37,7 +37,8 @@ export default {
     editTitle: 'Edit Banner',
     cover: 'Image',
     coverRequired: 'Please upload an image',
-    coverTip: 'Recommended size: 1920x480, JPG/PNG supported, max 20MB',
+    coverTip:
+      'Recommended size: {size} (ratio {ratio}), JPG/PNG supported, max {maxSize}MB. {safeZone}',
     href: 'Link',
     hrefPlaceholder: 'Enter link URL (optional)',
     type: 'Type',
