@@ -97,6 +97,25 @@ const canUpload = computed(() => {
   return fileList.value.length < props.max
 })
 
+/** image-card 宽高 CSS 变量（同时驱动触发器与预览卡片） */
+const uploadSizeStyle = computed(() => ({
+  '--upload-w': `${props.imageWidth}px`,
+  '--upload-h': `${props.imageHeight}px`,
+}))
+
+/**
+ * 超扁/超窄预览时的紧凑布局：
+ * - compact：横向排列图标+文字（高度不足以竖排时）
+ * - iconOnly：仅显示 + 号（高度极小时避免「上传」溢出）
+ */
+const isCompactTrigger = computed(() => props.imageHeight < 88)
+const isIconOnlyTrigger = computed(() => props.imageHeight < 52)
+const triggerIconSize = computed(() => {
+  if (isIconOnlyTrigger.value) return 18
+  if (isCompactTrigger.value) return 18
+  return 24
+})
+
 /** 计算文件 SHA-256 哈希 */
 async function calculateFileHash(file: File): Promise<string> {
   const buffer = await file.arrayBuffer()
@@ -229,7 +248,15 @@ defineExpose({
 </script>
 
 <template>
-  <div class="image-upload">
+  <div
+    class="image-upload"
+    :class="{
+      'image-upload--image-card': listType === 'image-card',
+      'image-upload--compact': listType === 'image-card' && isCompactTrigger,
+      'image-upload--icon-only': listType === 'image-card' && isIconOnlyTrigger,
+    }"
+    :style="uploadSizeStyle"
+  >
     <n-upload
       ref="uploadRef"
       v-model:file-list="fileList"
@@ -244,14 +271,15 @@ defineExpose({
       @before-upload="handleBeforeUpload"
       @remove="handleRemove"
     >
-      <!-- 上传按钮 -->
+      <!-- 上传按钮：尺寸交给外层 image-card 容器，内部不再叠一层虚线框 -->
       <template v-if="listType === 'image-card'">
         <div
           v-if="canUpload"
           class="image-upload__trigger"
-          :style="{ width: `${imageWidth}px`, height: `${imageHeight}px` }"
+          :title="t('common.upload')"
+          :aria-label="t('common.upload')"
         >
-          <n-icon size="24" color="var(--color-text-muted)">
+          <n-icon :size="triggerIconSize" color="var(--color-text-muted)">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -265,7 +293,9 @@ defineExpose({
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </n-icon>
-          <span class="image-upload__text">{{ t('common.upload') }}</span>
+          <span v-if="!isIconOnlyTrigger" class="image-upload__text">
+            {{ t('common.upload') }}
+          </span>
         </div>
       </template>
 
@@ -307,49 +337,119 @@ defineExpose({
 
 <style scoped lang="scss">
 .image-upload {
+  --upload-w: 100px;
+  --upload-h: 100px;
+
   &__trigger {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: var(--spacing-1);
-    border: 1px dashed var(--color-border);
-    border-radius: var(--radius-md);
-    background-color: var(--color-surface-alt);
-    cursor: pointer;
-    transition:
-      border-color var(--duration-fast) var(--easing-standard),
-      background-color var(--duration-fast) var(--easing-standard);
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    padding: 4px;
 
-    &:hover {
-      border-color: var(--color-primary);
-      background-color: var(--color-primary-light);
-    }
+    // 不在这里画边框，避免与 Naive image-card 触发器叠成双层虚线
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    overflow: hidden;
   }
 
   &__text {
+    flex-shrink: 0;
+    max-width: 100%;
+    overflow: hidden;
     font-size: var(--text-xs);
+    line-height: 1.2;
     color: var(--color-text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__tip {
     margin-top: var(--spacing-2);
     font-size: var(--text-xs);
+    line-height: 1.5;
     color: var(--color-text-muted);
+    overflow-wrap: anywhere;
   }
 
-  // 覆盖 Naive UI upload 组件的默认边框样式
-  :deep(.n-upload-trigger) {
-    border: none !important;
+  // 超扁预览：图标与「上传」横排，避免竖排溢出
+  &--compact {
+    .image-upload__trigger {
+      flex-direction: row;
+      gap: 6px;
+    }
+
+    .image-upload__text {
+      font-size: 12px;
+    }
   }
 
-  :deep(.n-upload-file-list) {
-    .n-upload-file {
-      border: 1px solid var(--color-border) !important;
+  // 极扁预览：只保留 + 号
+  &--icon-only {
+    .image-upload__trigger {
+      gap: 0;
+    }
+  }
+
+  // image-card：按传入宽高统一控制触发器与已上传预览，只保留一层边框
+  &--image-card {
+    :deep(.n-upload-file-list) {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-2);
+
+      // 覆盖 Naive 默认 96px 网格，避免外框尺寸与内容不一致
+      grid-template-columns: none !important;
+    }
+
+    :deep(.n-upload-trigger.n-upload-trigger--image-card),
+    :deep(.n-upload-file.n-upload-file--image-card-type) {
+      width: var(--upload-w) !important;
+      height: var(--upload-h) !important;
+      max-width: 100%;
       border-radius: var(--radius-md) !important;
+      transition:
+        width var(--duration-fast) var(--easing-standard),
+        height var(--duration-fast) var(--easing-standard),
+        border-color var(--duration-fast) var(--easing-standard),
+        background-color var(--duration-fast) var(--easing-standard);
+    }
+
+    :deep(.n-upload-trigger.n-upload-trigger--image-card) {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px dashed var(--color-border) !important;
+      background-color: var(--color-surface-alt);
 
       &:hover {
         border-color: var(--color-primary) !important;
+        background-color: var(--color-primary-light);
+      }
+    }
+
+    :deep(.n-upload-file.n-upload-file--image-card-type) {
+      overflow: hidden;
+      border: 1px solid var(--color-border) !important;
+      background-color: var(--color-surface-alt);
+
+      &:hover {
+        border-color: var(--color-primary) !important;
+      }
+
+      .n-upload-file-info,
+      .n-upload-file-info__thumbnail,
+      .n-image,
+      img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover;
       }
     }
   }
