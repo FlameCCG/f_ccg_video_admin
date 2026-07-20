@@ -4,7 +4,8 @@
 import type { PaginationParams } from './common'
 
 /**
- * 系统通知项
+ * 系统通知项（AdminList 返回的原始实体字段，camelCase）
+ * 注意：通知内容表已去掉 is_read；已读状态不在此实体中
  */
 export interface NotificationItem {
   /** 通知 ID */
@@ -26,13 +27,13 @@ export interface NotificationItem {
   /** 外部链接 */
   link: string
   /** 视频 ID */
-  articleID: number
+  videoID: number
   /** 视频标题 */
-  articleTitle: string
+  videoTitle: string
+  /** 动态 ID */
+  dynamicID: number
   /** 评论 ID */
   commentID: number
-  /** 是否已读 */
-  isRead: boolean
 }
 
 /**
