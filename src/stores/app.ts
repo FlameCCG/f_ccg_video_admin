@@ -23,6 +23,8 @@ export interface ThemeConfig {
   labelZh: string
   labelJa: string
   isDark: boolean
+  /** 主题代表色（下拉图标等展示用，与 tokens/_colors.scss 主色一致） */
+  accent: string
 }
 
 /**
@@ -35,6 +37,7 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '珍珠白',
     labelJa: 'パール',
     isDark: false,
+    accent: '#5c7cfa',
   },
   {
     name: 'obsidian',
@@ -42,6 +45,7 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '黑曜石',
     labelJa: 'オブシディアン',
     isDark: true,
+    accent: '#7c8aff',
   },
   {
     name: 'cyberpunk',
@@ -49,6 +53,7 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '赛博朋克',
     labelJa: 'サイバーパンク',
     isDark: true,
+    accent: '#00f3ff',
   },
   {
     name: 'sakura',
@@ -56,6 +61,7 @@ export const themeConfigs: ThemeConfig[] = [
     labelZh: '樱',
     labelJa: 'サクラ',
     isDark: false,
+    accent: '#ff6b9d',
   },
 ]
 

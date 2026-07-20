@@ -41,6 +41,18 @@ describe('app store', () => {
       expect(cyberpunk?.isDark).toBe(true)
       expect(sakura?.isDark).toBe(false)
     })
+
+    it('should expose accent colors for theme icons', () => {
+      const pearl = themeConfigs.find((t) => t.name === 'pearl')
+      const obsidian = themeConfigs.find((t) => t.name === 'obsidian')
+      const cyberpunk = themeConfigs.find((t) => t.name === 'cyberpunk')
+      const sakura = themeConfigs.find((t) => t.name === 'sakura')
+
+      expect(pearl?.accent).toBe('#5c7cfa')
+      expect(obsidian?.accent).toBe('#7c8aff')
+      expect(cyberpunk?.accent).toBe('#00f3ff')
+      expect(sakura?.accent).toBe('#ff6b9d')
+    })
   })
 
   describe('getThemeConfig', () => {

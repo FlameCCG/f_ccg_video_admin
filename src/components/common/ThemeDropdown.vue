@@ -57,7 +57,11 @@ function handleThemeChange(name: ThemeName): void {
         :class="[`theme-trigger--${size}`]"
         :title="t('layout.header.theme')"
       >
-        <NIcon :size="size === 'small' ? 16 : 18" class="theme-trigger__icon">
+        <NIcon
+          :size="size === 'small' ? 16 : 18"
+          class="theme-trigger__icon"
+          :style="{ color: currentConfig?.accent }"
+        >
           <!-- Pearl: Sun -->
           <svg
             v-if="currentTheme === 'pearl'"
@@ -160,7 +164,11 @@ function handleThemeChange(name: ThemeName): void {
           :class="{ 'is-active': currentTheme === config.name }"
           @click="handleThemeChange(config.name)"
         >
-          <span class="dropdown-option__icon">
+          <span
+            class="dropdown-option__icon"
+            :class="`dropdown-option__icon--${config.name}`"
+            :style="{ color: config.accent }"
+          >
             <svg
               v-if="config.name === 'pearl'"
               xmlns="http://www.w3.org/2000/svg"
@@ -346,6 +354,16 @@ function handleThemeChange(name: ThemeName): void {
 
   &.is-active {
     background-color: var(--color-primary-light);
+  }
+
+  &__icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    // 颜色由 :style accent 指定（各主题主色，不随当前主题 text 变色）
+    line-height: 0;
   }
 
   &__name {
