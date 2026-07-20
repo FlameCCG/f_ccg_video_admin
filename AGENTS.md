@@ -52,12 +52,13 @@
 
 - **Sass（Dart Sass，SCSS 语法）**：用于
   - 生成主题 CSS Variables（避免手写 4 套主题表）
-  - 编写复杂局部样式（表格、富文本、ECharts、特殊布局）
+  - 布局/排版/间距/复杂局部样式（表格、富文本、ECharts、特殊布局）
+  - 少量语义工具类（如 `.text-muted`、`.ml-2`），一律基于 token
 - **CSS Variables**：主题运行时切换的唯一来源（禁止用 Sass 变量做主题）
-- Tailwind CSS：用于常规布局/间距/排版/快速一致性落地
+- **禁止 Tailwind CSS**（本仓库已卸载；布局与颜色不得再引入 utility 框架）
 - Stylelint（scss/vue）：样式门禁
 
-> 原则：**主题 = CSS Variables（运行时）**；**工程抽象 = Sass（编译时）**；**日常 UI = Tailwind**。
+> 原则：**主题 = CSS Variables（运行时）**；**工程抽象与日常 UI 样式 = Sass（编译时）**；**基础组件 = Naive UI**。
 
 ### UI 组件库（硬性指定）
 
@@ -106,7 +107,8 @@
 - `src/styles/tokens/themes.scss` 生成：
   - `:root { --color-bg: ... }`
   - `[data-theme="cyberpunk"] { --color-bg: ... }` 等
-- Tailwind 颜色统一走 `var(--color-xxx)`，禁止写死颜色值（仅允许在 tokens 文件里出现）
+- 颜色统一走 `var(--color-xxx)` 等 CSS Variables，禁止写死颜色值（仅允许在 tokens 文件里出现）
+- 禁止使用 Tailwind / UnoCSS 等 utility 框架；禁止 `dark:` 类前缀
 
 ### 2) 高级主题（至少 4 套，且“有性格”）
 

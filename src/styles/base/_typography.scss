@@ -77,6 +77,15 @@ small,
   color: var(--color-text-muted);
 }
 
+// 旁注/表单提示间距（设计 token，非 Tailwind）
+.ml-2 {
+  margin-left: var(--spacing-2);
+}
+
+.ml-3 {
+  margin-left: var(--spacing-3);
+}
+
 // 代码
 code {
   font-family: var(--font-mono);
