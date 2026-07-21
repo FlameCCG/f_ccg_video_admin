@@ -18,6 +18,7 @@ import type {
   TranscodeConfig,
   ThirdLoginConfig,
   JwtConfig,
+  ServerCorsConfig,
 } from '@/api/types'
 import {
   SiteConfigForm,
@@ -27,6 +28,7 @@ import {
   TranscodeConfigForm,
   ThirdLoginConfigForm,
   JwtConfigForm,
+  ServerCorsConfigForm,
 } from './components'
 import {
   normalizeAIConfig,
@@ -51,6 +53,7 @@ const currentTab = computed(() => {
     'transcode',
     'thirdLogin',
     'jwt',
+    'server',
   ]
 
   // 优先从 query 参数获取（用于未注册子路由的配置项）
@@ -79,6 +82,7 @@ const configTabs = computed(() => [
   { key: 'transcode' as const, label: t('siteConfig.tabs.transcode') },
   { key: 'thirdLogin' as const, label: t('siteConfig.tabs.thirdLogin') },
   { key: 'jwt' as const, label: t('siteConfig.tabs.jwt') },
+  { key: 'server' as const, label: t('siteConfig.tabs.server') },
 ])
 
 // 表单数据
@@ -89,6 +93,7 @@ const aiFormData = ref<AIConfig | null>(null)
 const transcodeFormData = ref<TranscodeConfig | null>(null)
 const thirdLoginFormData = ref<ThirdLoginConfig | null>(null)
 const jwtFormData = ref<JwtConfig | null>(null)
+const serverFormData = ref<ServerCorsConfig | null>(null)
 
 // 获取配置数据
 const { isLoading, refetch } = useQuery({
@@ -118,6 +123,13 @@ const { isLoading, refetch } = useQuery({
         break
       case 'jwt':
         jwtFormData.value = data as JwtConfig
+        break
+      case 'server':
+        serverFormData.value = {
+          corsOrigins: Array.isArray((data as ServerCorsConfig)?.corsOrigins)
+            ? [...(data as ServerCorsConfig).corsOrigins]
+            : [],
+        }
         break
     }
     return data
@@ -151,6 +163,9 @@ const updateMutation = useMutation({
         break
       case 'jwt':
         data = jwtFormData.value
+        break
+      case 'server':
+        data = serverFormData.value
         break
     }
     if (!data) throw new Error('No data to save')
@@ -272,6 +287,12 @@ watch(currentTab, () => {
               <jwt-config-form
                 v-else-if="tab.key === 'jwt' && jwtFormData"
                 v-model="jwtFormData"
+                :loading="updateMutation.isPending.value"
+              />
+              <!-- CORS 白名单 -->
+              <server-cors-config-form
+                v-else-if="tab.key === 'server' && serverFormData"
+                v-model="serverFormData"
                 :loading="updateMutation.isPending.value"
               />
             </div>

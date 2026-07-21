@@ -11,6 +11,7 @@ export default {
     transcode: 'トランスコード設定',
     thirdLogin: 'サードパーティログイン',
     jwt: 'JWT設定',
+    server: 'CORS',
   },
   // 基本設定
   site: {
@@ -210,6 +211,13 @@ export default {
     refreshSecret: 'リフレッシュシークレット',
     daysTip: '単位：日',
     secretTip: 'シークレット情報は非表示です',
+  },
+  server: {
+    title: 'CORS',
+    corsOrigins: '許可する Origin ホワイトリスト',
+    placeholder: 'https://www.example.com',
+    tip: 'ブラウザ CORS ホワイトリスト（corsOrigins）のみ設定します。待ち受けアドレス等のプロセス設定は変更しません。',
+    hint: 'https://www.example.com のような完全な Origin を入力してください。* は任意オリジンを許可（Cookie 資格情報なし）。空の場合：同一オリジンは常に可、debug では loopback も可。',
   },
   // 操作
   actions: {

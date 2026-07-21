@@ -11,6 +11,7 @@ export default {
     transcode: '转码配置',
     thirdLogin: '第三方登录',
     jwt: 'JWT配置',
+    server: '跨域 CORS',
   },
   // 基础配置
   site: {
@@ -209,6 +210,14 @@ export default {
     refreshSecret: 'Refresh Secret',
     daysTip: '单位：天',
     secretTip: '密钥信息已隐藏',
+  },
+  // 跨域 CORS
+  server: {
+    title: '跨域 CORS',
+    corsOrigins: '允许的 Origin 白名单',
+    placeholder: 'https://www.example.com',
+    tip: '仅配置浏览器跨域白名单（corsOrigins）。不修改服务监听地址等进程级配置。',
+    hint: '填写完整 Origin，如 https://www.example.com。使用 * 表示允许任意来源（不带 Cookie 凭证）。留空时：同源始终可用；debug 模式额外允许本机 loopback。',
   },
   // 操作
   actions: {

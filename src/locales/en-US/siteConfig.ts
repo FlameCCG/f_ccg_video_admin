@@ -11,6 +11,7 @@ export default {
     transcode: 'Transcode Settings',
     thirdLogin: 'Third-party Login',
     jwt: 'JWT Settings',
+    server: 'CORS',
   },
   // Basic Settings
   site: {
@@ -211,6 +212,13 @@ export default {
     refreshSecret: 'Refresh Secret',
     daysTip: 'Unit: days',
     secretTip: 'Secret information is hidden',
+  },
+  server: {
+    title: 'CORS',
+    corsOrigins: 'Allowed Origin whitelist',
+    placeholder: 'https://www.example.com',
+    tip: 'Configure browser CORS whitelist only (corsOrigins). Does not change listen address or other process settings.',
+    hint: 'Use a full Origin such as https://www.example.com. Use * to allow any origin (without credentials). Empty list: same-origin always works; debug mode also allows loopback.',
   },
   // Actions
   actions: {

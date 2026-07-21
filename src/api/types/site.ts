@@ -5,7 +5,20 @@
 // ============ 站点配置类型 ============
 
 /** 配置名称类型 */
-export type SiteConfigName = 'site' | 'logger' | 'email' | 'ai' | 'transcode' | 'thirdLogin' | 'jwt'
+export type SiteConfigName =
+  | 'site'
+  | 'logger'
+  | 'email'
+  | 'ai'
+  | 'transcode'
+  | 'thirdLogin'
+  | 'jwt'
+  | 'server'
+
+/** 服务端 CORS 白名单（管理端仅暴露 corsOrigins） */
+export interface ServerCorsConfig {
+  corsOrigins: string[]
+}
 
 // ============ 公开站点配置类型（无需认证） ============
 
@@ -257,6 +270,7 @@ export interface SiteConfigMap {
   transcode: TranscodeConfig
   thirdLogin: ThirdLoginConfig
   jwt: JwtConfig
+  server: ServerCorsConfig
 }
 
 // ============ 站点统计类型 ============
