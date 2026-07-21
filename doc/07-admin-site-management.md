@@ -1,4 +1,4 @@
-﻿# 后台-站点管理
+# 后台-站点管理
 
 分类说明：站点统计与配置管理
 
@@ -98,7 +98,7 @@ Base URL：/v1
 - 权限: 需要 RBAC 权限
 - 依赖接口: 无
 - 接口说明: 获取单项站点配置（需管理员权限）
-- 说明: 不支持/不返回 mysql/redis/es/mongo/kafka/river
+- 说明: 不支持/不返回 mysql/redis/es/mongo/kafka/river；管理端返回密钥明文（secretKey/authCode/APIKey/clientSecret/JWT secret 等），便于直接查看与编辑
 - HTTP 状态码: 200（业务码 code 判断成功/失败）
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
@@ -159,7 +159,7 @@ name=site
         "enable": true,
         "endpoint": "172.17.209.73:9000",
         "accessKey": "minioadmin",
-        "secretKey": "******",
+        "secretKey": "minio-secret",
         "bucket": "videos",
         "useSSL": false,
         "publicPrefixes": ["user_files", "covers", "images"]
@@ -199,7 +199,7 @@ name=email
     "domain": "smtp.qq.com",
     "port": 587,
     "sendEmail": "2740451290@qq.com",
-    "authCode": "******",
+    "authCode": "smtp-auth-code",
     "sendNickName": "柳冠一的视频网站",
     "ssl": true,
     "tls": true,
@@ -216,11 +216,11 @@ name=ai
   "code": 0,
   "data": {
     "chatModelBaseURL": "https://api.deepseek.com/anthropic",
-    "chatModelAPIKey": "******",
+    "chatModelAPIKey": "sk-chat-key",
     "chatModel": "deepseek-v4-flash",
     "embeddingModel": "doubao-embedding-vision-251215",
     "embeddingDimensions": 2048,
-    "doubaoModelAPIKey": "******",
+    "doubaoModelAPIKey": "sk-doubao-key",
     "systemPrompt": "你是一个严谨的多模态助手。",
     "imageModel": "doubao-seedream-5-0-lite-260128",
     "imageModels": [],
@@ -282,27 +282,27 @@ name=thirdLogin
   "data": {
     "qq": {
       "appID": "102799890",
-      "appKey": "******",
+      "appKey": "qq-app-key",
       "redirect": "http://blog.flameccg.space/oauth"
     },
     "google": {
       "clientID": "381890901654-8ult37ugk4sgu5qo7r1m36b6ger9dqk9.apps.googleusercontent.com",
-      "clientSecret": "******",
+      "clientSecret": "oauth-client-secret",
       "redirect": "http://localhost:3000/oauth/google"
     },
     "github": {
       "clientID": "Iv1.examplegithubclient",
-      "clientSecret": "******",
+      "clientSecret": "oauth-client-secret",
       "redirect": "http://localhost:3000/oauth/github"
     },
     "x": {
       "clientID": "example-x-client-id",
-      "clientSecret": "******",
+      "clientSecret": "oauth-client-secret",
       "redirect": "http://localhost:3000/oauth/x"
     },
     "linuxdo": {
       "clientID": "example-linuxdo-client-id",
-      "clientSecret": "******",
+      "clientSecret": "oauth-client-secret",
       "redirect": "http://localhost:3000/oauth/linuxdo"
     }
   },
@@ -318,8 +318,8 @@ name=jwt
   "data": {
     "accessExp": 7,
     "refreshExp": 30,
-    "accessSecret": "******",
-    "refreshSecret": "******"
+    "accessSecret": "jwt-access-secret",
+    "refreshSecret": "jwt-refresh-secret"
   },
   "msg": "ok"
 }
@@ -332,7 +332,7 @@ name=jwt
 - 权限: 需要 RBAC 权限
 - 依赖接口: 无
 - 接口说明: 更新单项站点配置（需管理员权限）
-- 说明: 不支持 mysql/redis/es/mongo/kafka/river
+- 说明: 不支持 mysql/redis/es/mongo/kafka/river；密钥字段提交空字符串或历史占位符 `******` 时服务端保留原值，避免误覆盖
 - HTTP 状态码: 200（业务码 code 判断成功/失败）
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
@@ -390,7 +390,7 @@ name=site
       "enable": true,
       "endpoint": "172.17.209.73:9000",
       "accessKey": "minioadmin",
-      "secretKey": "******",
+      "secretKey": "minio-secret",
       "bucket": "videos",
       "useSSL": false,
       "publicPrefixes": ["user_files", "covers", "images"]
@@ -422,7 +422,7 @@ name=email
   "domain": "smtp.qq.com",
   "port": 587,
   "sendEmail": "2740451290@qq.com",
-  "authCode": "******",
+  "authCode": "smtp-auth-code",
   "sendNickName": "柳冠一的视频网站",
   "ssl": true,
   "tls": true,
@@ -435,11 +435,11 @@ name=ai
 ```json
 {
   "chatModelBaseURL": "https://api.deepseek.com/anthropic",
-  "chatModelAPIKey": "******",
+  "chatModelAPIKey": "sk-chat-key",
   "chatModel": "deepseek-v4-flash",
   "embeddingModel": "doubao-embedding-vision-251215",
   "embeddingDimensions": 2048,
-  "doubaoModelAPIKey": "******",
+  "doubaoModelAPIKey": "sk-doubao-key",
   "systemPrompt": "你是一个严谨的多模态助手。",
   "imageModel": "doubao-seedream-5-0-lite-260128",
   "imageModels": [],
@@ -491,27 +491,27 @@ name=thirdLogin
 {
   "qq": {
     "appID": "102799890",
-    "appKey": "******",
+    "appKey": "qq-app-key",
     "redirect": "http://blog.flameccg.space/oauth"
   },
   "google": {
     "clientID": "381890901654-8ult37ugk4sgu5qo7r1m36b6ger9dqk9.apps.googleusercontent.com",
-    "clientSecret": "******",
+    "clientSecret": "oauth-client-secret",
     "redirect": "http://localhost:3000/oauth/google"
   },
   "github": {
     "clientID": "Iv1.examplegithubclient",
-    "clientSecret": "******",
+    "clientSecret": "oauth-client-secret",
     "redirect": "http://localhost:3000/oauth/github"
   },
   "x": {
     "clientID": "example-x-client-id",
-    "clientSecret": "******",
+    "clientSecret": "oauth-client-secret",
     "redirect": "http://localhost:3000/oauth/x"
   },
   "linuxdo": {
     "clientID": "example-linuxdo-client-id",
-    "clientSecret": "******",
+    "clientSecret": "oauth-client-secret",
     "redirect": "http://localhost:3000/oauth/linuxdo"
   }
 }
@@ -523,8 +523,8 @@ name=jwt
 {
   "accessExp": 7,
   "refreshExp": 30,
-  "accessSecret": "******",
-  "refreshSecret": "******"
+  "accessSecret": "jwt-access-secret",
+  "refreshSecret": "jwt-refresh-secret"
 }
 ```
 
