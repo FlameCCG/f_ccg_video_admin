@@ -427,6 +427,7 @@ function handleDefaultBannerIDsChange(value: string): void {
               :value="formData.storage.minio.secretKey"
               type="password"
               show-password-on="click"
+              :input-props="{ autocomplete: 'new-password' }"
               @update:value="(v) => updateStorageField('minio', 'secretKey', v)"
             />
           </n-form-item>

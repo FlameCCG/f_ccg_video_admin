@@ -62,6 +62,7 @@ function updateField<K extends keyof JwtConfig>(field: K, value: JwtConfig[K]): 
             :value="formData.accessSecret"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateField('accessSecret', v)"
           />
         </n-form-item>
@@ -72,6 +73,7 @@ function updateField<K extends keyof JwtConfig>(field: K, value: JwtConfig[K]): 
             :value="formData.refreshSecret"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateField('refreshSecret', v)"
           />
         </n-form-item>

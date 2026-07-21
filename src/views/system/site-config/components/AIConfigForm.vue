@@ -130,6 +130,7 @@ const thinkingEffortSelectOptions = computed(() =>
             :value="formData.chatModelAPIKey"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateField('chatModelAPIKey', v)"
           />
         </n-form-item>
@@ -187,6 +188,7 @@ const thinkingEffortSelectOptions = computed(() =>
             :value="formData.doubaoModelAPIKey"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateField('doubaoModelAPIKey', v)"
           />
         </n-form-item>

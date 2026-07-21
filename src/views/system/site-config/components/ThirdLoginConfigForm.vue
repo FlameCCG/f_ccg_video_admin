@@ -70,6 +70,7 @@ function updateOAuthField(
             :value="formData.qq.appKey"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateQQField('appKey', v)"
           />
         </n-form-item>
@@ -103,6 +104,7 @@ function updateOAuthField(
             :value="formData.google.clientSecret"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateOAuthField('google', 'clientSecret', v)"
           />
         </n-form-item>
@@ -136,6 +138,7 @@ function updateOAuthField(
             :value="formData.github.clientSecret"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateOAuthField('github', 'clientSecret', v)"
           />
         </n-form-item>
@@ -169,6 +172,7 @@ function updateOAuthField(
             :value="formData.linuxdo.clientSecret"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateOAuthField('linuxdo', 'clientSecret', v)"
           />
         </n-form-item>
@@ -202,6 +206,7 @@ function updateOAuthField(
             :value="formData.x.clientSecret"
             type="password"
             show-password-on="click"
+            :input-props="{ autocomplete: 'new-password' }"
             @update:value="(v) => updateOAuthField('x', 'clientSecret', v)"
           />
         </n-form-item>
