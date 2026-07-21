@@ -29,7 +29,7 @@ export default {
     receiver: 'Receiver',
     receiverIdPlaceholder: 'Enter user ID',
     link: 'Link',
-    linkPlaceholder: 'Enter link URL (optional)',
+    linkPlaceholder: 'Link, e.g. example.com or http://example.com (optional)',
     videoId: 'Related Video',
     videoIdPlaceholder: 'Enter video ID (optional)',
     videoTitle: 'Video Title',

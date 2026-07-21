@@ -19,6 +19,7 @@ import type { NotificationItem } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { AppAvatar } from '@/components/common'
 import { useTableSelectionAction } from '@/composables'
+import { normalizeExternalHref } from '@/utils'
 import NotificationFormModal from './components/NotificationFormModal.vue'
 
 const { t } = useI18n()
@@ -168,10 +169,11 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     render: (row) => {
       const link = row.link as string
       if (!link) return '-'
+      const href = normalizeExternalHref(link)
       return h(
         'a',
         {
-          href: link,
+          href,
           target: '_blank',
           rel: 'noopener noreferrer',
           class: 'notification-link',
@@ -269,15 +271,20 @@ function handleFormSubmit(data: {
   videoTitle?: string
   link?: string
 }): void {
+  const payload = {
+    ...data,
+    link: data.link ? normalizeExternalHref(data.link) : data.link,
+  }
+
   if (editingNotification.value) {
     // 更新
     updateMutation.mutate({
       id: editingNotification.value.id,
-      ...data,
+      ...payload,
     })
   } else {
     // 创建
-    createMutation.mutate(data)
+    createMutation.mutate(payload)
   }
 }
 

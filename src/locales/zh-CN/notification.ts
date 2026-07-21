@@ -29,7 +29,7 @@ export default {
     receiver: '接收者',
     receiverIdPlaceholder: '请输入用户 ID',
     link: '跳转链接',
-    linkPlaceholder: '请输入跳转链接（可选）',
+    linkPlaceholder: '请输入链接，如 example.com 或 http://example.com（可选）',
     videoId: '关联视频',
     videoIdPlaceholder: '请输入视频 ID（可选）',
     videoTitle: '视频标题',

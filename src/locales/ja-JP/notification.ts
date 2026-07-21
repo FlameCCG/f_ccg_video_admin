@@ -29,7 +29,7 @@ export default {
     receiver: '受信者',
     receiverIdPlaceholder: 'ユーザーIDを入力',
     link: 'リンク',
-    linkPlaceholder: 'リンクURLを入力（任意）',
+    linkPlaceholder: 'リンクを入力、例: example.com または http://example.com（任意）',
     videoId: '関連動画',
     videoIdPlaceholder: '動画IDを入力（任意）',
     videoTitle: '動画タイトル',

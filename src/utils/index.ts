@@ -32,7 +32,7 @@ export {
 } from './storage'
 
 // URL 相关
-export { normalizeResourceUrl } from './url'
+export { normalizeResourceUrl, normalizeExternalHref } from './url'
 
 // 日期相关
 export { formatDateTime } from './date'
