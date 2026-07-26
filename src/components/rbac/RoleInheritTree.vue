@@ -4,7 +4,7 @@
  * Role Inheritance Tree Visualization with Vue Flow
  * Requirements: 16.2 - 角色继承管理
  */
-import { computed, watch, nextTick } from 'vue'
+import { computed, watch, nextTick, onScopeDispose } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { VueFlow, useVueFlow, MarkerType, Position } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
@@ -12,6 +12,9 @@ import { Controls } from '@vue-flow/controls'
 import { NEmpty, NSpin, NTag } from 'naive-ui'
 import type { Node, Edge } from '@vue-flow/core'
 import type { RoleInheritTreeNode } from '@/api/types'
+// 直接指到文件而不走 @/composables 桶：本组件已被拆成独立异步 chunk，
+// 走桶会把主题/SSE 等无关 composable 一起拖进这个 chunk
+import { useReducedMotion } from '@/composables/useReducedMotion'
 
 interface Props {
   /** 树数据 */
@@ -32,6 +35,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const { t } = useI18n()
 const { fitView } = useVueFlow({ id: 'role-inherit-tree' })
+const { prefersReducedMotion } = useReducedMotion()
 
 /** 是否有数据 */
 const hasData = computed(() => props.data && props.data.length > 0)
@@ -132,20 +136,56 @@ const totalNodes = computed(() => {
 
 const flowData = computed(() => convertTreeToFlow(props.data, props.highlightRoleId ?? null))
 
+/** fitView 前的等待时间（ms）：给 vue-flow 留出完成节点测量的时间 */
+const FIT_VIEW_DELAY_MS = 80
+/** fitView 视口动画时长（ms） */
+const FIT_VIEW_DURATION_MS = 200
+/** fitView 视口留白比例 */
+const FIT_VIEW_PADDING = 0.2
+
+/**
+ * fitView 延迟句柄。
+ * 本组件挂在抽屉/弹窗里，关闭即卸载；若不持有句柄，
+ * 定时器会在 vue-flow 实例已销毁之后才触发 fitView。
+ */
+let fitViewTimer: ReturnType<typeof setTimeout> | null = null
+/** 作用域是否已销毁：nextTick 回调同样可能晚于卸载执行 */
+let scopeDisposed = false
+
+function clearFitViewTimer(): void {
+  if (fitViewTimer !== null) {
+    clearTimeout(fitViewTimer)
+    fitViewTimer = null
+  }
+}
+
 function scheduleFitView(): void {
   void nextTick(() => {
-    setTimeout(() => {
-      void fitView({ padding: 0.2, duration: 200 })
-    }, 80)
+    if (scopeDisposed) return
+    clearFitViewTimer()
+    fitViewTimer = setTimeout(() => {
+      fitViewTimer = null
+      if (scopeDisposed) return
+      void fitView({
+        padding: FIT_VIEW_PADDING,
+        // 视口动画属于 JS 驱动动效，CSS 媒体查询兜不住，这里显式尊重减少动效偏好
+        duration: prefersReducedMotion.value ? 0 : FIT_VIEW_DURATION_MS,
+      })
+    }, FIT_VIEW_DELAY_MS)
   })
 }
 
+onScopeDispose(() => {
+  scopeDisposed = true
+  clearFitViewTimer()
+})
+
+// props.data 每次都是 vue-query 返回的新对象，比较引用即可，无需 deep 遍历整棵树
 watch(
   () => [props.data, props.highlightRoleId] as const,
   () => {
     if (hasData.value) scheduleFitView()
-  },
-  { deep: true }
+  }
 )
 </script>
 
@@ -251,17 +291,17 @@ watch(
 .role-flow-node {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacing-1);
   min-width: 120px;
   max-width: 180px;
-  padding: 12px 16px;
+  padding: var(--spacing-3) var(--spacing-4);
   background: var(--color-surface);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: grab;
   transition:
-    border-color var(--duration-fast) ease,
-    box-shadow var(--duration-fast) ease;
+    border-color var(--duration-fast) var(--easing-standard),
+    box-shadow var(--duration-fast) var(--easing-standard);
 
   &:hover {
     border-color: var(--color-primary);
@@ -369,5 +409,16 @@ watch(
   --vf-pattern-color: var(--color-border);
 
   opacity: 0.45;
+}
+
+// 减少动效：蚂蚁线属于纯装饰（虚线本身已足够区分继承边），节点微交互也直接落位
+@media (prefers-reduced-motion: reduce) {
+  .role-flow-node {
+    transition: none;
+  }
+
+  .vue-flow__edge.animated .vue-flow__edge-path {
+    animation: none;
+  }
 }
 </style>

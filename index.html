@@ -1,10 +1,86 @@
 <!doctype html>
-<html lang="en">
+<!-- data-theme 兜底值：JS 被禁用时仍能拿到完整的 Pearl 变量表 -->
+<html lang="zh-CN" data-theme="pearl">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>admin-console</title>
+    <title>视频网站后台管理系统</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- 声明同时支持浅色/深色，避免浏览器对深色主题做强制反色（Auto Dark Theme） -->
+    <meta name="color-scheme" content="light dark" />
+
+    <!--
+      theme-color 只能写字面量（HTML meta 的 content 不支持 var()），
+      这是全项目唯一允许硬编码色值的例外：两个值手抄自
+      src/styles/tokens/_colors.scss 的 pearl.bg / obsidian.bg，改动色板时需同步。
+      cyberpunk / sakura 复用同明暗档的近似值（浏览器 UI 色不需要逐主题精确）。
+      默认按系统偏好匹配，下面的引导脚本会再按“用户手动选择的主题”校正一次。
+    -->
+    <meta
+      id="theme-color-light"
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#f6f5f3"
+    />
+    <meta
+      id="theme-color-dark"
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#0b0c10"
+    />
+
+    <!--
+      主题/语言预置引导：同步执行，早于 Vite 注入的样式与业务 JS，因此不会有首帧闪烁。
+      背景：data-theme 原本只由 stores/app.ts applyTheme() 在 App.vue setup 里写入，
+      而 main.ts 要等 initI18n() 的动态 import 往返结束才 mount，
+      这期间 :root 落在浅色 Pearl 上 —— obsidian/cyberpunk 用户整个启动过程都是白屏。
+      这里读取的是与 store 完全相同的 localStorage key，且存储格式为裸字符串（非 JSON）：
+        - admin-console-theme：useStorage 默认值为 null，@vueuse 退化到 'any' 序列化器（write = String(v)）
+        - admin-console-locale：locales/index.ts 直接 localStorage.setItem(key, locale)
+      所以随后 initTheme() 只是幂等确认，不会触发第二次重绘。
+    -->
+    <script>
+      ;(function () {
+        try {
+          var THEMES = ['pearl', 'obsidian', 'cyberpunk', 'sakura']
+          var DARK_THEMES = ['obsidian', 'cyberpunk']
+          var LOCALES = ['zh-CN', 'en-US', 'ja-JP']
+          var root = document.documentElement
+
+          // 主题：存储值非法/缺失时回退到系统偏好（与 stores/app.ts initTheme 一致）
+          var theme = window.localStorage.getItem('admin-console-theme')
+          if (THEMES.indexOf(theme) < 0) {
+            theme =
+              window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'obsidian'
+                : 'pearl'
+          }
+          root.setAttribute('data-theme', theme)
+
+          // 语言：回退逻辑与 locales/index.ts getBrowserLocale() 保持一致，避免 mount 后再改 lang
+          var locale = window.localStorage.getItem('admin-console-locale')
+          if (LOCALES.indexOf(locale) < 0) {
+            var browserLang = navigator.language || ''
+            locale = 'zh-CN'
+            if (browserLang.indexOf('ja') === 0) locale = 'ja-JP'
+            else if (browserLang.indexOf('en') === 0) locale = 'en-US'
+          }
+          root.setAttribute('lang', locale)
+
+          // 让浏览器 UI 色跟随“已选主题”，而不是只跟随系统偏好
+          var isDark = DARK_THEMES.indexOf(theme) >= 0
+          var lightMeta = document.getElementById('theme-color-light')
+          var darkMeta = document.getElementById('theme-color-dark')
+          if (lightMeta && darkMeta) {
+            lightMeta.media = isDark ? 'not all' : 'all'
+            darkMeta.media = isDark ? 'all' : 'not all'
+          }
+        } catch {
+          // localStorage 被禁用（隐私模式/三方存储拦截）时静默降级到 <html> 上的兜底值
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

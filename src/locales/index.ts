@@ -1,10 +1,11 @@
 /**
  * Vue I18n 配置
  * 支持中文(zh-CN)、英文(en-US)、日文(ja-JP)
- * 使用懒加载方式加载语言包
+ * 默认语言（zh-CN）静态打包进首屏 chunk，其余语言懒加载
  */
 import { createI18n } from 'vue-i18n'
 import type { I18n } from 'vue-i18n'
+import zhCN from './zh-CN'
 
 /**
  * 支持的语言类型
@@ -32,8 +33,9 @@ export const localeConfigs: LocaleConfig[] = [
 
 /**
  * 默认语言
+ * 用 satisfies 保留字面量类型：下方 loadLocaleMessages 依赖它做类型收窄
  */
-export const DEFAULT_LOCALE: LocaleType = 'zh-CN'
+export const DEFAULT_LOCALE = 'zh-CN' satisfies LocaleType
 
 /**
  * 本地存储 key
@@ -64,19 +66,30 @@ export function getInitialLocale(): LocaleType {
 }
 
 /**
- * 懒加载语言包
+ * 非默认语言的懒加载表（静态可分析，Vite 能生成对应 chunk 与 modulepreload 提示）
+ *
+ * 原实现用 `import.meta.glob` + 运行时拼出的 key 取语言包，默认语言也走这条路：
+ * Vite 无法为运行时 key 生成预加载提示，导致 100% 用户在首屏渲染前多等一次网络往返；
+ * 且 glob 写在函数体内，每次切换语言都会重建一次映射表。
+ */
+const lazyLocaleLoaders: Record<
+  Exclude<LocaleType, typeof DEFAULT_LOCALE>,
+  () => Promise<{ default: Record<string, unknown> }>
+> = {
+  'en-US': () => import('./en-US'),
+  'ja-JP': () => import('./ja-JP'),
+}
+
+/**
+ * 加载语言包（默认语言直接返回静态引入的结果，不产生额外请求）
  */
 async function loadLocaleMessages(locale: LocaleType): Promise<Record<string, unknown>> {
-  const modules = import.meta.glob<{ default: Record<string, unknown> }>('./**/index.ts')
-  const path = `./${locale}/index.ts`
-
-  if (modules[path]) {
-    const mod = await modules[path]()
-    return mod.default
+  if (locale === DEFAULT_LOCALE) {
+    return zhCN
   }
 
-  console.warn(`Locale messages not found for: ${locale}`)
-  return {}
+  const mod = await lazyLocaleLoaders[locale]()
+  return mod.default
 }
 
 /**

@@ -45,15 +45,28 @@ import type { LocaleType } from '@/locales'
  * 使用 Vite 的 import.meta.glob 实现视图组件的懒加载。
  * 这样可以实现代码分割，只有在访问对应路由时才加载组件。
  *
+ * 【为什么只匹配 index.vue】
+ * 后端 menus 表的 component 列只有两种取值：`Layout`，或 `views/<模块>/<页面>/index.vue`
+ * （见仓库根目录 menus.csv：去重后 17 个视图路径，全部以 index.vue 结尾，
+ * 没有任何一个指向 components 目录）。
+ * 此前这里用的是「views 下全部 .vue」的宽松 glob，
+ * 于是各页面 components 目录里的抽屉/弹窗也被注册成动态 import 入口，
+ * Rollup 把它们切成独立 chunk 并在多个页面间共享 —— 例如视频详情抽屉被拆出去后，
+ * 连带把 VideoPlayer → dash.js 一起拖进公共 chunk。
+ * 收窄到 index.vue 后少了 23 个无意义的分割点，而对 menus.csv 的解析结果完全等价
+ * （回归用例见 permission.glob.test.ts）。
+ *
  * 【工作原理】
  * import.meta.glob 会在构建时扫描匹配的文件，生成一个对象：
  * {
- *   '/src/views/user/list/index.vue': () => import('/src/views/user/list/index.vue'),
- *   '/src/views/video/list/index.vue': () => import('/src/views/video/list/index.vue'),
+ *   '/src/views/users/list/index.vue': () => import('/src/views/users/list/index.vue'),
+ *   '/src/views/content/videos/index.vue': () => import('/src/views/content/videos/index.vue'),
  *   ...
  * }
+ *
+ * 【注意】登录页 / 403 / 404 不在菜单里，它们在 src/router/routes.ts 中显式懒加载。
  */
-const viewModules = import.meta.glob<{ default: RouteComponent }>('@/views/**/*.vue')
+const viewModules = import.meta.glob<{ default: RouteComponent }>('@/views/**/index.vue')
 
 /**
  * 布局组件映射
@@ -84,10 +97,14 @@ const layoutModules: Record<string, () => Promise<{ default: RouteComponent }>> 
  * 2. 处理视图组件路径，移除前缀，确保格式正确
  * 3. 从 viewModules 中查找对应的懒加载函数
  *
+ * 【导出说明】
+ * 对外导出仅为了让 permission.glob.test.ts 能锁定「menus.csv 里每个 component 都解析得到
+ * 懒加载函数」这一契约（glob 收窄后的回归防线），业务代码不要直接调用。
+ *
  * @param component 后端返回的组件路径
  * @returns 懒加载组件函数，如果找不到则返回 undefined
  */
-function resolveComponent(
+export function resolveComponent(
   component: string | undefined
 ): (() => Promise<{ default: RouteComponent }>) | undefined {
   if (!component) return undefined

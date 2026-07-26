@@ -7,12 +7,12 @@
  * 统一走系统继承树接口 GET /admin/rbac/role/inherit/tree，
  * 通过 highlightRoleId 高亮指定角色（可选 roleId query 由 getRoleInheritTreeById 使用）。
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery } from '@tanstack/vue-query'
-import { NModal, NButton, NIcon } from 'naive-ui'
+import { NModal, NButton, NIcon, NSpin } from 'naive-ui'
+import type { FunctionalComponent } from 'vue'
 import { getRoleInheritTree } from '@/api/rbac'
-import { RoleInheritTree } from '@/components/rbac'
 
 interface Props {
   /** 是否显示 */
@@ -36,6 +36,32 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+/** 异步组件占位延迟（ms）：网络足够快时不闪一下骨架 */
+const ASYNC_LOADING_DELAY_MS = 150
+
+/** 继承树 chunk 加载中的占位 */
+const RoleInheritTreeLoading: FunctionalComponent = () =>
+  h('div', { class: 'role-inherit-tree-loading' }, [
+    h(NSpin, { size: 'small' }),
+    h('span', { class: 'role-inherit-tree-loading__text' }, t('common.loading')),
+  ])
+
+/**
+ * 角色继承树（内部依赖 @vue-flow，约 359KB）。
+ * 这里必须异步加载：本弹窗从角色列表页静态引入，若同步 import 会把整个图库
+ * 打进角色管理页的 chunk —— 而继承树只在用户主动点开时才需要。
+ *
+ * 下面的 disable 说明：typescript-eslint 的 program 不解析 .vue 模块，
+ * 动态 import 在它眼里是 any；vue-tsc 能拿到真实 SFC 类型，
+ * 模板上的 props 依旧受 strictTemplates 校验，所以这里不是真的丢类型。
+ */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+const RoleInheritTree = defineAsyncComponent({
+  loader: () => import('@/components/rbac/RoleInheritTree.vue'),
+  loadingComponent: RoleInheritTreeLoading,
+  delay: ASYNC_LOADING_DELAY_MS,
+})
 
 const isSpecificRole = computed(() => {
   const id = props.roleId ?? props.highlightRoleId
@@ -123,7 +149,9 @@ function handleRefresh(): void {
       <p class="role-inherit-tree-modal__hint">
         {{ t('rbac.role.inheritTree.hint') }}
       </p>
+      <!-- 弹窗关闭时不挂载，@vue-flow chunk 才不会被提前拉取 -->
       <role-inherit-tree
+        v-if="visible"
         :data="treeData"
         :loading="isLoading"
         :highlight-role-id="activeHighlightId"
@@ -140,5 +168,20 @@ function handleRefresh(): void {
     font-size: var(--text-sm);
     color: var(--color-text-secondary);
   }
+}
+
+// 继承树 chunk 加载占位（由渲染函数产出，故需穿透 scoped）
+:deep(.role-inherit-tree-loading) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-16) 0;
+}
+
+:deep(.role-inherit-tree-loading__text) {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 </style>

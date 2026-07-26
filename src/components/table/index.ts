@@ -4,7 +4,5 @@
  */
 
 export { default as DataTable } from './DataTable.vue'
-export { default as TableToolbar } from './TableToolbar.vue'
-export { default as TablePagination } from './TablePagination.vue'
 export { default as TableActions } from './TableActions.vue'
 export { default as BatchActions } from './BatchActions.vue'
