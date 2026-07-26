@@ -42,16 +42,21 @@ describe('app store', () => {
       expect(sakura?.isDark).toBe(false)
     })
 
-    it('should expose accent colors for theme icons', () => {
-      const pearl = themeConfigs.find((t) => t.name === 'pearl')
-      const obsidian = themeConfigs.find((t) => t.name === 'obsidian')
-      const cyberpunk = themeConfigs.find((t) => t.name === 'cyberpunk')
-      const sakura = themeConfigs.find((t) => t.name === 'sakura')
+    // accent 指向 tokens 侧生成的 --theme-accent-*（见 tokens/themes.scss），
+    // 不再在 TS 里复制色值 —— 否则改了色板就会和主题色卡不一致。
+    it('should reference theme accent tokens instead of hardcoding hex', () => {
+      for (const config of themeConfigs) {
+        expect(config.accent).toBe(`var(--theme-accent-${config.name})`)
+      }
+    })
 
-      expect(pearl?.accent).toBe('#5c7cfa')
-      expect(obsidian?.accent).toBe('#7c8aff')
-      expect(cyberpunk?.accent).toBe('#00f3ff')
-      expect(sakura?.accent).toBe('#ff6b9d')
+    it('should expose an accent for every theme', () => {
+      expect(themeConfigs.map((t) => t.name).sort()).toEqual([
+        'cyberpunk',
+        'obsidian',
+        'pearl',
+        'sakura',
+      ])
     })
   })
 
