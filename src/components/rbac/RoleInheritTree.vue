@@ -260,8 +260,8 @@ watch(
   border-radius: var(--radius-md);
   cursor: grab;
   transition:
-    border-color var(--motion-fast) ease,
-    box-shadow var(--motion-fast) ease;
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease;
 
   &:hover {
     border-color: var(--color-primary);

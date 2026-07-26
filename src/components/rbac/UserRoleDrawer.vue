@@ -320,7 +320,7 @@ const renderLabel: TransferRenderSourceLabel = ({ option }) => {
 :deep(.transfer-label-btn) {
   flex-shrink: 0;
   opacity: 0.6;
-  transition: opacity var(--motion-fast);
+  transition: opacity var(--duration-fast);
 
   &:hover {
     opacity: 1;

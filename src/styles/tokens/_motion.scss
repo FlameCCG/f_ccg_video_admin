@@ -20,6 +20,11 @@ $easing: (
   'ease-in': cubic-bezier(0.4, 0, 1, 1),
   'ease-out': cubic-bezier(0, 0, 0.2, 1),
   'ease-in-out': cubic-bezier(0.4, 0, 0.2, 1),
+  // 项目默认曲线：界面元素减速入位，适用于 hover / press / 状态反馈。
+  // 此前 18 处 var(--easing-standard) 引用了一个不存在的变量 ——
+  // 非法的 timing-function 会让整条 transition 简写失效，
+  // 也就是说那 18 个过渡从未真正生效过。
+  'standard': cubic-bezier(0.2, 0, 0, 1),
   // 自然减速曲线 - 高质感入场与状态反馈
   'out-quart': cubic-bezier(0.25, 1, 0.5, 1),
   'out-quint': cubic-bezier(0.22, 1, 0.36, 1),
