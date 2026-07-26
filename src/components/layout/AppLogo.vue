@@ -48,21 +48,26 @@ defineProps<{
 </template>
 
 <style scoped lang="scss">
+@use '@/styles/transitions/interaction' as ix;
+
 .app-logo {
   display: flex;
   align-items: center;
-  gap: 14px;
-  text-decoration: none;
+  gap: var(--spacing-3);
+  padding: var(--spacing-1);
+  margin: calc(-1 * var(--spacing-1));
   color: var(--color-text);
-  padding: 4px;
-  margin: -4px;
+  text-decoration: none;
   border-radius: var(--radius-lg);
-  transition:
-    gap 280ms cubic-bezier(0.4, 0, 0.2, 1),
-    background 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  @include ix.feedback-transition;
+  @include ix.focus-ring;
+
+  // $lift 传 0：logo 紧贴 logo 区底部的分隔线，上抬会顶到线上
+  @include ix.pressable(0.98, 0);
 
   &:hover {
-    background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+    background: var(--color-primary-subtle);
 
     .logo-icon-inner {
       transform: scale(1.05);
@@ -74,23 +79,17 @@ defineProps<{
     }
   }
 
-  &:active {
-    .logo-icon-inner {
-      transform: scale(0.98);
-    }
-  }
-
   &.is-collapsed {
-    justify-content: center;
     gap: 0;
+    justify-content: center;
   }
 }
 
 .logo-icon {
   position: relative;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: var(--spacing-10);
+  height: var(--spacing-10);
 }
 
 .logo-icon-inner {
@@ -101,53 +100,56 @@ defineProps<{
   justify-content: center;
   width: 100%;
   height: 100%;
-  border-radius: var(--radius-lg);
+  color: var(--color-on-primary);
   background: linear-gradient(
     135deg,
     var(--color-primary) 0%,
     color-mix(in srgb, var(--color-primary) 80%, var(--color-primary-hover) 20%) 100%
   );
-  color: white;
+  border-radius: var(--radius-lg);
+
+  // 顶部 1px 高光用 on-primary 兑出来：这是「主色表面上的墨色」，
+  // 深色主题下自然翻转，不会像写死的白色那样在暗色主色上糊成一片。
   box-shadow:
-    0 2px 8px color-mix(in srgb, var(--color-primary) 30%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    var(--shadow-elev-1),
+    inset 0 1px 0 color-mix(in srgb, var(--color-on-primary) 15%, transparent);
+
+  @include ix.feedback-transition;
 
   svg {
-    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1));
+    filter: drop-shadow(0 1px 1px var(--color-overlay-soft));
   }
 }
 
 .logo-glow {
   position: absolute;
-  inset: -4px;
-  border-radius: var(--radius-xl);
+  inset: calc(-1 * var(--spacing-1));
   background: radial-gradient(circle at center, var(--color-primary) 0%, transparent 70%);
+  border-radius: var(--radius-xl);
   opacity: 0.3;
   filter: blur(8px);
-  transition:
-    opacity 300ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
+
+  @include ix.feedback-transition;
 }
 
 .logo-text-wrapper {
-  overflow: hidden;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .logo-text {
   display: flex;
   flex-direction: column;
   gap: 0;
-  line-height: 1.2;
+  line-height: var(--leading-tight);
 }
 
 .logo-text-main {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  letter-spacing: var(--tracking-tight);
   background: linear-gradient(135deg, var(--color-text) 0%, var(--color-text-secondary) 100%);
   /* stylelint-disable-next-line property-no-vendor-prefix */
   -webkit-background-clip: text;
@@ -156,47 +158,17 @@ defineProps<{
 }
 
 .logo-text-sub {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  letter-spacing: var(--tracking-wider);
   color: var(--color-text-muted);
+  text-transform: uppercase;
 }
 
-/* Logo 文字过渡动画 */
-.logo-text-enter-active {
-  transition:
-    opacity 200ms cubic-bezier(0.4, 0, 0.2, 1) 80ms,
-    transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.logo-text-leave-active {
-  transition:
-    opacity 150ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.logo-text-enter-from {
-  opacity: 0;
-  transform: translateX(-12px) scale(0.95);
-}
-
-.logo-text-leave-to {
-  opacity: 0;
-  transform: translateX(-8px) scale(0.98);
-}
-
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .app-logo,
-  .logo-icon-inner,
-  .logo-glow {
-    transition: none;
-  }
-
-  .logo-text-enter-active,
-  .logo-text-leave-active {
-    transition: none;
-  }
-}
+/* Logo 文字过渡动画：进场减速入位、离场加速离开，时长与曲线全部走语义 token */
+@include ix.enter-leave(
+  'logo-text',
+  translateX(calc(-1 * var(--spacing-3))) scale(0.95),
+  translateX(calc(-1 * var(--spacing-2))) scale(0.98)
+);
 </style>

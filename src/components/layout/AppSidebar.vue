@@ -4,18 +4,26 @@
  * 包含 Logo 和菜单，带精致的折叠动画
  * Requirements: 6.1, 6.4
  */
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NTooltip } from 'naive-ui'
 import { useAppStore } from '@/stores/app'
 import AppLogo from './AppLogo.vue'
 import AppMenu from './AppMenu.vue'
 
+defineProps<{
+  /**
+   * 折叠态宽度（px）
+   * 由 DefaultLayout 从 --layout-sider-collapsed-width 读出后透传：
+   * NMenu 折叠态要用同一个数字才能把图标摆在侧边栏中线上。
+   */
+  collapsedWidth: number
+}>()
+
 const { t } = useI18n()
 const appStore = useAppStore()
 
 const collapsed = computed(() => appStore.sidebarCollapsed)
-const isHovering = ref(false)
 
 /** 切换侧边栏折叠状态 */
 function handleToggle(): void {
@@ -33,7 +41,7 @@ function handleToggle(): void {
     <!-- 菜单区域 - 独立滚动容器 -->
     <div class="sidebar-menu">
       <div class="sidebar-menu__scroll">
-        <AppMenu :collapsed="collapsed" />
+        <AppMenu :collapsed="collapsed" :collapsed-width="collapsedWidth" />
       </div>
     </div>
 
@@ -43,11 +51,9 @@ function handleToggle(): void {
         <template #trigger>
           <button
             class="collapse-btn"
-            :class="{ 'is-collapsed': collapsed, 'is-hovering': isHovering }"
+            :class="{ 'is-collapsed': collapsed }"
             :aria-label="collapsed ? t('layout.sidebar.expand') : t('layout.sidebar.collapse')"
             @click="handleToggle"
-            @mouseenter="isHovering = true"
-            @mouseleave="isHovering = false"
           >
             <span class="collapse-btn-inner">
               <span class="collapse-icon-wrapper">
@@ -88,63 +94,64 @@ function handleToggle(): void {
 </template>
 
 <style scoped lang="scss">
+@use '@/styles/transitions/interaction' as ix;
+
 .app-sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
-  position: relative;
   overflow: hidden;
 }
 
 .sidebar-logo {
-  flex-shrink: 0;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
   position: relative;
-  transition: padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+
+  // 必须与顶栏同高：logo 区底部的 hairline 要和 header 的下边框连成一条线。
+  // 此前写死 64px 而 header 是 56px，每个页面左上角都能看到 8px 的错位台阶。
+  height: var(--layout-header-height);
+  padding: 0 var(--spacing-5);
 
   &::after {
-    content: '';
     position: absolute;
-    bottom: 0;
-    left: 20px;
-    right: 20px;
+    inset: auto var(--spacing-5) 0;
     height: 1px;
+    content: '';
     background: linear-gradient(
       90deg,
       transparent 0%,
-      var(--color-border-light) 20%,
-      var(--color-border-light) 80%,
+      var(--color-border-subtle) 20%,
+      var(--color-border-subtle) 80%,
       transparent 100%
     );
-    transition:
-      left 280ms cubic-bezier(0.4, 0, 0.2, 1),
-      right 280ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  // 折叠态只切换内边距，不做补间：侧边栏宽度动画已经把状态变化说清楚了，
+  // 每个子块再各自补一条 padding / left / right 过渡，只会在动画期间多出几轮布局计算。
   .is-collapsed & {
-    padding: 0 12px;
+    padding: 0 var(--spacing-3);
 
     &::after {
-      left: 12px;
-      right: 12px;
+      inset: auto var(--spacing-3) 0;
     }
   }
 }
 
 .sidebar-menu {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  position: relative;
 
   &__scroll {
     height: 100%;
+    padding: var(--spacing-3) var(--spacing-2);
     overflow: hidden auto;
-    padding: 12px 8px;
-    transition: padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar-thumb) transparent;
 
     &::-webkit-scrollbar {
       width: 4px;
@@ -152,75 +159,77 @@ function handleToggle(): void {
 
     &::-webkit-scrollbar-track {
       background: transparent;
-      margin: 8px 0;
+      margin: var(--spacing-2) 0;
     }
 
     &::-webkit-scrollbar-thumb {
-      background: var(--color-border);
-      border-radius: 2px;
+      background: var(--color-scrollbar-thumb);
+      border-radius: var(--radius-full);
 
       &:hover {
-        background: var(--color-text-muted);
+        background: var(--color-scrollbar-thumb-hover);
       }
     }
 
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-border) transparent;
-  }
-
-  .is-collapsed & &__scroll {
-    padding: 12px 4px;
+    // 折叠态去掉横向内边距，让菜单可用宽度正好等于侧边栏折叠宽度 ——
+    // NMenu 折叠态是按 collapsedWidth 反算 padding-left 来居中图标的，
+    // 容器窄一点图标就整体偏左（此前这条规则写成 `.is-collapsed & &__scroll`，
+    // 编译出来要求两层嵌套的 .sidebar-menu，从未匹配到任何元素）。
+    .is-collapsed & {
+      padding-inline: 0;
+    }
   }
 }
 
 .sidebar-footer {
-  flex-shrink: 0;
-  padding: 12px;
   position: relative;
-  transition: padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  padding: var(--spacing-3);
 
   &::before {
-    content: '';
     position: absolute;
-    top: 0;
-    left: 20px;
-    right: 20px;
+    inset: 0 var(--spacing-5) auto;
     height: 1px;
+    content: '';
     background: linear-gradient(
       90deg,
       transparent 0%,
-      var(--color-border-light) 20%,
-      var(--color-border-light) 80%,
+      var(--color-border-subtle) 20%,
+      var(--color-border-subtle) 80%,
       transparent 100%
     );
   }
 
   .is-collapsed & {
-    padding: 12px 8px;
+    padding: var(--spacing-3) var(--spacing-2);
 
     &::before {
-      left: 12px;
-      right: 12px;
+      inset: 0 var(--spacing-3) auto;
     }
   }
 }
 
 .collapse-btn {
   position: relative;
-  width: 100%;
-  height: 44px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0 12px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: var(--radius-lg);
+  width: 100%;
+
+  // 44px：与菜单项同一量级的按压区域（菜单项高度由 Naive 的 Menu.itemHeight 决定）
+  height: calc(var(--spacing-10) + var(--spacing-1));
+  padding: 0 var(--spacing-3);
   overflow: hidden;
-  transition:
-    padding 280ms cubic-bezier(0.4, 0, 0.2, 1),
-    justify-content 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-lg);
+
+  @include ix.feedback-transition;
+  @include ix.focus-ring;
+
+  // $lift 传 0：按钮贴着侧边栏底部的分隔线，上抬会顶到线上
+  @include ix.pressable(0.98, 0);
 
   &.is-collapsed {
     justify-content: center;
@@ -233,9 +242,10 @@ function handleToggle(): void {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--spacing-2);
   color: var(--color-text-secondary);
-  transition: color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  @include ix.feedback-transition;
 
   .collapse-btn:hover & {
     color: var(--color-primary);
@@ -246,12 +256,11 @@ function handleToggle(): void {
   position: absolute;
   inset: 0;
   background: var(--color-primary);
+  border-radius: var(--radius-lg);
   opacity: 0;
   transform: scale(0.95);
-  border-radius: var(--radius-lg);
-  transition:
-    opacity 200ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  @include ix.feedback-transition;
 
   .collapse-btn:hover & {
     opacity: 0.08;
@@ -263,16 +272,19 @@ function handleToggle(): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--spacing-8);
+  height: var(--spacing-8);
+  background: var(--color-primary-subtle);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+
+  // 背景走 hover 语义；箭头翻转是折叠动作的一部分，时长与曲线跟侧边栏宽度动画对齐，
+  // 否则 100ms 就转完、宽度还在走，两个动作会散开。
   transition:
-    background 200ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+    background-color ix.$hover-motion,
+    transform var(--duration-slow) var(--easing-ease-in-out);
 
   .collapse-btn:hover & {
-    background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    background: var(--color-primary-subtle-hover);
   }
 
   .is-collapsed & {
@@ -282,7 +294,8 @@ function handleToggle(): void {
 
 .collapse-icon {
   flex-shrink: 0;
-  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  @include ix.feedback-transition;
 
   .collapse-btn:hover & {
     transform: translateX(-2px);
@@ -294,60 +307,35 @@ function handleToggle(): void {
 }
 
 .collapse-text {
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
   overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
 }
 
-.text-fade-enter-active,
-.text-fade-leave-active {
-  transition:
-    opacity 150ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.text-fade-enter-from {
-  opacity: 0;
-  transform: translateX(-8px);
-}
-
-.text-fade-leave-to {
-  opacity: 0;
-  transform: translateX(8px);
-}
+@include ix.enter-leave(
+  'text-fade',
+  translateX(calc(-1 * var(--spacing-2))),
+  translateX(var(--spacing-2))
+);
 
 .sidebar-glow {
   position: absolute;
   bottom: 0;
   left: 50%;
-  transform: translateX(-50%);
   width: 80%;
-  height: 120px;
+  height: var(--spacing-24);
   background: radial-gradient(
     ellipse at center bottom,
     color-mix(in srgb, var(--color-primary) 6%, transparent) 0%,
     transparent 70%
   );
-  pointer-events: none;
   opacity: 0.8;
+  transform: translateX(-50%);
+  pointer-events: none;
 
   .is-collapsed & {
     opacity: 0.4;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .collapse-btn,
-  .collapse-btn-inner,
-  .collapse-btn-bg,
-  .collapse-icon-wrapper,
-  .collapse-icon,
-  .sidebar-logo,
-  .sidebar-menu,
-  .sidebar-footer,
-  .sidebar-glow {
-    transition: none;
   }
 }
 </style>

@@ -26,6 +26,14 @@ export default {
   breadcrumb: {
     home: 'ホーム',
   },
+  tabs: {
+    label: '開いているページ',
+    close: '閉じる',
+    closeOther: '他を閉じる',
+    closeRight: '右側を閉じる',
+    closeAll: 'すべて閉じる',
+    closeTab: 'タブ「{title}」を閉じる',
+  },
   theme: {
     title: 'テーマ設定',
     pearl: 'パール',

@@ -26,6 +26,14 @@ export default {
   breadcrumb: {
     home: '首页',
   },
+  tabs: {
+    label: '已打开的页面',
+    close: '关闭',
+    closeOther: '关闭其他',
+    closeRight: '关闭右侧',
+    closeAll: '关闭所有',
+    closeTab: '关闭标签「{title}」',
+  },
   theme: {
     title: '主题设置',
     pearl: '珍珠白',

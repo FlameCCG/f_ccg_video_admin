@@ -26,6 +26,14 @@ export default {
   breadcrumb: {
     home: 'Home',
   },
+  tabs: {
+    label: 'Open pages',
+    close: 'Close',
+    closeOther: 'Close others',
+    closeRight: 'Close to the right',
+    closeAll: 'Close all',
+    closeTab: 'Close tab {title}',
+  },
   theme: {
     title: 'Theme Settings',
     pearl: 'Pearl',

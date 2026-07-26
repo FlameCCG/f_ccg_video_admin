@@ -5,7 +5,7 @@
  * 图标完全由后端返回的 SVG 字符串渲染，无兜底逻辑
  * Requirements: 6.1, 6.4
  */
-import { computed, h, type VNode } from 'vue'
+import { computed, h, ref, watch, type VNode } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NMenu, type MenuOption } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
@@ -17,6 +17,12 @@ import { SvgIcon } from '@/components/common'
 defineProps<{
   /** 是否折叠状态 */
   collapsed?: boolean
+  /**
+   * 折叠态宽度（px）
+   * 与侧边栏折叠宽度同源（--layout-sider-collapsed-width）：NMenu 折叠态是按
+   * collapsedWidth 反算 padding-left 把图标推到中线的，两个数字不一致就会错位。
+   */
+  collapsedWidth: number
 }>()
 
 const route = useRoute()
@@ -161,10 +167,34 @@ const activeKey = computed(() => {
   return findMenuIdByPath(permissionStore.menus, route.path)
 })
 
-/** 展开的菜单 keys */
-const expandedKeys = computed(() => {
-  return findExpandedKeys(permissionStore.menus, route.path)
-})
+/**
+ * 展开的菜单 keys（受控）
+ * 原来绑的是 :default-expanded-keys —— default 系列 prop 只在首次渲染生效，
+ * 之后从地址栏或标签栏跳进深层路由，父级菜单都不会跟着展开。
+ * 改成受控后：路由变化只「补齐」当前路由所需的父级，不去动其它节点，
+ * 用户手动展开/收起的结果因此得以保留。
+ */
+const expandedKeys = ref<string[]>([])
+
+watch(
+  [() => route.path, () => permissionStore.menus],
+  ([path, menus]) => {
+    const required = findExpandedKeys(menus, path)
+    if (required.length === 0) return
+
+    const merged = new Set([...expandedKeys.value, ...required])
+    // merged 一定是当前集合的超集，尺寸没变说明父级已经都是展开态
+    if (merged.size !== expandedKeys.value.length) {
+      expandedKeys.value = [...merged]
+    }
+  },
+  { immediate: true }
+)
+
+/** 用户手动展开/收起 */
+function handleExpandedKeysUpdate(keys: string[]): void {
+  expandedKeys.value = keys
+}
 
 /** 根据菜单 ID 查找菜单路径 */
 function findMenuPath(menus: Menu[], menuId: string, parentPath = ''): string | null {
@@ -206,53 +236,52 @@ function handleMenuSelect(key: string): void {
 <template>
   <NMenu
     :collapsed="collapsed"
-    :collapsed-width="64"
+    :collapsed-width="collapsedWidth"
     :collapsed-icon-size="20"
     :options="menuOptions"
     :value="activeKey"
-    :default-expanded-keys="expandedKeys"
+    :expanded-keys="expandedKeys"
     :indent="24"
     @update:value="handleMenuSelect"
+    @update:expanded-keys="handleExpandedKeysUpdate"
   />
 </template>
 
 <style scoped lang="scss">
-:deep(.n-menu) {
-  --n-item-height: 44px;
-  --n-item-text-color: var(--color-text-secondary);
-  --n-item-text-color-hover: var(--color-text);
-  --n-item-text-color-active: var(--color-primary);
-  --n-item-icon-color: var(--color-text-muted);
-  --n-item-icon-color-hover: var(--color-text-secondary);
-  --n-item-icon-color-active: var(--color-primary);
-  --n-arrow-color: var(--color-text-muted);
-  --n-arrow-color-hover: var(--color-text-secondary);
-  --n-arrow-color-active: var(--color-primary);
+@use '@/styles/transitions/interaction' as ix;
 
-  transition: padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
+// 这里原本还有一整块 `:deep(.n-menu) { --n-item-text-color / --n-item-height / ... }`。
+// 那块是死代码：NMenu 把主题算出的 --n-item-* / --n-arrow-* / --n-item-height 全部写在
+// `.n-menu` 的 inline style 上（Menu.mjs 的 cssVars，且本项目没开 inline-theme-disabled），
+// 样式表里的同名声明不加 !important 压不过 inline style。
+// 这些颜色的正确入口是 useNaiveTheme.ts 的 themeOverrides.Menu（已覆盖 item/icon 各态），
+// 所以这里不再重复一份，也不用 !important 去硬顶。
 :deep(.n-menu-item) {
-  margin: 2px 0;
+  margin: calc(var(--spacing-1) / 2) 0;
 }
 
 :deep(.n-menu-item-content) {
   position: relative;
-  border-radius: var(--radius-lg) !important;
-  margin: 0 8px;
-  padding: 0 12px !important;
-  transition:
-    background 200ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 200ms cubic-bezier(0.4, 0, 0.2, 1),
-    margin 280ms cubic-bezier(0.4, 0, 0.2, 1),
-    padding 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0 var(--spacing-2);
+  border-radius: var(--radius-lg);
 
-  // 折叠时调整边距
-  .n-menu--collapsed & {
-    margin: 0 4px;
-    padding: 0 !important;
-    justify-content: center;
-  }
+  // 同时接管 naive 自带的 background-color / padding-left / border-color 过渡：
+  // padding 的补间是按「每个菜单项」跑的，折叠一次要给二十多个元素各排一轮布局，
+  // 而宽度动画已经把状态变化说清楚了，看不出这一层补间。
+  @include ix.feedback-transition;
+  @include ix.pressable(0.98, 0);
+}
+
+// 展开态才接管横向内边距。必须 !important：naive 把 padding-left 写在 inline style 上，
+// 常规声明压不过它。折叠态刻意不覆盖 —— 那里要靠 naive 用 collapsedWidth 算出的
+// padding-left 把图标推到侧边栏中线（配合下面的 margin: 0 与 AppSidebar 折叠态去掉
+// 滚动容器横向内边距，菜单项宽度正好等于 collapsedWidth，公式才成立）。
+:deep(.n-menu:not(.n-menu--collapsed) .n-menu-item-content) {
+  padding: 0 var(--spacing-3) !important;
+}
+
+:deep(.n-menu--collapsed .n-menu-item-content) {
+  margin: 0;
 }
 
 :deep(.n-menu-item-content--selected) {
@@ -260,83 +289,84 @@ function handleMenuSelect(key: string): void {
     135deg,
     color-mix(in srgb, var(--color-primary) 12%, transparent) 0%,
     color-mix(in srgb, var(--color-primary) 8%, transparent) 100%
-  ) !important;
+  );
 
-  // 左侧指示条
+  // 左侧指示条。naive 用同一个 ::before 画它自己的选中底色，且有两处声明比这里更强
+  // （折叠选中态写了 !important，hover 选中态选择器更具体），
+  // 不加 !important 指示条会在折叠态和 hover 时被染成浅色 —— 这里没有别的办法。
   &::before {
-    content: '';
     position: absolute;
-    left: 0;
     top: 50%;
-    transform: translateY(-50%);
+    left: 0;
     width: 3px;
-    height: 20px;
-    background: var(--color-primary);
+    height: var(--spacing-5);
+    content: '';
+    background: var(--color-primary) !important;
     border-radius: 0 2px 2px 0;
-    box-shadow: 0 0 8px color-mix(in srgb, var(--color-primary) 50%, transparent);
+    box-shadow: 0 0 var(--spacing-2) color-mix(in srgb, var(--color-primary) 50%, transparent);
+    transform: translateY(-50%);
   }
 
+  // 折叠态改成底部指示条
   .n-menu--collapsed &::before {
-    left: 50%;
     top: auto;
-    bottom: 4px;
-    transform: translateX(-50%);
-    width: 20px;
+    bottom: var(--spacing-1);
+    left: 50%;
+    width: var(--spacing-5);
     height: 3px;
     border-radius: 2px 2px 0 0;
+    transform: translateX(-50%);
   }
 }
 
 :deep(.n-menu-item-content:not(.n-menu-item-content--selected):hover) {
-  background: color-mix(in srgb, var(--color-text) 5%, transparent) !important;
+  background: var(--color-surface-hover);
 }
 
 :deep(.n-menu-item-content:not(.n-menu-item-content--selected):active) {
-  background: color-mix(in srgb, var(--color-text) 8%, transparent) !important;
+  background: var(--color-surface-active);
 }
 
 // 图标样式
 :deep(.n-menu-item-content__icon) {
-  transition:
-    color 200ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  @include ix.feedback-transition;
+}
 
-  .n-menu-item-content:hover & {
-    transform: scale(1.08);
-  }
+// hover 放大。整条选择器必须写在同一个 :deep() 里：scoped 编译只给 :deep 之前的部分
+// 加 scopeId，而 .n-menu-item-content 不是任何组件的根元素、拿不到 scopeId ——
+// 原来 `.n-menu-item-content:hover &` 编译出的是 `.n-menu-item-content[data-v-x]:hover`，
+// 永远匹配不上，这个放大效果其实一直没生效。
+:deep(.n-menu-item-content:hover .n-menu-item-content__icon) {
+  transform: scale(1.08);
+}
 
-  .n-menu-item-content--selected & {
-    color: var(--color-primary) !important;
-  }
+// 选中态图标着色。多写一个 .n-menu 是为了提高特异性：naive 在折叠态会给所有图标统一
+// 上色（.n-menu--collapsed .n-menu-item-content .n-menu-item-content__icon），
+// 与不带 .n-menu 的写法特异性相同，谁生效取决于样式注入顺序。
+:deep(.n-menu .n-menu-item-content--selected .n-menu-item-content__icon) {
+  color: var(--color-primary);
 }
 
 // 子菜单样式
+// 这里的 --n-item-height 是有效的：它声明在 .n-submenu-children 上，
+// 不与 .n-menu 的 inline style 竞争，而是被子项继承。
 :deep(.n-submenu-children) {
-  --n-item-height: 40px;
+  --n-item-height: var(--spacing-10);
 
-  .n-menu-item-content {
-    padding-left: 20px !important;
-
-    &::before {
-      left: 8px;
-      width: 2px;
-      height: 16px;
-    }
+  .n-menu-item-content::before {
+    left: var(--spacing-2);
+    width: 2px;
+    height: var(--spacing-4);
   }
+}
+
+// 子菜单缩进。选择器必须比上面那条展开态 padding 规则更具体，否则会被它压掉。
+:deep(.n-menu:not(.n-menu--collapsed) .n-submenu-children .n-menu-item-content) {
+  padding-left: var(--spacing-5) !important;
 }
 
 // 展开箭头动画
 :deep(.n-base-icon) {
-  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-// Reduced motion
-@media (prefers-reduced-motion: reduce) {
-  :deep(.n-menu),
-  :deep(.n-menu-item-content),
-  :deep(.n-menu-item-content__icon),
-  :deep(.n-base-icon) {
-    transition: none !important;
-  }
+  transition: transform ix.$expand-motion;
 }
 </style>
