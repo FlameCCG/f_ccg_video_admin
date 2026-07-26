@@ -5,12 +5,11 @@ import { formatDateTime } from '@/utils'
  * Video List Page
  * Requirements: 9.1, 9.2, 9.5 - 视频列表、筛选、删除
  */
-import { ref, computed, h } from 'vue'
+import { ref, computed, provide, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
   NCard,
-  NSpace,
   NButton,
   NIcon,
   NGi,
@@ -24,11 +23,16 @@ import {
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 import { getVideoList, deleteVideo, getPartitions } from '@/api/video'
 import type { AdminVideoItem, VideoStatus, VideoSortType } from '@/api/types'
-import { DataTable, TableActions } from '@/components/table'
+import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar, AppStatusTag } from '@/components/common'
-import TranscodePipelineProgress from '@/components/video/TranscodePipelineProgress.vue'
-import { useTableSelectionAction, useTranscodeProgressSSE } from '@/composables'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
+import TranscodeProgressCell from '@/components/video/TranscodeProgressCell.vue'
+import {
+  useTableSelectionAction,
+  useTranscodeProgressSSE,
+  transcodeProgressKey,
+} from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
 
 const { t } = useI18n()
@@ -55,10 +59,18 @@ const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checke
 const detailDrawerVisible = ref(false)
 const selectedVideoId = ref<number | null>(null)
 
-/** 获取视频列表 */
+/**
+ * 获取视频列表
+ * searchParams 就在 queryKey 里，改动筛选/分页即触发请求；
+ * 因此各 handler 里不再额外调 refetch()（那会让同一次交互打两个请求，
+ * 并且 refetch 无条件绕过 staleTime，等于让上面的 staleTime 彻底失效）。
+ */
 const {
   data: videoData,
   isLoading,
+  isFetching,
+  isError,
+  error: listError,
   refetch,
 } = useQuery({
   queryKey: ['videoList', searchParams],
@@ -91,8 +103,8 @@ const deleteMutation = useMutation({
     void queryClient.invalidateQueries({ queryKey: ['videoList'] })
     void queryClient.invalidateQueries({ queryKey: ['recycleVideoList'] })
   },
-  onError: (error: Error) => {
-    message.error(error.message || t('common.tips.operationFailed'))
+  onError: (err: Error) => {
+    message.error(err.message || t('common.tips.operationFailed'))
   },
 })
 
@@ -103,13 +115,37 @@ const videoList = computed(() => {
 })
 const total = computed(() => videoData.value?.total ?? 0)
 
+/**
+ * 失败详情：优先服务端 msg，没有再兜一句通用说明。
+ * 「只在没有任何可展示数据时才用失败态替换表格」的判断已由 DataTable 内部完成
+ * （error && !loading && data.length === 0），这里不再重复一份。
+ */
+const loadErrorDetail = computed(() => {
+  const msg = listError.value?.message?.trim()
+  return msg ? msg : t('video.list.loadFailedHint')
+})
+
 /** 当前页视频 ID → 转码进度 SSE */
 const pageVideoIds = computed(() =>
   (videoData.value?.list ?? [])
     .map((v) => v.id)
     .filter((id): id is number => typeof id === 'number' && id > 0)
 )
-const { progressMap } = useTranscodeProgressSSE(pageVideoIds)
+const {
+  progressMap,
+  error: transcodeStreamError,
+  reconnect: reconnectTranscodeStream,
+} = useTranscodeProgressSSE(pageVideoIds)
+
+/**
+ * 进度表向下 provide，由每行的 TranscodeProgressCell 自行订阅。
+ * 列的 render 函数一旦读了 progressMap，整个 tbody（Naive 用同一个渲染
+ * effect 产出）就会跟着每秒数次的 SSE 推送一起重渲染。
+ */
+provide(transcodeProgressKey, progressMap)
+
+/** 只有「已放弃重连」才提示用户：disconnected 期间 EventSource 仍在自动重试 */
+const transcodeStreamAborted = computed(() => transcodeStreamError.value === 'aborted')
 
 /** 分区选项 */
 const partitionOptions = computed(() => {
@@ -173,8 +209,10 @@ function formatNumber(num: number): string {
 
 /**
  * 表格列配置
- * - 不用 fixed / scroll-x：整表随容器自适应，无横向滚动条、无固定列阴影/叠字
- * - 头像并入作者列，转码列可收缩，保证所有字段同一屏可见
+ * - 列宽合计约 1.4k：窄屏由 DataTable 的横向滚动承接，不再靠压缩列宽硬塞一屏
+ * - 头像并入作者列
+ * - 转码列只渲染 TranscodeProgressCell 并把 row.id 交给它：render 函数不碰
+ *   progressMap，SSE 推送才不会把整个 tbody 拖着重渲染
  */
 const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
@@ -193,7 +231,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
         objectFit: 'cover',
         lazy: true,
         previewDisabled: false,
-        style: { borderRadius: '4px' },
+        style: { borderRadius: 'var(--radius-sm)' },
       }),
   },
   {
@@ -215,7 +253,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
           style: {
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: 'var(--spacing-2)',
             maxWidth: '100%',
             minWidth: 0,
           },
@@ -254,18 +292,12 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     key: 'transcode',
     minWidth: 200,
     width: 260,
-    render: (row) => {
-      const id = row.id as number
-      return h(TranscodePipelineProgress, {
-        items: progressMap.value[id] ?? [],
-        density: 'compact',
-      })
-    },
+    render: (row) => h(TranscodeProgressCell, { videoId: row.id as number }),
   },
   {
     title: t('video.list.partition'),
     key: 'partitionName',
-    width: 80,
+    width: 96,
     ellipsis: { tooltip: true },
   },
   {
@@ -324,8 +356,12 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   },
 ])
 
-/** 批量操作配置 */
-const batchActions = computed(() => [
+/**
+ * 批量操作配置。
+ * 刻意不叫 batchActions：模板里的 <batch-actions> 会被按 camelize / PascalCase
+ * 两种写法去 setup 绑定里找组件，同名变量会让人（和 lint）分不清指的是哪一个。
+ */
+const batchActionOptions = computed(() => [
   { key: 'softDelete', label: t('video.delete.softDelete'), type: 'warning' as const },
   { key: 'hardDelete', label: t('video.delete.hardDelete'), type: 'error' as const },
 ])
@@ -333,7 +369,6 @@ const batchActions = computed(() => [
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
-  void refetch()
 }
 
 /** 处理重置 */
@@ -347,20 +382,42 @@ function handleReset(): void {
     page: 1,
     pageSize: 10,
   }
-  void refetch()
 }
 
 /** 处理页码变化 */
 function handlePageChange(page: number): void {
   searchParams.value.page = page
-  void refetch()
 }
 
 /** 处理每页数量变化 */
 function handlePageSizeChange(pageSize: number): void {
   searchParams.value.pageSize = pageSize
   searchParams.value.page = 1
-  void refetch()
+}
+
+/** 状态筛选变化 */
+function handleStatusChange(value: string | number | null): void {
+  searchParams.value.status = typeof value === 'number' ? (value as VideoStatus) : null
+}
+
+/** 分区筛选变化 */
+function handlePartitionChange(value: string | number | null): void {
+  searchParams.value.partitionId = typeof value === 'number' ? value : null
+}
+
+/** 排序变化 */
+function handleSortChange(value: string | number | null): void {
+  searchParams.value.sort = typeof value === 'string' ? (value as VideoSortType) : 'latest'
+}
+
+/** 选中行变化 */
+function handleCheckedRowKeysChange(keys: DataTableRowKey[]): void {
+  checkedRowKeys.value = keys
+}
+
+/** 清空选中 */
+function handleClearSelection(): void {
+  checkedRowKeys.value = []
 }
 
 /** 处理操作 */
@@ -406,14 +463,55 @@ function confirmDelete(videoIds: number[], hardDelete: boolean): void {
   })
 }
 
-/** 处理刷新 */
+/** 处理刷新：用户主动发起，是 refetch 的正当用法（同时用作失败重试） */
 function handleRefresh(): void {
   void refetch()
+}
+
+/** 转码进度流已放弃重连时的手动重连 */
+function handleReconnectStream(): void {
+  reconnectTranscodeStream()
 }
 </script>
 
 <template>
   <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('video.list.title')">
+      <template #actions>
+        <n-button
+          v-if="transcodeStreamAborted"
+          size="small"
+          quaternary
+          type="warning"
+          @click="handleReconnectStream"
+        >
+          {{ t('video.transcode.streamOffline') }}
+        </n-button>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 搜索表单 -->
     <n-card :bordered="false" class="page-list__search">
       <search-form :loading="isLoading" @search="handleSearch" @reset="handleReset">
@@ -434,7 +532,7 @@ function handleRefresh(): void {
               :options="statusOptions"
               :placeholder="t('video.filter.statusPlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.status = val as VideoStatus | null)"
+              @change="handleStatusChange"
             />
           </n-form-item>
         </n-gi>
@@ -445,7 +543,7 @@ function handleRefresh(): void {
               :options="partitionOptions"
               :placeholder="t('video.filter.partitionPlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.partitionId = val as number | null)"
+              @change="handlePartitionChange"
             />
           </n-form-item>
         </n-gi>
@@ -457,7 +555,7 @@ function handleRefresh(): void {
               :placeholder="t('video.filter.sortBy')"
               :width="'100%'"
               :clearable="false"
-              @change="(val) => (searchParams.sort = (val as VideoSortType) || 'latest')"
+              @change="handleSortChange"
             />
           </n-form-item>
         </n-gi>
@@ -466,47 +564,24 @@ function handleRefresh(): void {
 
     <!-- 数据表格 -->
     <n-card :bordered="false" class="page-list__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="page-list__title">{{ t('video.list.title') }}</span>
-          <n-button size="small" secondary @click="handleRefresh">
-            <template #icon>
-              <n-icon>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-              </n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </n-space>
-      </template>
-
       <!-- 批量操作栏 -->
       <batch-actions
         v-if="checkedRowKeys.length > 0"
         :selected-count="checkedRowKeys.length"
-        :actions="batchActions"
+        :actions="batchActionOptions"
         @action="handleBatchAction"
-        @clear="checkedRowKeys = []"
+        @clear="handleClearSelection"
       />
 
+      <!-- 加载失败：500 与「无数据」必须长得不一样，且要给出重试出口。
+           交给 DataTable 统一渲染（与其余 15 个列表页同一套契约），
+           这样失败态出现在表格框架内部，表头与分页栏不会整块塌陷。 -->
       <data-table
         :columns="columns"
         :data="videoList"
         :loading="isLoading || deleteMutation.isPending.value"
+        :error="isError"
+        :error-description="loadErrorDetail"
         :selectable="true"
         :checked-row-keys="checkedRowKeys"
         :page="searchParams.page"
@@ -515,7 +590,8 @@ function handleRefresh(): void {
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
-        @update:checked-row-keys="(keys) => (checkedRowKeys = keys)"
+        @update:checked-row-keys="handleCheckedRowKeysChange"
+        @retry="handleRefresh"
       />
     </n-card>
 
@@ -525,5 +601,5 @@ function handleRefresh(): void {
 </template>
 
 <style scoped lang="scss">
-// 使用全局 page-list 样式
+// 失败态已由 DataTable 在表格框架内渲染，此处无需额外布局
 </style>

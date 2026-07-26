@@ -7,7 +7,7 @@
 import { ref, computed, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import { NCard, NSpace, NButton, NIcon, NTag, NEllipsis, useMessage, useDialog } from 'naive-ui'
+import { NCard, NButton, NIcon, NTag, NEllipsis, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 import {
   getNotificationList,
@@ -18,6 +18,7 @@ import {
 import type { NotificationItem } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { AppAvatar } from '@/components/common'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { useTableSelectionAction } from '@/composables'
 import { normalizeExternalHref } from '@/utils'
 import NotificationFormModal from './components/NotificationFormModal.vue'
@@ -41,10 +42,17 @@ const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checke
 const formModalVisible = ref(false)
 const editingNotification = ref<NotificationItem | null>(null)
 
-/** 获取通知列表 */
+/**
+ * 获取通知列表
+ * searchParams（分页）就在 queryKey 里，翻页即触发请求；
+ * 因此各 handler 里不再额外调 refetch()（那会让同一次交互打两个请求，
+ * 并且 refetch 无条件绕过 staleTime，等于让上面的 staleTime 彻底失效）。
+ */
 const {
   data: notificationData,
-  isLoading,
+  isFetching,
+  isError,
+  error: listError,
   refetch,
 } = useQuery({
   queryKey: ['notificationList', searchParams],
@@ -103,6 +111,9 @@ const notificationList = computed(() => {
   return list as unknown as Record<string, unknown>[]
 })
 const total = computed(() => notificationData.value?.total ?? 0)
+
+/** 加载失败描述：优先服务端 msg，缺失时由 DataTable 兜底通用文案 */
+const loadErrorDescription = computed(() => listError.value?.message?.trim() || undefined)
 
 /** 格式化接收者 */
 function formatReceiver(receiverId: number): string {
@@ -206,14 +217,22 @@ const batchActions = computed(() => [
 /** 处理页码变化 */
 function handlePageChange(page: number): void {
   searchParams.value.page = page
-  void refetch()
 }
 
 /** 处理每页数量变化 */
 function handlePageSizeChange(pageSize: number): void {
   searchParams.value.pageSize = pageSize
   searchParams.value.page = 1
-  void refetch()
+}
+
+/** 处理选中行变化 */
+function handleCheckedRowKeysChange(keys: DataTableRowKey[]): void {
+  checkedRowKeys.value = keys
+}
+
+/** 清空选中 */
+function handleClearSelection(): void {
+  checkedRowKeys.value = []
 }
 
 /** 处理创建 */
@@ -296,74 +315,71 @@ function handleRefresh(): void {
 
 <template>
   <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('notification.list.pageTitle')">
+      <template #actions>
+        <n-button type="primary" size="small" @click="handleCreate">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('notification.actions.create') }}
+        </n-button>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 数据表格 -->
     <n-card :bordered="false" class="page-list__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="page-list__title">{{ t('notification.list.pageTitle') }}</span>
-          <n-space :size="8">
-            <n-button type="primary" size="small" @click="handleCreate">
-              <template #icon>
-                <n-icon>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </n-icon>
-              </template>
-              {{ t('notification.actions.create') }}
-            </n-button>
-            <n-button size="small" secondary @click="handleRefresh">
-              <template #icon>
-                <n-icon>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <polyline points="23 4 23 10 17 10" />
-                    <polyline points="1 20 1 14 7 14" />
-                    <path
-                      d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                    />
-                  </svg>
-                </n-icon>
-              </template>
-              {{ t('common.refresh') }}
-            </n-button>
-          </n-space>
-        </n-space>
-      </template>
-
       <!-- 批量操作栏 -->
       <BatchActions
         v-if="checkedRowKeys.length > 0"
         :selected-count="checkedRowKeys.length"
         :actions="batchActions"
         @action="handleBatchAction"
-        @clear="checkedRowKeys = []"
+        @clear="handleClearSelection"
       />
 
       <data-table
         :columns="columns"
         :data="notificationList"
-        :loading="isLoading || deleteMutation.isPending.value"
+        :loading="isFetching || deleteMutation.isPending.value"
+        :error="isError"
+        :error-description="loadErrorDescription"
         :selectable="true"
         :checked-row-keys="checkedRowKeys"
         :page="searchParams.page"
@@ -372,7 +388,8 @@ function handleRefresh(): void {
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
-        @update:checked-row-keys="(keys) => (checkedRowKeys = keys)"
+        @update:checked-row-keys="handleCheckedRowKeysChange"
+        @retry="handleRefresh"
       />
     </n-card>
 

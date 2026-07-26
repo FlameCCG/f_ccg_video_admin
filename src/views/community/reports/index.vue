@@ -30,6 +30,7 @@ import type { ReportType, ReportStatus } from '@/api/types'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppStatusTag } from '@/components/common'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { useTableSelectionAction } from '@/composables'
 
 const { t } = useI18n()
@@ -56,10 +57,18 @@ const handleForm = ref({
 })
 const handleReportIds = ref<number[]>([])
 
-/** 获取举报列表 */
+/**
+ * 获取举报列表
+ * searchParams（含 type / status / 分页）就在 queryKey 里，改动即触发请求；
+ * 因此各 handler 里不再额外调 refetch()（那会让同一次交互打两个请求，
+ * 并且 refetch 无条件绕过 staleTime，等于让上面的 staleTime 彻底失效）。
+ */
 const {
   data: reportData,
   isLoading,
+  isFetching,
+  isError,
+  error: listError,
   refetch,
 } = useQuery({
   queryKey: ['reportList', searchParams],
@@ -95,6 +104,9 @@ const reportList = computed(() => {
   return list as unknown as Record<string, unknown>[]
 })
 const total = computed(() => reportData.value?.total ?? 0)
+
+/** 加载失败描述：优先服务端 msg，缺失时由 DataTable 兜底通用文案 */
+const loadErrorDescription = computed(() => listError.value?.message?.trim() || undefined)
 
 /** 举报类型选项 */
 const typeOptions = computed(() => [
@@ -300,7 +312,6 @@ const handleActionSummary = computed(() => {
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
-  void refetch()
 }
 
 /** 处理重置 */
@@ -311,28 +322,39 @@ function handleReset(): void {
     page: 1,
     pageSize: 10,
   }
-  void refetch()
 }
 
 /** 处理类型切换 */
-function handleTypeChange(type: ReportType): void {
-  searchParams.value.type = type
+function handleTypeChange(value: string | number | null): void {
+  searchParams.value.type = value as ReportType
   searchParams.value.page = 1
   checkedRowKeys.value = []
-  void refetch()
+}
+
+/** 处理状态筛选变化 */
+function handleStatusChange(value: string | number | null): void {
+  searchParams.value.status = value as ReportStatus | null
 }
 
 /** 处理页码变化 */
 function handlePageChange(page: number): void {
   searchParams.value.page = page
-  void refetch()
 }
 
 /** 处理每页数量变化 */
 function handlePageSizeChange(pageSize: number): void {
   searchParams.value.pageSize = pageSize
   searchParams.value.page = 1
-  void refetch()
+}
+
+/** 处理选中行变化 */
+function handleCheckedRowKeysChange(keys: DataTableRowKey[]): void {
+  checkedRowKeys.value = keys
+}
+
+/** 清空选中 */
+function handleClearSelection(): void {
+  checkedRowKeys.value = []
 }
 
 /** 处理操作 */
@@ -384,9 +406,36 @@ function handleRefresh(): void {
 </script>
 
 <template>
-  <div class="report-page">
+  <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('community.report.title')">
+      <template #actions>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 搜索表单 -->
-    <n-card :bordered="false" class="report-page__search">
+    <n-card :bordered="false" class="page-list__search">
       <search-form :loading="isLoading" @search="handleSearch" @reset="handleReset">
         <n-gi span="6 m:3 l:2">
           <n-form-item :label="t('community.report.type')" path="type">
@@ -396,7 +445,7 @@ function handleRefresh(): void {
               :placeholder="t('community.report.typePlaceholder')"
               :width="'100%'"
               :clearable="false"
-              @change="(val) => handleTypeChange(val as ReportType)"
+              @change="handleTypeChange"
             />
           </n-form-item>
         </n-gi>
@@ -407,7 +456,7 @@ function handleRefresh(): void {
               :options="statusOptions"
               :placeholder="t('community.report.statusPlaceholder')"
               :width="'100%'"
-              @change="(val) => (searchParams.status = val as ReportStatus | null)"
+              @change="handleStatusChange"
             />
           </n-form-item>
         </n-gi>
@@ -415,48 +464,22 @@ function handleRefresh(): void {
     </n-card>
 
     <!-- 数据表格 -->
-    <n-card :bordered="false" class="report-page__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="report-page__title">{{ t('community.report.title') }}</span>
-          <n-button size="small" secondary @click="handleRefresh">
-            <template #icon>
-              <n-icon>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-              </n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </n-space>
-      </template>
-
+    <n-card :bordered="false" class="page-list__table">
       <!-- 批量操作栏 -->
       <BatchActions
         v-if="checkedRowKeys.length > 0"
         :selected-count="checkedRowKeys.length"
         :actions="batchActions"
         @action="handleBatchAction"
-        @clear="checkedRowKeys = []"
+        @clear="handleClearSelection"
       />
 
       <data-table
         :columns="columns"
         :data="reportList"
-        :loading="isLoading || handleMutation.isPending.value"
+        :loading="isFetching || handleMutation.isPending.value"
+        :error="isError"
+        :error-description="loadErrorDescription"
         :selectable="true"
         :checked-row-keys="checkedRowKeys"
         :page="searchParams.page"
@@ -465,7 +488,8 @@ function handleRefresh(): void {
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
-        @update:checked-row-keys="(keys) => (checkedRowKeys = keys)"
+        @update:checked-row-keys="handleCheckedRowKeysChange"
+        @retry="handleRefresh"
       />
     </n-card>
 
@@ -506,25 +530,7 @@ function handleRefresh(): void {
 </template>
 
 <style scoped lang="scss">
-.report-page {
-  padding: var(--spacing-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-
-  &__search {
-    flex-shrink: 0;
-  }
-
-  &__table {
-    flex: 1;
-    min-height: 0;
-  }
-
-  &__title {
-    font-size: var(--text-lg);
-    font-weight: 500;
-    color: var(--color-text);
-  }
-}
+// 使用全局 page-list 样式：原来这里克隆了一份带 padding 的 .report-page，
+// 叠在 .content-wrapper 的页面内缩上会把内缩翻倍，且缺少 height/min-height，
+// 表格撑不满剩余高度。
 </style>

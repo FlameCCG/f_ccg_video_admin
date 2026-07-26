@@ -23,9 +23,10 @@ import {
 import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
 import { getVideoList, deleteVideo, restoreVideo, getPartitions } from '@/api/video'
 import type { AdminVideoItem } from '@/api/types'
-import { DataTable, TableActions } from '@/components/table'
+import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar } from '@/components/common'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { useTableSelectionAction } from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
 
@@ -50,10 +51,17 @@ const { resolveTargetIds, createDialogContent } = useTableSelectionAction(checke
 const detailDrawerVisible = ref(false)
 const selectedVideoId = ref<number | null>(null)
 
-/** 获取已删除的视频列表 (status=3) */
+/**
+ * 获取已删除的视频列表 (status=3)
+ * searchParams 就在 queryKey 里，改动筛选/分页即触发请求；
+ * 因此各 handler 里不再额外调 refetch()（那会让同一次交互打两个请求，
+ * 并且 refetch 无条件绕过 staleTime，等于让上面的 staleTime 彻底失效）。
+ */
 const {
   data: videoData,
   isLoading,
+  isFetching,
+  isError,
   refetch,
 } = useQuery({
   queryKey: ['recycleVideoList', searchParams],
@@ -70,7 +78,11 @@ const {
 })
 
 /** 获取分区列表（用于筛选） */
-const { data: partitionsData } = useQuery({
+const {
+  data: partitionsData,
+  isFetching: isPartitionsFetching,
+  isError: isPartitionsError,
+} = useQuery({
   queryKey: ['partitions'],
   queryFn: () => getPartitions({ page: 1, pageSize: 100 }),
   staleTime: 5 * 60 * 1000,
@@ -117,6 +129,15 @@ const partitionOptions = computed(() => {
     label: p.name,
   }))
 })
+
+/**
+ * 分区筛选的占位文案。
+ * 分区列表是二级查询，失败时下拉框会变成一个「空得毫无理由」的筛选项；
+ * 占位文案切成「加载失败」才能让用户知道不是没有分区，而是没取到。
+ */
+const partitionPlaceholder = computed(() =>
+  isPartitionsError.value ? t('common.tips.loadFailed') : t('video.filter.partitionPlaceholder')
+)
 
 /** 格式化时长 */
 function formatDuration(seconds: number): string {
@@ -230,7 +251,6 @@ const batchActions = computed(() => [
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
-  void refetch()
 }
 
 /** 处理重置 */
@@ -241,20 +261,32 @@ function handleReset(): void {
     page: 1,
     pageSize: 10,
   }
-  void refetch()
 }
 
 /** 处理页码变化 */
 function handlePageChange(page: number): void {
   searchParams.value.page = page
-  void refetch()
 }
 
 /** 处理每页数量变化 */
 function handlePageSizeChange(pageSize: number): void {
   searchParams.value.pageSize = pageSize
   searchParams.value.page = 1
-  void refetch()
+}
+
+/** 分区筛选变化 */
+function handlePartitionChange(value: string | number | null): void {
+  searchParams.value.partitionId = typeof value === 'number' ? value : null
+}
+
+/** 选中行变化 */
+function handleCheckedRowKeysChange(keys: DataTableRowKey[]): void {
+  checkedRowKeys.value = keys
+}
+
+/** 清空选中 */
+function handleClearSelection(): void {
+  checkedRowKeys.value = []
 }
 
 /** 处理操作 */
@@ -318,16 +350,43 @@ function confirmHardDelete(videoIds: number[]): void {
   })
 }
 
-/** 处理刷新 */
+/** 处理刷新：用户主动发起，是 refetch 的正当用法（同时用作失败重试） */
 function handleRefresh(): void {
   void refetch()
 }
 </script>
 
 <template>
-  <div class="recycle-page">
+  <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('video.recycle.title')">
+      <template #actions>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 搜索表单 -->
-    <n-card :bordered="false" class="recycle-page__search">
+    <n-card :bordered="false" class="page-list__search">
       <search-form :loading="isLoading" @search="handleSearch" @reset="handleReset">
         <n-gi span="6 m:3 l:2">
           <n-form-item :label="t('video.filter.keyword')" path="keyword">
@@ -344,9 +403,10 @@ function handleRefresh(): void {
             <filter-select
               :value="searchParams.partitionId"
               :options="partitionOptions"
-              :placeholder="t('video.filter.partitionPlaceholder')"
+              :placeholder="partitionPlaceholder"
+              :loading="isPartitionsFetching"
               :width="'100%'"
-              @change="(val) => (searchParams.partitionId = val as number | null)"
+              @change="handlePartitionChange"
             />
           </n-form-item>
         </n-gi>
@@ -354,48 +414,21 @@ function handleRefresh(): void {
     </n-card>
 
     <!-- 数据表格 -->
-    <n-card :bordered="false" class="recycle-page__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="recycle-page__title">{{ t('video.recycle.title') }}</span>
-          <n-button size="small" secondary @click="handleRefresh">
-            <template #icon>
-              <n-icon>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-              </n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </n-space>
-      </template>
-
+    <n-card :bordered="false" class="page-list__table">
       <!-- 批量操作栏 -->
-      <batch-actions
+      <BatchActions
         v-if="checkedRowKeys.length > 0"
         :selected-count="checkedRowKeys.length"
         :actions="batchActions"
         @action="handleBatchAction"
-        @clear="checkedRowKeys = []"
+        @clear="handleClearSelection"
       />
 
       <data-table
         :columns="columns"
         :data="videoList"
-        :loading="isLoading || restoreMutation.isPending.value || deleteMutation.isPending.value"
+        :loading="isFetching || restoreMutation.isPending.value || deleteMutation.isPending.value"
+        :error="isError"
         :selectable="true"
         :checked-row-keys="checkedRowKeys"
         :page="searchParams.page"
@@ -404,7 +437,8 @@ function handleRefresh(): void {
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
-        @update:checked-row-keys="(keys) => (checkedRowKeys = keys)"
+        @update:checked-row-keys="handleCheckedRowKeysChange"
+        @retry="handleRefresh"
       />
     </n-card>
 
@@ -414,25 +448,7 @@ function handleRefresh(): void {
 </template>
 
 <style scoped lang="scss">
-.recycle-page {
-  padding: var(--spacing-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-
-  &__search {
-    flex-shrink: 0;
-  }
-
-  &__table {
-    flex: 1;
-    min-height: 0;
-  }
-
-  &__title {
-    font-size: var(--text-lg);
-    font-weight: 500;
-    color: var(--color-text);
-  }
-}
+// 使用全局 page-list 样式：原来这里是一份 .recycle-page 克隆块，
+// 它自带 padding 会与 .content-wrapper 的页面内缩叠成两倍内缩，
+// 且缺 height: 100% / min-height: 0，表格区撑不满剩余高度。
 </style>

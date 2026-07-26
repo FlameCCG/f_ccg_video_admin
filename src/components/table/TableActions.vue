@@ -4,9 +4,9 @@
  * 用于表格行的操作按钮
  * Requirements: 8.1, 9.1
  */
-import { computed } from 'vue'
+import { computed, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NSpace, NButton, NDropdown, NIcon, NTooltip } from 'naive-ui'
+import { NButton, NDropdown, NIcon, NTooltip } from 'naive-ui'
 import type { DropdownOption } from 'naive-ui'
 
 interface ActionItem {
@@ -54,6 +54,16 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+/**
+ * 溢出菜单里破坏性操作的文字色。
+ *
+ * 下拉层被 teleport 到 body，scoped 样式够不到；而 Naive 把选项文字色写在
+ * .n-dropdown-option-body__label 上，给选项根节点加行内色也覆盖不到。
+ * 所以用 render 函数把 danger 语义色写进 label 自身 —— 值仍是 token，
+ * 不是硬编码颜色。
+ */
+const DANGER_LABEL_STYLE = { color: 'var(--color-danger-text)' } as const
+
 /** 可见的操作项 */
 const visibleActions = computed(() => {
   return props.actions.filter((action) => action.show !== false)
@@ -71,11 +81,16 @@ const moreActions = computed(() => {
 
 /** 更多操作下拉选项 */
 const moreOptions = computed<DropdownOption[]>(() => {
-  return moreActions.value.map((action) => ({
-    key: action.key,
-    label: action.label || t(`common.${action.key}`),
-    disabled: action.disabled,
-  }))
+  return moreActions.value.map((action) => {
+    const label = getActionLabel(action)
+    return {
+      key: action.key,
+      // 破坏性操作在溢出菜单里也必须读作破坏性，不能因为收进「更多」就退化成普通项
+      label:
+        action.type === 'error' ? () => h('span', { style: DANGER_LABEL_STYLE }, label) : label,
+      disabled: action.disabled,
+    }
+  })
 })
 
 /** 处理操作点击 */
@@ -95,102 +110,132 @@ function getActionLabel(action: ActionItem): string {
 </script>
 
 <template>
-  <div class="table-actions">
-    <n-space :size="divider ? 0 : 8" align="center">
-      <!-- 主要操作按钮 -->
-      <template v-for="(action, index) in mainActions" :key="action.key">
-        <n-tooltip v-if="action.icon" trigger="hover">
-          <template #trigger>
-            <n-button
-              class="table-actions__button"
-              text
-              :type="action.type || 'primary'"
-              :size="size"
-              :disabled="action.disabled"
-              @click="handleAction(action.key)"
-            >
-              {{ getActionLabel(action) }}
-            </n-button>
-          </template>
-          {{ getActionLabel(action) }}
-        </n-tooltip>
+  <div class="table-actions" :class="{ 'table-actions--divided': divider }">
+    <!-- 主要操作按钮 -->
+    <template v-for="(action, index) in mainActions" :key="action.key">
+      <n-tooltip v-if="action.icon" trigger="hover">
+        <template #trigger>
+          <n-button
+            class="table-actions__button"
+            text
+            :type="action.type || 'primary'"
+            :size="size"
+            :disabled="action.disabled"
+            :aria-label="getActionLabel(action)"
+            @click="handleAction(action.key)"
+          >
+            {{ getActionLabel(action) }}
+          </n-button>
+        </template>
+        {{ getActionLabel(action) }}
+      </n-tooltip>
+      <n-button
+        v-else
+        class="table-actions__button"
+        text
+        :type="action.type || 'primary'"
+        :size="size"
+        :disabled="action.disabled"
+        :aria-label="getActionLabel(action)"
+        @click="handleAction(action.key)"
+      >
+        {{ getActionLabel(action) }}
+      </n-button>
+
+      <!-- 分隔符（纯装饰，对读屏隐藏） -->
+      <span
+        v-if="divider && index < mainActions.length - 1"
+        class="table-actions__divider"
+        aria-hidden="true"
+      />
+    </template>
+
+    <!-- 更多操作 -->
+    <template v-if="moreActions.length > 0">
+      <span
+        v-if="divider && mainActions.length > 0"
+        class="table-actions__divider"
+        aria-hidden="true"
+      />
+      <!--
+        trigger 必须是 click 而不是 hover：hover 触发的下拉键盘完全打不开，
+        对只用键盘的用户等于「更多操作不存在」。
+      -->
+      <n-dropdown :options="moreOptions" trigger="click" @select="handleMoreSelect">
         <n-button
-          v-else
           class="table-actions__button"
           text
-          :type="action.type || 'primary'"
           :size="size"
-          :disabled="action.disabled"
-          @click="handleAction(action.key)"
+          type="primary"
+          aria-haspopup="menu"
+          :aria-label="t('common.more')"
         >
-          {{ getActionLabel(action) }}
+          {{ t('common.more') }}
+          <template #icon>
+            <n-icon aria-hidden="true">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </n-icon>
+          </template>
         </n-button>
-
-        <!-- 分隔符 -->
-        <span v-if="divider && index < mainActions.length - 1" class="table-actions__divider" />
-      </template>
-
-      <!-- 更多操作 -->
-      <template v-if="moreActions.length > 0">
-        <span v-if="divider && mainActions.length > 0" class="table-actions__divider" />
-        <n-dropdown :options="moreOptions" trigger="hover" @select="handleMoreSelect">
-          <n-button class="table-actions__button" text :size="size" type="primary">
-            {{ t('common.more') }}
-            <template #icon>
-              <n-icon>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </n-icon>
-            </template>
-          </n-button>
-        </n-dropdown>
-      </template>
-    </n-space>
+      </n-dropdown>
+    </template>
   </div>
 </template>
 
 <style scoped lang="scss">
+@use '@/styles/transitions/interaction' as ix;
+
+// 原来靠 n-space + :size="divider ? 0 : 8" 排版，8 是魔法数，
+// 还要用 :deep(.n-space) 反过来改它的 justify/wrap。直接 flex + gap token 更短。
 .table-actions {
   display: inline-flex;
+  flex-wrap: nowrap;
+  gap: var(--spacing-2);
   align-items: center;
   justify-content: center;
   width: 100%;
 
-  :deep(.n-space) {
-    justify-content: center;
-    flex-wrap: nowrap;
-  }
-
-  :deep(.table-actions__button) {
-    padding: 0 4px;
-    white-space: nowrap;
-  }
-
-  :deep(.table-actions__button:not(.n-button--disabled)) {
-    cursor: pointer;
-  }
-
-  :deep(.table-actions__button.n-button--disabled) {
-    cursor: not-allowed;
+  // 有分隔符时不再需要额外间距，分隔符自带左右外边距
+  &--divided {
+    gap: 0;
   }
 
   &__divider {
     display: inline-block;
     width: 1px;
-    height: 14px;
+    height: var(--text-base);
     margin: 0 var(--spacing-2);
     background-color: var(--color-border);
+  }
+
+  // 行内文字按钮：焦点环 + 按压反馈。
+  // $lift 传 0：表格行高很紧，1px 上抬会让整行看起来在抖。
+  // 按钮类型（primary / warning / error…）的文字色由 themeOverrides.Button 的
+  // textColorText* 提供，已经是 --color-<sem>-text 角色，破坏性操作天然读作破坏性。
+  :deep(.table-actions__button) {
+    padding: 0 var(--spacing-1);
+    white-space: nowrap;
+
+    @include ix.feedback-transition;
+    @include ix.focus-ring;
+    @include ix.pressable(0.94, 0);
+  }
+
+  // 禁用态必须「看起来就按不动」：Naive 已给透明度，这里补光标与去掉悬浮反馈
+  :deep(.table-actions__button.n-button--disabled) {
+    cursor: not-allowed;
   }
 }
 </style>

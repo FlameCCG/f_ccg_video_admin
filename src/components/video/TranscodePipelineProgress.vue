@@ -88,21 +88,63 @@ function resChips(resolutions?: number[]): string {
   if (!resolutions?.length) return ''
   return resolutions.map((r) => `${r}p`).join(' · ')
 }
+
+/** 提示行：label + text 两段式，避免把冒号一类的连接符写死在模板里 */
+interface HintLine {
+  label: string
+  text: string
+}
+
+/**
+ * 整个单元格只用一个 tooltip。
+ * 此前是「总进度一个 + 每条 pipeline 各一个」，一行就要挂 3 个 NTooltip
+ * （每个都是完整的 Popover + Binder/Follower），十行即 30 个弹层实例。
+ * 这里把所有需要解释的信息汇总成若干行，由外层单个 tooltip 承载。
+ * 只在真的有额外信息（error / message / stage）时才生成行，
+ * 没有行就整体禁用 tooltip —— 与旧的逐个 `:disabled` 判断等价。
+ */
+const hintLines = computed<HintLine[]>(() => {
+  const lines: HintLine[] = []
+  const multiPart = entries.value.length > 1
+
+  for (const entry of entries.value) {
+    const partPrefix = multiPart ? t('video.transcode.part', { id: entry.partId ?? 0 }) : ''
+
+    if (entry.error || entry.message || entry.stage) {
+      const overall = t('video.transcode.overall')
+      lines.push({
+        label: partPrefix ? `${partPrefix} / ${overall}` : overall,
+        text: overallHint(entry),
+      })
+    }
+
+    for (const pipeline of entry.pipelines ?? []) {
+      if (!pipeline.error && !pipeline.message) continue
+      const name = pipelineLabel(pipeline.name)
+      lines.push({
+        label: partPrefix ? `${partPrefix} / ${name}` : name,
+        text: pipelineHint(pipeline),
+      })
+    }
+  }
+
+  return lines
+})
 </script>
 
 <template>
-  <div v-if="entries.length" class="tc" :class="isDetail ? 'tc--detail' : 'tc--compact'">
-    <section v-for="entry in entries" :key="entry.partId ?? 0" class="tc-entry">
-      <div v-if="entries.length > 1" class="tc-part">
-        {{ t('video.transcode.part', { id: entry.partId ?? 0 }) }}
-      </div>
+  <n-tooltip v-if="entries.length" :disabled="hintLines.length === 0" placement="top-start">
+    <template #trigger>
+      <div class="tc" :class="isDetail ? 'tc--detail' : 'tc--compact'">
+        <section v-for="entry in entries" :key="entry.partId ?? 0" class="tc-entry">
+          <div v-if="entries.length > 1" class="tc-part">
+            {{ t('video.transcode.part', { id: entry.partId ?? 0 }) }}
+          </div>
 
-      <!-- 总进度 -->
-      <div class="tc-overall" :class="`tc-overall--${statusTone(entry.status)}`">
-        <div class="tc-overall__head">
-          <span class="tc-overall__label">{{ t('video.transcode.overall') }}</span>
-          <n-tooltip :disabled="!entry.error && !entry.message && !entry.stage">
-            <template #trigger>
+          <!-- 总进度 -->
+          <div class="tc-overall" :class="`tc-overall--${statusTone(entry.status)}`">
+            <div class="tc-overall__head">
+              <span class="tc-overall__label">{{ t('video.transcode.overall') }}</span>
               <span class="tc-overall__meta">
                 <span class="tc-overall__status">{{ statusLabel(entry.status) }}</span>
                 <span v-if="entry.message || entry.stage" class="tc-overall__msg">
@@ -110,49 +152,49 @@ function resChips(resolutions?: number[]): string {
                 </span>
                 <span class="tc-overall__pct">{{ clampPercent(entry.percent) }}%</span>
               </span>
-            </template>
-            {{ overallHint(entry) }}
-          </n-tooltip>
-        </div>
-        <n-progress
-          type="line"
-          :percentage="clampPercent(entry.percent)"
-          :show-indicator="false"
-          :processing="isProcessing(entry.status)"
-          :status="progressStatus(entry.status)"
-          :height="isDetail ? 6 : 4"
-          :border-radius="99"
-        />
-      </div>
+            </div>
+            <n-progress
+              type="line"
+              :percentage="clampPercent(entry.percent)"
+              :show-indicator="false"
+              :processing="isProcessing(entry.status)"
+              :status="progressStatus(entry.status)"
+              :height="isDetail ? 6 : 4"
+              :border-radius="99"
+            />
+          </div>
 
-      <!-- Pipeline 明细：仅名称 / 状态 / 百分比 / 分辨率 chips，无重复进度条 -->
-      <ul v-if="entry.pipelines?.length" class="tc-pipes">
-        <li
-          v-for="pipeline in entry.pipelines"
-          :key="pipeline.name"
-          class="tc-pipe"
-          :class="[
-            `tc-pipe--${pipeline.name.toLowerCase()}`,
-            `tc-pipe--${statusTone(pipeline.status)}`,
-          ]"
-        >
-          <n-tooltip :disabled="!pipeline.error && !pipeline.message">
-            <template #trigger>
+          <!-- Pipeline 明细：仅名称 / 状态 / 百分比 / 分辨率 chips，无重复进度条 -->
+          <ul v-if="entry.pipelines?.length" class="tc-pipes">
+            <li
+              v-for="pipeline in entry.pipelines"
+              :key="pipeline.name"
+              class="tc-pipe"
+              :class="[
+                `tc-pipe--${pipeline.name.toLowerCase()}`,
+                `tc-pipe--${statusTone(pipeline.status)}`,
+              ]"
+            >
               <div class="tc-pipe__row">
                 <span class="tc-pipe__name">{{ pipelineLabel(pipeline.name) }}</span>
                 <span class="tc-pipe__status">{{ statusLabel(pipeline.status) }}</span>
                 <span class="tc-pipe__pct">{{ clampPercent(pipeline.percent) }}%</span>
               </div>
-            </template>
-            {{ pipelineHint(pipeline) }}
-          </n-tooltip>
-          <div v-if="pipeline.resolutions?.length" class="tc-pipe__res">
-            {{ resChips(pipeline.resolutions) }}
-          </div>
-        </li>
-      </ul>
-    </section>
-  </div>
+              <div v-if="pipeline.resolutions?.length" class="tc-pipe__res">
+                {{ resChips(pipeline.resolutions) }}
+              </div>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </template>
+    <ul class="tc-tip">
+      <li v-for="(line, index) in hintLines" :key="index" class="tc-tip__line">
+        <span class="tc-tip__label">{{ line.label }}</span>
+        <span class="tc-tip__text">{{ line.text }}</span>
+      </li>
+    </ul>
+  </n-tooltip>
   <span v-else class="tc-empty">{{ t('video.transcode.idle') }}</span>
 </template>
 
@@ -160,14 +202,9 @@ function resChips(resolutions?: number[]): string {
 .tc {
   min-width: 0;
   width: 100%;
-}
 
-.tc--compact {
-  max-width: 260px;
-}
-
-.tc--detail {
-  max-width: 100%;
+  // 整块由单个 tooltip 承载，鼠标停在任意位置都能出提示
+  cursor: default;
 }
 
 .tc-entry + .tc-entry {
@@ -175,7 +212,7 @@ function resChips(resolutions?: number[]): string {
 }
 
 .tc-part {
-  margin-bottom: 4px;
+  margin-bottom: var(--spacing-1);
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
@@ -183,47 +220,51 @@ function resChips(resolutions?: number[]): string {
 
 .tc-overall {
   min-width: 0;
-  margin-bottom: 6px;
-  padding: 6px 8px;
-  background: var(--color-surface-hover);
-  border: 1px solid var(--color-border-light);
+  margin-bottom: var(--spacing-1);
+  padding: var(--spacing-1) var(--spacing-2);
+
+  // surface-2 而非 surface-hover：这是静置态背景，不是 hover 反馈色
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
 }
 
 .tc--detail .tc-overall {
-  padding: 10px 12px;
+  padding: var(--spacing-2) var(--spacing-3);
   margin-bottom: var(--spacing-2);
 }
 
+// 语义边框/底色直接用 <sem>-border / <sem>-subtle token，
+// 不再用 color-mix 现调 —— 四套主题各自调过对比度，混色会把它们抹平
 .tc-overall--ok {
-  border-color: color-mix(in srgb, var(--color-success) 28%, var(--color-border-light));
+  border-color: var(--color-success-border);
 }
 
 .tc-overall--active {
-  border-color: color-mix(in srgb, var(--color-info) 32%, var(--color-border-light));
+  border-color: var(--color-info-border);
 }
 
 .tc-overall--err {
-  border-color: color-mix(in srgb, var(--color-error) 36%, var(--color-border-light));
-  background: color-mix(in srgb, var(--color-error) 6%, var(--color-surface-hover));
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-subtle);
 }
 
 .tc-overall--warn {
-  border-color: color-mix(in srgb, var(--color-warning) 32%, var(--color-border-light));
+  border-color: var(--color-warning-border);
 }
 
 .tc-overall__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-1);
 }
 
 .tc-overall__label {
   flex: 0 0 auto;
   color: var(--color-text);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
 }
 
@@ -232,10 +273,10 @@ function resChips(resolutions?: number[]): string {
   flex: 1 1 auto;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--spacing-1);
   min-width: 0;
-  font-size: 11px;
-  line-height: 1.2;
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
 }
 
 .tc-overall__status {
@@ -243,20 +284,22 @@ function resChips(resolutions?: number[]): string {
   color: var(--color-text-muted);
 }
 
+// 语义色作为「表面上的文字」必须走 -text 变体（>= 4.5:1），
+// 直接用 --color-success 之类的填充色在浅色主题下读不清
 .tc-overall--ok .tc-overall__status {
-  color: var(--color-success);
+  color: var(--color-success-text);
 }
 
 .tc-overall--active .tc-overall__status {
-  color: var(--color-info);
+  color: var(--color-info-text);
 }
 
 .tc-overall--err .tc-overall__status {
-  color: var(--color-error);
+  color: var(--color-danger-text);
 }
 
 .tc-overall--warn .tc-overall__status {
-  color: var(--color-warning);
+  color: var(--color-warning-text);
 }
 
 .tc-overall__msg {
@@ -278,22 +321,22 @@ function resChips(resolutions?: number[]): string {
 
 .tc-pipes {
   display: grid;
-  gap: 4px;
+  gap: var(--spacing-1);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .tc--detail .tc-pipes {
-  gap: 6px;
+  gap: var(--spacing-2);
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .tc-pipe {
   min-width: 0;
-  padding: 5px 8px;
+  padding: var(--spacing-1) var(--spacing-2);
   background: var(--color-surface);
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--color-border-subtle);
   border-left: 3px solid var(--color-border-strong);
   border-radius: var(--radius-md);
 }
@@ -307,30 +350,29 @@ function resChips(resolutions?: number[]): string {
 }
 
 .tc-pipe--ok {
-  border-color: color-mix(in srgb, var(--color-success) 22%, var(--color-border-light));
+  border-color: var(--color-success-border);
 }
 
 .tc-pipe--active {
-  border-color: color-mix(in srgb, var(--color-info) 26%, var(--color-border-light));
+  border-color: var(--color-info-border);
 }
 
 .tc-pipe--err {
-  border-color: color-mix(in srgb, var(--color-error) 30%, var(--color-border-light));
+  border-color: var(--color-danger-border);
 }
 
 .tc-pipe--warn {
-  border-color: color-mix(in srgb, var(--color-warning) 26%, var(--color-border-light));
+  border-color: var(--color-warning-border);
 }
 
 .tc-pipe__row {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-1);
   min-width: 0;
-  font-size: 11px;
-  line-height: 1.3;
-  cursor: default;
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
 }
 
 .tc-pipe__name {
@@ -348,19 +390,19 @@ function resChips(resolutions?: number[]): string {
 }
 
 .tc-pipe--ok .tc-pipe__status {
-  color: var(--color-success);
+  color: var(--color-success-text);
 }
 
 .tc-pipe--active .tc-pipe__status {
-  color: var(--color-info);
+  color: var(--color-info-text);
 }
 
 .tc-pipe--err .tc-pipe__status {
-  color: var(--color-error);
+  color: var(--color-danger-text);
 }
 
 .tc-pipe--warn .tc-pipe__status {
-  color: var(--color-warning);
+  color: var(--color-warning-text);
 }
 
 .tc-pipe__pct {
@@ -370,15 +412,55 @@ function resChips(resolutions?: number[]): string {
 }
 
 .tc-pipe__res {
-  margin-top: 2px;
+  margin-top: var(--spacing-1);
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.02em;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
 }
 
 .tc-empty {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+}
+
+// tooltip 内容被 teleport 到 body，但 scopeId 由本组件的渲染函数写入，
+// 因此 scoped 选择器依然命中
+.tc-tip {
+  display: grid;
+  gap: var(--spacing-1);
+  margin: 0;
+  padding: 0;
+
+  // ch 而非固定 px：宽度跟随字号，长报错信息才会换行而不是撑破气泡
+  max-width: 40ch;
+  list-style: none;
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.tc-tip__label {
+  margin-right: var(--spacing-1);
+  font-weight: var(--font-semibold);
+}
+
+.tc-tip__text {
+  // tooltip 是反色气泡，正文色由 Naive 主题给定，这里只做主次区分
+  opacity: 0.85;
+}
+
+// 列表里每一行都挂着一条 processing 状态、永不静止的进度条，
+// 减少动效偏好下必须真的停下来。
+// base/_accessibility.scss 的全局兜底只把 animation-duration 压到 0.01ms
+// 且迭代 1 次 —— 条纹仍会被画出一帧，动画名也还在。这里直接抹掉 animation-name。
+// !important 无法避免：条纹动画由 Naive 的 cssr 运行时注入，选择器是
+// `.n-progress .n-progress-graph .n-progress-graph-line
+//  .n-progress-graph-line-rail .n-progress-graph-line-fill--processing::after`
+// （5 个类），scoped 块想在特异度上压过它只能堆出同样长的选择器链，
+// 那等于把 Naive 的内部结构层数写死在业务组件里，比 !important 更脆。
+@media (prefers-reduced-motion: reduce) {
+  .tc :deep(.n-progress-graph-line-fill--processing)::after {
+    animation: none !important;
+  }
 }
 </style>

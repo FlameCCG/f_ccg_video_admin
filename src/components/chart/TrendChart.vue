@@ -1,10 +1,26 @@
 <script setup lang="ts">
 /**
  * 趋势图表组件
- * 用于展示数据趋势的折线图/面积图
- * Requirements: 7.2, 7.3, 7.4, 7.5
+ * Canvas 折线 / 面积图
+ *
+ * 五条约束（改动前请先读）：
+ * 1. 所有颜色来自 token：线走 props.color 或 --color-chart-1，网格走
+ *    --color-chart-grid，坐标文字走 --color-chart-axis，数据点内芯走
+ *    --color-surface。旧实现的兜底值 #4f46e5 / #999 / #eee 不属于任何一套主题，
+ *    数据点内芯写死 #fff —— 在 cyberpunk 的 #05060f 上就是四个白点。
+ * 2. 字体走 --font-sans + --text-xs。旧实现 ctx.font = '12px sans-serif'，
+ *    于是首页四张图的坐标标签全部是 Arial，而周围 UI 是字体栈的第一顺位，
+ *    这是落地页上最显眼的「廉价感」来源。
+ * 3. CSSOM 读取（getComputedStyle）会强制样式重算，必须缓存：只在主题 / 颜色
+ *    变化时重读，resize 重绘复用缓存。
+ * 4. rAF 必须去重 + 卸载时取消。ResizeObserver 建立观察时必然回调一次，
+ *    与 onMounted 的首绘叠加会让首帧画两次；不取消的 rAF 会在组件卸载后
+ *    继续跑，拿着已经失效的 canvas。
+ * 5. 鼠标移动不读布局：几何量在绘制时缓存下来，事件里只用 offsetX；
+ *    命中的数据点索引没变就直接返回，不触发组件重渲染。
  */
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { NCard, NSpin } from 'naive-ui'
 import { useTheme } from '@/composables/useTheme'
 
@@ -32,12 +48,14 @@ interface Props {
   showDots?: boolean
   /** 是否平滑曲线 */
   smooth?: boolean
-  /** 线条颜色 */
+  /** 线条颜色（支持 var(--x) 形式），默认 --color-chart-1 */
   color?: string
   /** 是否加载中 */
   loading?: boolean
   /** 是否显示工具提示 */
   showTooltip?: boolean
+  /** 无数据时的提示文案，缺省则不提示 */
+  emptyText?: string
   /** Y 轴最小值 */
   yMin?: number
   /** Y 轴最大值 */
@@ -54,11 +72,13 @@ const props = withDefaults(defineProps<Props>(), {
   color: undefined,
   loading: false,
   showTooltip: true,
+  emptyText: undefined,
   yMin: undefined,
   yMax: undefined,
 })
 
 const { currentTheme } = useTheme()
+const { locale } = useI18n()
 
 /** Canvas 引用 */
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -66,7 +86,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 /** 容器引用 */
 const containerRef = ref<HTMLDivElement | null>(null)
 
-/** 工具提示状态 */
+/** 工具提示状态：x / y 是数据点在画布内的坐标，提示框锚定数据点而不是光标 */
 const tooltip = ref({
   show: false,
   x: 0,
@@ -75,6 +95,183 @@ const tooltip = ref({
   value: 0,
   rate: 0,
 })
+
+/** 是否有可绘制的数据 */
+const hasPoints = computed(() => props.data.x.length > 0 && props.data.values.length > 0)
+
+// ============================================
+// 数值格式化
+// ============================================
+
+/**
+ * 紧凑数字格式化。
+ * 旧实现写死 'w' / 'k' 后缀，英文/日文界面下同样输出「1.2w」；
+ * 交给 Intl 之后 zh-CN 得到「1.2万」、en-US 得到「1.2K」，且不需要新增文案 key。
+ */
+const compactFormatter = computed(
+  () =>
+    new Intl.NumberFormat(locale.value, {
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    })
+)
+
+/** 坐标轴用紧凑格式 */
+function formatAxis(value: number): string {
+  return compactFormatter.value.format(value)
+}
+
+/** 提示框用精确值：鼠标停上去就是为了看准确数字，这里不该再做量级压缩 */
+const exactFormatter = computed(() => new Intl.NumberFormat(locale.value))
+
+/** 变化率：带符号百分比，符号本身就表达了方向，不再额外画箭头 */
+const percentFormatter = computed(
+  () =>
+    new Intl.NumberFormat(locale.value, {
+      style: 'percent',
+      signDisplay: 'exceptZero',
+      maximumFractionDigits: 1,
+    })
+)
+
+const tooltipValueText = computed(() => exactFormatter.value.format(tooltip.value.value))
+
+// 后端 rates 已是百分数（0.5 表示 0.5%），除以 100 换回 Intl percent 需要的小数
+const tooltipRateText = computed(() => percentFormatter.value.format(tooltip.value.rate / 100))
+
+// ============================================
+// 主题色缓存
+// ============================================
+
+/** 绘制用调色板 */
+interface ChartPalette {
+  /** 线条 / 面积主色 */
+  series: string
+  /** 面积渐变（已含透明度） */
+  areaTop: string
+  areaBottom: string
+  /** 网格线 */
+  grid: string
+  /** 坐标文字 */
+  axis: string
+  /** 数据点内芯 */
+  dot: string
+  /** 坐标标签字号（单独留一份用于校验 ctx.font 是否赋值成功） */
+  fontSize: string
+  /** 坐标标签字体（CSS font 简写） */
+  font: string
+}
+
+/** 面积渐变的上下透明度 */
+const AREA_ALPHA_TOP = 0.24
+const AREA_ALPHA_BOTTOM = 0.02
+
+/**
+ * 给颜色附加透明度。
+ * 旧实现直接拼字符串（`${color}40`），只有在色值恰好是 6 位 hex 时才成立；
+ * token 一旦换成 rgb() 写法，面积渐变就会静默变成非法颜色。
+ * 这里显式识别 hex / rgb()，其余情况原样返回（宁可不透明，也不要画错色）。
+ */
+function withAlpha(color: string, alpha: number): string {
+  const input = color.trim()
+
+  if (input.startsWith('#')) {
+    const body = input.slice(1)
+    // #abc / #abcd 先展开成 #aabbcc
+    const full =
+      body.length === 3 || body.length === 4
+        ? body.slice(0, 3).replace(/./g, (ch) => ch + ch)
+        : body.slice(0, 6)
+    if (/^[0-9a-f]{6}$/i.test(full)) {
+      const r = Number.parseInt(full.slice(0, 2), 16)
+      const g = Number.parseInt(full.slice(2, 4), 16)
+      const b = Number.parseInt(full.slice(4, 6), 16)
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`
+    }
+  }
+
+  const channels = /^rgba?\(([^)]+)\)$/.exec(input)?.[1]
+  if (channels) {
+    const parts = channels.split(/[,/\s]+/).filter(Boolean)
+    if (parts.length >= 3) {
+      return `rgba(${parts.slice(0, 3).join(', ')}, ${alpha})`
+    }
+  }
+
+  return input
+}
+
+/** 一次 getComputedStyle 读全部需要的 token */
+function readPalette(): ChartPalette {
+  const fallback: ChartPalette = {
+    series: 'transparent',
+    areaTop: 'transparent',
+    areaBottom: 'transparent',
+    grid: 'transparent',
+    axis: 'transparent',
+    dot: 'transparent',
+    fontSize: '12px',
+    font: '12px sans-serif',
+  }
+  if (typeof window === 'undefined') return fallback
+
+  const style = getComputedStyle(document.documentElement)
+  const read = (name: string): string => style.getPropertyValue(name).trim()
+
+  // props.color 允许直接传 var(--x)：解析成实际色值再交给 canvas
+  let series = props.color?.trim() ?? ''
+  const varMatch = series.match(/^var\(\s*(--[^),\s]+)/)
+  if (varMatch?.[1]) series = read(varMatch[1])
+  if (!series) series = read('--color-chart-1')
+
+  const fontSize = read('--text-xs') || '12px'
+  const fontFamily = read('--font-sans') || 'sans-serif'
+
+  return {
+    series,
+    areaTop: withAlpha(series, AREA_ALPHA_TOP),
+    areaBottom: withAlpha(series, AREA_ALPHA_BOTTOM),
+    grid: read('--color-chart-grid'),
+    axis: read('--color-chart-axis'),
+    dot: read('--color-surface'),
+    fontSize,
+    font: `${fontSize} ${fontFamily}`,
+  }
+}
+
+/** 调色板缓存：只在主题 / color 变化时失效 */
+let palette: ChartPalette | null = null
+
+// ============================================
+// 绘制几何
+// ============================================
+
+/** 绘制内边距（CSS px）：左侧留给 Y 轴标签，下侧留给 X 轴标签 */
+const PADDING = { top: 20, right: 20, bottom: 30, left: 50 } as const
+
+/** Y 轴分段数 */
+const Y_LINES = 5
+
+/** 数据点半径与线宽（canvas 内部几何，无法走 CSS token，集中在此处声明） */
+const DOT_RADIUS = 4
+const GRID_LINE_WIDTH = 1
+const SERIES_LINE_WIDTH = 2
+
+/** X 轴标签最小间距与单个标签的估算宽度 */
+const LABEL_MIN_GAP = 20
+const LABEL_SLOT_WIDTH = 80
+
+/** 标签与坐标轴的间距 */
+const LABEL_OFFSET = 8
+
+/** 最近一次绘制的 CSS 像素尺寸：鼠标事件靠它换算，避免每次事件读布局 */
+let geometry = { width: 0, height: 0 }
+
+/** 最近一次绘制的数据点坐标：提示框锚定用 */
+let drawnPoints: { x: number; y: number }[] = []
+
+/** 当前命中的数据点索引 */
+let hoverIndex = -1
 
 // 计算 Y 轴范围
 const yRange = computed(() => {
@@ -116,6 +313,106 @@ const yRange = computed(() => {
   }
 })
 
+/** 平滑曲线：把 points 依次连成三次贝塞尔 */
+function strokeSmoothPath(
+  ctx: CanvasRenderingContext2D,
+  points: { x: number; y: number }[],
+  minY: number,
+  maxY: number
+): void {
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = (i === 0 ? points[0] : points[i - 1])!
+    const p1 = points[i]!
+    const p2 = points[i + 1]!
+    const p3 = (i === points.length - 2 ? points[i + 1] : points[i + 2])!
+
+    const tension = 0.2
+    const cp1x = p1.x + (p2.x - p0.x) * tension
+    let cp1y = p1.y + (p2.y - p0.y) * tension
+    const cp2x = p2.x - (p3.x - p1.x) * tension
+    let cp2y = p2.y - (p3.y - p1.y) * tension
+
+    // 限制控制点 Y 坐标在图表区域内，防止过度弯曲
+    cp1y = Math.max(minY, Math.min(maxY, cp1y))
+    cp2y = Math.max(minY, Math.min(maxY, cp2y))
+
+    // 进一步限制控制点：极值点或与相邻点同高时压平，避免出现波浪
+    if (
+      (p1.y <= p0.y && p1.y <= p2.y) ||
+      (p1.y >= p0.y && p1.y >= p2.y) ||
+      Math.abs(p1.y - p2.y) < 0.1
+    ) {
+      cp1y = p1.y
+    }
+    if (
+      (p2.y <= p1.y && p2.y <= p3.y) ||
+      (p2.y >= p1.y && p2.y >= p3.y) ||
+      Math.abs(p1.y - p2.y) < 0.1
+    ) {
+      cp2y = p2.y
+    }
+
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+  }
+}
+
+/** 绘制 X 轴标签（首尾必显，中间按估算宽度抽稀） */
+function drawXLabels(
+  ctx: CanvasRenderingContext2D,
+  labels: string[],
+  xStep: number,
+  chartWidth: number,
+  height: number
+): void {
+  const maxLabels = Math.max(2, Math.floor(chartWidth / LABEL_SLOT_WIDTH))
+  const xLabelStep = Math.max(1, Math.ceil(labels.length / maxLabels))
+  const baseline = height - PADDING.bottom + LABEL_OFFSET
+
+  let lastDrawnRight = -Infinity
+
+  for (let i = 0; i < labels.length; i++) {
+    const isFirst = i === 0
+    const isLast = i === labels.length - 1
+    if (!isFirst && !isLast && i % xLabelStep !== 0) continue
+
+    const label = labels[i]!
+    const xPos = PADDING.left + i * xStep
+    const textWidth = ctx.measureText(label).width
+
+    let align: CanvasTextAlign = 'center'
+    let left = xPos - textWidth / 2
+    let right = xPos + textWidth / 2
+
+    if (isFirst) {
+      align = 'left'
+      left = xPos
+      right = xPos + textWidth
+    } else if (isLast) {
+      align = 'right'
+      left = xPos - textWidth
+      right = xPos
+    }
+
+    if (left > lastDrawnRight + LABEL_MIN_GAP || isFirst) {
+      // 非末位标签需要给末位让出位置，否则两者会叠在一起
+      if (!isLast && labels.length > 1) {
+        const lastLabel = labels[labels.length - 1]!
+        const lastLeft =
+          PADDING.left + (labels.length - 1) * xStep - ctx.measureText(lastLabel).width
+        if (right > lastLeft - LABEL_MIN_GAP) continue
+      }
+
+      ctx.textAlign = align
+      ctx.fillText(label, xPos, baseline)
+      lastDrawnRight = right
+    } else if (isLast) {
+      ctx.clearRect(left - 5, height - PADDING.bottom, textWidth + 10, 20)
+      ctx.textAlign = align
+      ctx.fillText(label, xPos, baseline)
+    }
+  }
+}
+
 /** 绘制图表 */
 function drawChart(): void {
   const canvas = canvasRef.value
@@ -125,382 +422,262 @@ function drawChart(): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  // 设置 canvas 尺寸
   const rect = container.getBoundingClientRect()
-  const dpr = window.devicePixelRatio || 1
-  canvas.width = rect.width * dpr
-  canvas.height = props.height * dpr
-  canvas.style.width = `${rect.width}px`
-  canvas.style.height = `${props.height}px`
-  ctx.scale(dpr, dpr)
-
   const width = rect.width
   const height = props.height
-  const padding = { top: 20, right: 20, bottom: 30, left: 50 }
-  const chartWidth = width - padding.left - padding.right
-  const chartHeight = height - padding.top - padding.bottom
+  if (width <= 0) return
 
-  // 清空画布
+  // 只在像素尺寸真的变了时才重设 backing store：赋值 canvas.width 会
+  // 重新分配整块位图（1.28MB 量级）并清空状态，resize 期间每帧都做太贵。
+  const dpr = window.devicePixelRatio || 1
+  const pixelWidth = Math.round(width * dpr)
+  const pixelHeight = Math.round(height * dpr)
+  if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+    canvas.width = pixelWidth
+    canvas.height = pixelHeight
+    canvas.style.width = `${width}px`
+    canvas.style.height = `${height}px`
+  }
+
+  // 用 setTransform 而不是 scale：scale 是叠乘的，一旦不再每次重设
+  // canvas.width（那会顺带重置变换矩阵），scale 就会逐帧累积放大。
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
 
-  const { x, values } = props.data
-  if (x.length === 0 || values.length === 0) return
+  geometry = { width, height }
 
-  // 计算坐标
+  const { x, values } = props.data
+  if (x.length === 0 || values.length === 0) {
+    drawnPoints = []
+    return
+  }
+
+  const colors = (palette ??= readPalette())
+
+  const chartWidth = width - PADDING.left - PADDING.right
+  const chartHeight = height - PADDING.top - PADDING.bottom
   const xStep = chartWidth / (x.length - 1 || 1)
   const yScale = chartHeight / (yRange.value.max - yRange.value.min || 1)
 
-  // 获取主题颜色
-  const computedStyle = getComputedStyle(document.documentElement)
-
-  // 解析颜色值：如果是 CSS 变量则获取实际值
-  let primaryColor =
-    props.color || computedStyle.getPropertyValue('--color-primary').trim() || '#4f46e5'
-
-  // 如果 color 是 CSS 变量格式，解析它
-  if (primaryColor.startsWith('var(')) {
-    const varMatch = primaryColor.match(/var\(([^)]+)\)/)
-    if (varMatch?.[1]) {
-      primaryColor = computedStyle.getPropertyValue(varMatch[1]).trim() || '#4f46e5'
-    }
-  }
-
-  const textColor = computedStyle.getPropertyValue('--color-text-muted').trim() || '#999'
-  const borderColor = computedStyle.getPropertyValue('--color-border-light').trim() || '#eee'
-
-  // 绘制网格
+  // 网格
   if (props.showGrid) {
-    ctx.strokeStyle = borderColor
-    ctx.lineWidth = 1
-
-    // 水平网格线
-    const yLines = 5
-    for (let i = 0; i <= yLines; i++) {
-      const y = padding.top + (chartHeight / yLines) * i
+    ctx.strokeStyle = colors.grid
+    ctx.lineWidth = GRID_LINE_WIDTH
+    for (let i = 0; i <= Y_LINES; i++) {
+      const y = PADDING.top + (chartHeight / Y_LINES) * i
       ctx.beginPath()
-      ctx.moveTo(padding.left, y)
-      ctx.lineTo(width - padding.right, y)
+      ctx.moveTo(PADDING.left, y)
+      ctx.lineTo(width - PADDING.right, y)
       ctx.stroke()
     }
   }
 
-  // 绘制 Y 轴标签
-  ctx.fillStyle = textColor
-  ctx.font = '12px sans-serif'
+  // Y 轴标签
+  ctx.fillStyle = colors.axis
+  // canvas 对非法的 font 简写是「静默忽略赋值」，会悄悄退回 10px sans-serif。
+  // 赋值后回读校验一次，字体栈万一解析失败也至少保住字号。
+  ctx.font = colors.font
+  if (!ctx.font.startsWith(colors.fontSize)) {
+    ctx.font = `${colors.fontSize} sans-serif`
+  }
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
-
-  const yLines = 5
-  for (let i = 0; i <= yLines; i++) {
-    const y = padding.top + (chartHeight / yLines) * i
-    // 确保 Y 轴标签是整数
+  for (let i = 0; i <= Y_LINES; i++) {
+    const y = PADDING.top + (chartHeight / Y_LINES) * i
     const value = Math.round(
-      yRange.value.max - ((yRange.value.max - yRange.value.min) / yLines) * i
+      yRange.value.max - ((yRange.value.max - yRange.value.min) / Y_LINES) * i
     )
-    ctx.fillText(formatNumber(value), padding.left - 8, y)
+    ctx.fillText(formatAxis(value), PADDING.left - LABEL_OFFSET, y)
   }
 
-  // 绘制 X 轴标签
+  // X 轴标签（日期简化：2026-03-01 -> 03-01）
   ctx.textBaseline = 'top'
+  const displayLabels = x.map((label) =>
+    /^\d{4}-\d{2}-\d{2}$/.test(label) ? label.slice(5) : label
+  )
+  drawXLabels(ctx, displayLabels, xStep, chartWidth, height)
 
-  let lastDrawnRight = -1000
-  const minGap = 20 // 标签之间的最小间距
-  const maxLabels = Math.max(2, Math.floor(chartWidth / 80)) // 预估最大标签数
-  const xLabelStep = Math.max(1, Math.ceil(x.length / maxLabels))
-
-  // 预处理标签，简化日期显示
-  const displayLabels = x.map((label) => {
-    if (label.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      return label.substring(5) // "2026-03-01" -> "03-01"
-    }
-    if (label.match(/^\d{4}-\d{2}$/)) {
-      return label // 保持原样 "2026-01"
-    }
-    return label
-  })
-
-  for (let i = 0; i < x.length; i++) {
-    const isFirst = i === 0
-    const isLast = i === x.length - 1
-    const isStep = i % xLabelStep === 0
-
-    if (isFirst || isLast || isStep) {
-      const label = displayLabels[i]!
-      const xPos = padding.left + i * xStep
-      const textWidth = ctx.measureText(label).width
-
-      let align: CanvasTextAlign = 'center'
-      let left = xPos - textWidth / 2
-      let right = xPos + textWidth / 2
-      let drawX = xPos
-
-      if (isFirst) {
-        align = 'left'
-        left = xPos
-        right = xPos + textWidth
-        drawX = xPos
-      } else if (isLast) {
-        align = 'right'
-        left = xPos - textWidth
-        right = xPos
-        drawX = xPos
-      }
-
-      // 检查是否与前一个绘制的标签重叠
-      if (left > lastDrawnRight + minGap || isFirst) {
-        // 如果不是最后一个，检查是否会与最后一个标签重叠
-        if (!isLast && x.length > 1) {
-          const lastLabel = displayLabels[x.length - 1]!
-          const lastTextWidth = ctx.measureText(lastLabel).width
-          const lastXPos = padding.left + (x.length - 1) * xStep
-          const lastLeft = lastXPos - lastTextWidth
-          if (right > lastLeft - minGap) {
-            continue // 跳过当前标签，为最后一个标签留出空间
-          }
-        }
-
-        ctx.textAlign = align
-        ctx.fillText(label, drawX, height - padding.bottom + 8)
-        lastDrawnRight = right
-      } else if (isLast) {
-        // 如果是最后一个且重叠了，清除背景并强制绘制
-        ctx.clearRect(left - 5, height - padding.bottom, textWidth + 10, 20)
-        ctx.textAlign = align
-        ctx.fillText(label, drawX, height - padding.bottom + 8)
-      }
-    }
-  }
-
-  // 计算点坐标
+  // 数据点坐标
   const points = values.map((value, i) => {
-    // 处理所有值都相同且为0的情况
-    let y = padding.top + chartHeight
+    let y = PADDING.top + chartHeight
     if (yRange.value.max > yRange.value.min) {
-      y = padding.top + chartHeight - (value - yRange.value.min) * yScale
+      y = PADDING.top + chartHeight - (value - yRange.value.min) * yScale
     }
-    return {
-      x: padding.left + i * xStep,
-      y,
-    }
+    return { x: PADDING.left + i * xStep, y }
   })
+  drawnPoints = points
 
-  // 绘制面积图
+  const firstPoint = points[0]
+  if (!firstPoint) return
+
+  const lastPoint = points[points.length - 1]!
+  const isFlat = points.every((p) => Math.abs(p.y - firstPoint.y) < 0.1)
+  const useSmooth = props.smooth && points.length > 2 && !isFlat
+  const minY = PADDING.top
+  const maxY = height - PADDING.bottom
+
+  // 面积
   if (props.type === 'area') {
-    const gradient = ctx.createLinearGradient(0, padding.top, 0, height - padding.bottom)
-    gradient.addColorStop(0, `${primaryColor}40`)
-    gradient.addColorStop(1, `${primaryColor}05`)
+    const gradient = ctx.createLinearGradient(0, PADDING.top, 0, height - PADDING.bottom)
+    gradient.addColorStop(0, colors.areaTop)
+    gradient.addColorStop(1, colors.areaBottom)
 
     ctx.fillStyle = gradient
     ctx.beginPath()
-
-    const firstPoint = points[0]
-    const lastPoint = points[points.length - 1]
-    if (!firstPoint || !lastPoint) return
-
-    ctx.moveTo(firstPoint.x, height - padding.bottom)
+    ctx.moveTo(firstPoint.x, height - PADDING.bottom)
     ctx.lineTo(firstPoint.x, firstPoint.y)
-
-    // 检查是否所有点都在同一条水平线上（例如所有值都是0）
-    const isFlat = points.every((p) => Math.abs(p.y - points[0]!.y) < 0.1)
-
-    if (props.smooth && points.length > 2 && !isFlat) {
-      for (let i = 0; i < points.length - 1; i++) {
-        const p0 = (i === 0 ? points[0] : points[i - 1])!
-        const p1 = points[i]!
-        const p2 = points[i + 1]!
-        const p3 = (i === points.length - 2 ? points[i + 1] : points[i + 2])!
-
-        const tension = 0.2
-        const cp1x = p1.x + (p2.x - p0.x) * tension
-        let cp1y = p1.y + (p2.y - p0.y) * tension
-        const cp2x = p2.x - (p3.x - p1.x) * tension
-        let cp2y = p2.y - (p3.y - p1.y) * tension
-
-        // 限制控制点 Y 坐标在图表区域内，防止过度弯曲
-        const minY = padding.top
-        const maxY = height - padding.bottom
-        cp1y = Math.max(minY, Math.min(maxY, cp1y))
-        cp2y = Math.max(minY, Math.min(maxY, cp2y))
-
-        // 进一步限制控制点，防止在极值点出现波浪
-        // 如果 p1 是极值点，或者 p1 和 p2 处于同一水平线，压平控制点
-        if (
-          (p1.y <= p0.y && p1.y <= p2.y) ||
-          (p1.y >= p0.y && p1.y >= p2.y) ||
-          Math.abs(p1.y - p2.y) < 0.1
-        ) {
-          cp1y = p1.y
-        }
-        if (
-          (p2.y <= p1.y && p2.y <= p3.y) ||
-          (p2.y >= p1.y && p2.y >= p3.y) ||
-          Math.abs(p1.y - p2.y) < 0.1
-        ) {
-          cp2y = p2.y
-        }
-
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
-      }
+    if (useSmooth) {
+      strokeSmoothPath(ctx, points, minY, maxY)
     } else {
       points.forEach((point) => ctx.lineTo(point.x, point.y))
     }
-
-    ctx.lineTo(lastPoint.x, height - padding.bottom)
+    ctx.lineTo(lastPoint.x, height - PADDING.bottom)
     ctx.closePath()
     ctx.fill()
   }
 
-  // 绘制线条
-  ctx.strokeStyle = primaryColor
-  ctx.lineWidth = 2
+  // 折线
+  ctx.strokeStyle = colors.series
+  ctx.lineWidth = SERIES_LINE_WIDTH
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.beginPath()
-
-  const lineFirstPoint = points[0]
-
-  if (lineFirstPoint) {
-    ctx.moveTo(lineFirstPoint.x, lineFirstPoint.y)
-
-    // 检查是否所有点都在同一条水平线上（例如所有值都是0）
-    const isFlat = points.every((p) => Math.abs(p.y - points[0]!.y) < 0.1)
-
-    if (props.smooth && points.length > 2 && !isFlat) {
-      for (let i = 0; i < points.length - 1; i++) {
-        const p0 = (i === 0 ? points[0] : points[i - 1])!
-        const p1 = points[i]!
-        const p2 = points[i + 1]!
-        const p3 = (i === points.length - 2 ? points[i + 1] : points[i + 2])!
-
-        const tension = 0.2
-        const cp1x = p1.x + (p2.x - p0.x) * tension
-        let cp1y = p1.y + (p2.y - p0.y) * tension
-        const cp2x = p2.x - (p3.x - p1.x) * tension
-        let cp2y = p2.y - (p3.y - p1.y) * tension
-
-        // 限制控制点 Y 坐标在图表区域内，防止过度弯曲
-        const minY = padding.top
-        const maxY = height - padding.bottom
-        cp1y = Math.max(minY, Math.min(maxY, cp1y))
-        cp2y = Math.max(minY, Math.min(maxY, cp2y))
-
-        // 进一步限制控制点，防止在极值点出现波浪
-        // 关键修复：当当前点和下一个点在同一水平线，或者当前点是峰值/谷值时，压平控制点
-        if (
-          (p1.y <= p0.y && p1.y <= p2.y) ||
-          (p1.y >= p0.y && p1.y >= p2.y) ||
-          Math.abs(p1.y - p2.y) < 0.1
-        ) {
-          cp1y = p1.y
-        }
-        if (
-          (p2.y <= p1.y && p2.y <= p3.y) ||
-          (p2.y >= p1.y && p2.y >= p3.y) ||
-          Math.abs(p1.y - p2.y) < 0.1
-        ) {
-          cp2y = p2.y
-        }
-
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
-      }
-    } else {
-      points.forEach((point, i) => {
-        if (i === 0) ctx.moveTo(point.x, point.y)
-        else ctx.lineTo(point.x, point.y)
-      })
-    }
-
-    ctx.stroke()
+  ctx.moveTo(firstPoint.x, firstPoint.y)
+  if (useSmooth) {
+    strokeSmoothPath(ctx, points, minY, maxY)
+  } else {
+    points.forEach((point) => ctx.lineTo(point.x, point.y))
   }
+  ctx.stroke()
 
-  // 绘制数据点
+  // 数据点：内芯用表面色，不再是写死的白色
   if (props.showDots) {
+    ctx.lineWidth = SERIES_LINE_WIDTH
+    ctx.strokeStyle = colors.series
+    ctx.fillStyle = colors.dot
     points.forEach((point) => {
-      ctx.fillStyle = '#fff'
       ctx.beginPath()
-      ctx.arc(point.x, point.y, 4, 0, Math.PI * 2)
+      ctx.arc(point.x, point.y, DOT_RADIUS, 0, Math.PI * 2)
       ctx.fill()
-
-      ctx.strokeStyle = primaryColor
-      ctx.lineWidth = 2
       ctx.stroke()
     })
   }
 }
 
-/** 格式化数字 */
-function formatNumber(value: number): string {
-  if (value >= 10000) {
-    return `${(value / 10000).toFixed(1)}w`
-  }
-  if (value >= 1000) {
-    return `${(value / 1000).toFixed(1)}k`
-  }
-  return value.toFixed(0)
+// ============================================
+// 重绘调度
+// ============================================
+
+/** 待执行的 rAF 句柄，0 表示没有 */
+let rafId = 0
+
+/** 合并同一帧内的多次重绘请求 */
+function scheduleDraw(): void {
+  if (rafId !== 0) return
+  rafId = requestAnimationFrame(() => {
+    rafId = 0
+    drawChart()
+  })
 }
 
-/** 处理鼠标移动 */
-function handleMouseMove(e: MouseEvent): void {
-  if (!props.showTooltip || !canvasRef.value || !containerRef.value) return
-
-  const rect = canvasRef.value.getBoundingClientRect()
-  const x = e.clientX - rect.left
-  const padding = { left: 50, right: 20 }
-  const chartWidth = rect.width - padding.left - padding.right
-
-  const { x: labels, values, rates } = props.data
-  if (labels.length === 0) return
-
-  const xStep = chartWidth / (labels.length - 1 || 1)
-  const index = Math.round((x - padding.left) / xStep)
-
-  if (index >= 0 && index < labels.length) {
-    const label = labels[index]
-    const value = values[index]
-    if (label !== undefined && value !== undefined) {
-      tooltip.value = {
-        show: true,
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-        label,
-        value,
-        rate: rates?.[index] ?? 0,
-      }
-    }
-  }
+/** 主题 / 颜色变化：调色板失效后重绘 */
+function invalidateAndDraw(): void {
+  palette = null
+  scheduleDraw()
 }
 
-/** 处理鼠标离开 */
-function handleMouseLeave(): void {
-  tooltip.value.show = false
-}
-
-/** 监听数据变化重绘 */
+// 数据是整体替换的引用（上游 computed 每次产出新对象），无需 deep 遍历
 watch(
-  () => [props.data, currentTheme.value],
-  () => {
-    requestAnimationFrame(drawChart)
-  },
-  { deep: true }
+  () => [
+    props.data,
+    props.type,
+    props.height,
+    props.showGrid,
+    props.showDots,
+    props.smooth,
+    locale.value,
+  ],
+  scheduleDraw
 )
 
-/** 监听窗口大小变化 */
+watch([() => props.color, currentTheme], invalidateAndDraw)
+
 let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
-  drawChart()
-
   if (containerRef.value) {
-    resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(drawChart)
-    })
+    // 首绘完全交给 ResizeObserver：observe() 一定会投递一次初始回调。
+    // 这里不能再额外 scheduleDraw —— RO 的回调在同一帧的 rAF 之后投递，
+    // 两者都调用会变成「第 N 帧画一次、第 N+1 帧再画一次」。
+    resizeObserver = new ResizeObserver(scheduleDraw)
     resizeObserver.observe(containerRef.value)
+  } else {
+    scheduleDraw()
   }
 })
 
 onUnmounted(() => {
+  if (rafId !== 0) {
+    cancelAnimationFrame(rafId)
+    rafId = 0
+  }
   resizeObserver?.disconnect()
+  resizeObserver = null
+  drawnPoints = []
 })
+
+// ============================================
+// 交互
+// ============================================
+
+/**
+ * 鼠标移动：只用 offsetX（相对事件目标的内容盒，无需读布局），
+ * 命中索引不变就直接返回 —— 否则每秒 ~60 次事件都会触发一次组件重渲染。
+ */
+function handleMouseMove(e: MouseEvent): void {
+  if (!props.showTooltip) return
+  if (geometry.width <= 0 || drawnPoints.length === 0) return
+
+  const labels = props.data.x
+  const chartWidth = geometry.width - PADDING.left - PADDING.right
+  const xStep = chartWidth / (labels.length - 1 || 1)
+  const index = Math.round((e.offsetX - PADDING.left) / xStep)
+
+  if (index < 0 || index >= labels.length) {
+    if (hoverIndex !== -1) {
+      hoverIndex = -1
+      tooltip.value.show = false
+    }
+    return
+  }
+
+  if (index === hoverIndex) return
+
+  const point = drawnPoints[index]
+  const label = labels[index]
+  const value = props.data.values[index]
+  if (!point || label === undefined || value === undefined) return
+
+  hoverIndex = index
+  tooltip.value = {
+    show: true,
+    x: point.x,
+    y: point.y,
+    label,
+    value,
+    rate: props.data.rates?.[index] ?? 0,
+  }
+}
+
+function handleMouseLeave(): void {
+  hoverIndex = -1
+  tooltip.value.show = false
+}
+
+/** 提示框锚点位移：走 transform，不碰 left / top，避免每次移动都触发重排 */
+const anchorStyle = computed(() => ({
+  transform: `translate3d(${tooltip.value.x}px, ${tooltip.value.y}px, 0)`,
+}))
 </script>
 
 <template>
@@ -517,38 +694,51 @@ onUnmounted(() => {
         @mousemove="handleMouseMove"
         @mouseleave="handleMouseLeave"
       >
-        <canvas ref="canvasRef" class="trend-chart__canvas" />
+        <canvas ref="canvasRef" class="trend-chart__canvas" role="img" :aria-label="title" />
 
-        <!-- 工具提示 -->
-        <Transition name="fade">
-          <div
-            v-if="tooltip.show && showTooltip"
-            class="trend-chart__tooltip"
-            :style="{ left: `${tooltip.x}px`, top: `${tooltip.y - 60}px` }"
-          >
-            <div class="trend-chart__tooltip-label">{{ tooltip.label }}</div>
-            <div class="trend-chart__tooltip-value">{{ formatNumber(tooltip.value) }}</div>
-            <div v-if="tooltip.rate" class="trend-chart__tooltip-rate">
-              <span :class="tooltip.rate >= 0 ? 'is-up' : 'is-down'">
-                {{ tooltip.rate >= 0 ? '↑' : '↓' }} {{ Math.abs(tooltip.rate).toFixed(1) }}%
-              </span>
+        <!-- 无数据：避免有数据的页面里夹着一张空白画布 -->
+        <div v-if="!hasPoints && emptyText && !loading" class="trend-chart__empty">
+          {{ emptyText }}
+        </div>
+
+        <!-- 工具提示：锚点负责定位，内层负责进离场 -->
+        <div class="trend-chart__anchor" :style="anchorStyle">
+          <Transition name="tip">
+            <div v-if="tooltip.show && showTooltip" class="trend-chart__tooltip">
+              <div class="trend-chart__tooltip-label">{{ tooltip.label }}</div>
+              <div class="trend-chart__tooltip-value">{{ tooltipValueText }}</div>
+              <div v-if="tooltip.rate" class="trend-chart__tooltip-rate">
+                <span :class="tooltip.rate >= 0 ? 'is-up' : 'is-down'">{{ tooltipRateText }}</span>
+              </div>
             </div>
-          </div>
-        </Transition>
+          </Transition>
+        </div>
       </div>
     </n-spin>
   </n-card>
 </template>
 
 <style scoped lang="scss">
+@use '@/styles/transitions/interaction' as ix;
+
 .trend-chart {
+  height: 100%;
   background-color: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-elev-1);
+
+  @include ix.feedback-transition;
+
+  // 图表卡片不做位移 hover：鼠标停在上面是为了读 tooltip，卡片跟着动会打断阅读。
+  // 只提一档阴影，把「当前正在看这张图」讲清楚。
+  &:hover {
+    box-shadow: var(--shadow-elev-2);
+  }
 
   &__title {
     font-size: var(--text-base);
-    font-weight: 500;
+    font-weight: var(--font-medium);
     color: var(--color-text);
   }
 
@@ -562,52 +752,86 @@ onUnmounted(() => {
     width: 100%;
   }
 
+  &__empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+
+    // 不参与命中测试，否则它会取代 canvas 成为 mousemove 的 target
+    pointer-events: none;
+  }
+
+  // 零尺寸锚点：停在数据点上，提示框相对它排布，
+  // 于是「定位 transform」与「进场 transform」不会互相覆盖。
+  &__anchor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+
   &__tooltip {
     position: absolute;
-    padding: var(--spacing-2) var(--spacing-3);
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
-    pointer-events: none;
-    transform: translateX(-50%);
+    bottom: var(--spacing-3);
+    left: 0;
     z-index: 10;
+    padding: var(--spacing-2) var(--spacing-3);
     white-space: nowrap;
+    background-color: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-tooltip);
+    box-shadow: var(--shadow-elev-2);
+    transform: translateX(-50%);
   }
 
   &__tooltip-label {
+    margin-bottom: var(--spacing-1);
     font-size: var(--text-xs);
     color: var(--color-text-muted);
-    margin-bottom: var(--spacing-1);
   }
 
   &__tooltip-value {
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--font-semibold);
     color: var(--color-text);
+    font-variant-numeric: tabular-nums;
   }
 
   &__tooltip-rate {
-    font-size: var(--text-xs);
     margin-top: var(--spacing-1);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
 
     .is-up {
-      color: var(--color-success);
+      color: var(--color-success-text);
     }
 
     .is-down {
-      color: var(--color-danger);
+      color: var(--color-danger-text);
     }
   }
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity var(--duration-fast) var(--easing-standard);
-}
+// 提示框进离场：基础态已带 translateX(-50%)，进场态必须把它一起写上，
+// 否则 transform 简写会把居偏移吃掉、提示框跳到数据点右侧。
+@include ix.enter-leave(
+  'tip',
+  translateX(-50%) translateY(var(--spacing-1)),
+  translateX(-50%) translateY(var(--spacing-1))
+);
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+// 时长由 --motion-* token 统一压到 0，这里只把位移归零：
+// 0ms 的过渡仍会让提示框在偏移位置闪现一帧。
+@media (prefers-reduced-motion: reduce) {
+  .tip-enter-from,
+  .tip-leave-to {
+    transform: translateX(-50%);
+  }
 }
 </style>

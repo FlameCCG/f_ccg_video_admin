@@ -7,13 +7,14 @@
 import { ref, computed, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery } from '@tanstack/vue-query'
-import { NCard, NSpace, NButton, NIcon, NGi, NFormItem, NInputNumber } from 'naive-ui'
+import { NCard, NButton, NIcon, NGi, NFormItem, NInputNumber } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { getBanRecords } from '@/api/user'
 import type { UserStatus, BanRecordItem } from '@/api/types'
 import { DataTable } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppStatusTag } from '@/components/common'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { formatDateTime } from '@/utils'
 
 const { t } = useI18n()
@@ -26,10 +27,17 @@ const searchParams = ref({
   pageSize: 10,
 })
 
-/** 获取封禁记录列表 */
+/**
+ * 获取封禁记录列表
+ * searchParams 就在 queryKey 里，改动筛选/分页即触发请求；
+ * 因此各 handler 里不再额外调 refetch()（那会让同一次交互打两个请求，
+ * 并且 refetch 无条件绕过 staleTime，等于让上面的 staleTime 彻底失效）。
+ */
 const {
   data: recordData,
   isLoading,
+  isFetching,
+  isError,
   refetch,
 } = useQuery({
   queryKey: ['banRecords', searchParams],
@@ -161,7 +169,6 @@ function onStatusChange(val: unknown): void {
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
-  void refetch()
 }
 
 /** 处理重置 */
@@ -172,23 +179,20 @@ function handleReset(): void {
     page: 1,
     pageSize: 10,
   }
-  void refetch()
 }
 
 /** 处理页码变化 */
 function handlePageChange(page: number): void {
   searchParams.value.page = page
-  void refetch()
 }
 
 /** 处理每页数量变化 */
 function handlePageSizeChange(pageSize: number): void {
   searchParams.value.pageSize = pageSize
   searchParams.value.page = 1
-  void refetch()
 }
 
-/** 处理刷新 */
+/** 处理刷新：用户主动发起，是 refetch 的正当用法（同时用作失败重试） */
 function handleRefresh(): void {
   void refetch()
 }
@@ -196,6 +200,33 @@ function handleRefresh(): void {
 
 <template>
   <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('user.banRecord.title')">
+      <template #actions>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 搜索表单 -->
     <n-card :bordered="false" class="page-list__search">
       <search-form :loading="isLoading" @search="handleSearch" @reset="handleReset">
@@ -226,38 +257,11 @@ function handleRefresh(): void {
 
     <!-- 数据表格 -->
     <n-card :bordered="false" class="page-list__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="page-list__title">{{ t('user.banRecord.title') }}</span>
-          <n-button size="small" secondary @click="handleRefresh">
-            <template #icon>
-              <n-icon>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-              </n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </n-space>
-      </template>
-
       <data-table
         :columns="columns"
         :data="recordList"
-        :loading="isLoading"
+        :loading="isFetching"
+        :error="isError"
         :selectable="false"
         :page="searchParams.page"
         :page-size="searchParams.pageSize"
@@ -265,6 +269,7 @@ function handleRefresh(): void {
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
+        @retry="handleRefresh"
       />
     </n-card>
   </div>

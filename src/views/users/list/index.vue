@@ -7,14 +7,15 @@
 import { ref, computed, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery } from '@tanstack/vue-query'
-import { NCard, NSpace, NButton, NIcon, NGi, NFormItem, NInput, useMessage } from 'naive-ui'
-import type { DataTableColumns, DataTableRowKey } from 'naive-ui'
+import { NCard, NButton, NIcon, NGi, NFormItem, NInput, useMessage } from 'naive-ui'
+import type { DataTableColumns } from 'naive-ui'
 import { getUserList } from '@/api/user'
 import { getRoles } from '@/api/rbac'
 import type { AdminUserListItem, UserStatus } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppAvatar, AppStatusTag } from '@/components/common'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { UserRoleDrawer, UserPermissionDrawer } from '@/components/rbac'
 import UserEditDrawer from './components/UserEditDrawer.vue'
 import UserBanDialog from './components/UserBanDialog.vue'
@@ -32,9 +33,6 @@ const searchParams = ref({
   pageSize: 10,
 })
 
-/** 选中的行 */
-const checkedRowKeys = ref<DataTableRowKey[]>([])
-
 /** 编辑抽屉状态 */
 const editDrawerVisible = ref(false)
 const editingUser = ref<AdminUserListItem | null>(null)
@@ -51,10 +49,17 @@ const roleManagingUser = ref<AdminUserListItem | null>(null)
 const permissionDrawerVisible = ref(false)
 const permissionViewingUser = ref<AdminUserListItem | null>(null)
 
-/** 获取用户列表 */
+/**
+ * 获取用户列表
+ * searchParams 就在 queryKey 里，改动筛选/分页即触发请求；
+ * 因此各 handler 里不再额外调 refetch()（那会让同一次交互打两个请求，
+ * 并且 refetch 无条件绕过 staleTime，等于让上面的 staleTime 彻底失效）。
+ */
 const {
   data: userData,
   isLoading,
+  isFetching,
+  isError,
   refetch,
 } = useQuery({
   queryKey: ['userList', searchParams],
@@ -70,7 +75,11 @@ const {
 })
 
 /** 获取角色列表（用于筛选） */
-const { data: roles } = useQuery({
+const {
+  data: roles,
+  isFetching: isRolesFetching,
+  isError: isRolesError,
+} = useQuery({
   queryKey: ['roles'],
   queryFn: getRoles,
   staleTime: 5 * 60 * 1000,
@@ -89,6 +98,15 @@ const roleOptions = computed(() => {
     label: role.name,
   }))
 })
+
+/**
+ * 角色筛选的占位文案。
+ * 角色列表是二级查询，失败时下拉框会变成一个「空得毫无理由」的筛选项；
+ * 占位文案切成「加载失败」才能让用户知道不是没有角色，而是没取到。
+ */
+const rolePlaceholder = computed(() =>
+  isRolesError.value ? t('common.tips.loadFailed') : t('user.filter.rolePlaceholder')
+)
 
 /** 状态选项 */
 const statusOptions = computed(() => [
@@ -214,14 +232,9 @@ function onRoleChange(val: unknown): void {
   searchParams.value.roleId = val as number | null
 }
 
-function onCheckedRowKeysChange(keys: DataTableRowKey[]): void {
-  checkedRowKeys.value = keys
-}
-
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
-  void refetch()
 }
 
 /** 处理重置 */
@@ -233,20 +246,17 @@ function handleReset(): void {
     page: 1,
     pageSize: 10,
   }
-  void refetch()
 }
 
 /** 处理页码变化 */
 function handlePageChange(page: number): void {
   searchParams.value.page = page
-  void refetch()
 }
 
 /** 处理每页数量变化 */
 function handlePageSizeChange(pageSize: number): void {
   searchParams.value.pageSize = pageSize
   searchParams.value.page = 1
-  void refetch()
 }
 
 /** 处理操作 */
@@ -288,7 +298,7 @@ function handleRoleSuccess(): void {
   void refetch()
 }
 
-/** 处理刷新 */
+/** 处理刷新：用户主动发起，是 refetch 的正当用法（同时用作失败重试） */
 function handleRefresh(): void {
   void refetch()
 }
@@ -296,6 +306,33 @@ function handleRefresh(): void {
 
 <template>
   <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('user.list.title')">
+      <template #actions>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 搜索表单 -->
     <n-card :bordered="false" class="page-list__search">
       <search-form :loading="isLoading" @search="handleSearch" @reset="handleReset">
@@ -325,7 +362,8 @@ function handleRefresh(): void {
             <filter-select
               :value="searchParams.roleId"
               :options="roleOptions"
-              :placeholder="t('user.filter.rolePlaceholder')"
+              :placeholder="rolePlaceholder"
+              :loading="isRolesFetching"
               :width="'100%'"
               @change="onRoleChange"
             />
@@ -336,47 +374,19 @@ function handleRefresh(): void {
 
     <!-- 数据表格 -->
     <n-card :bordered="false" class="page-list__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="page-list__title">{{ t('user.list.title') }}</span>
-          <n-button size="small" secondary @click="handleRefresh">
-            <template #icon>
-              <n-icon>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-              </n-icon>
-            </template>
-            {{ t('common.refresh') }}
-          </n-button>
-        </n-space>
-      </template>
-
       <data-table
         :columns="columns"
         :data="userList"
-        :loading="isLoading"
+        :loading="isFetching"
+        :error="isError"
         :selectable="false"
-        :checked-row-keys="checkedRowKeys"
         :page="searchParams.page"
         :page-size="searchParams.pageSize"
         :total="total"
         row-key="id"
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
-        @update:checked-row-keys="onCheckedRowKeysChange"
+        @retry="handleRefresh"
       />
     </n-card>
 

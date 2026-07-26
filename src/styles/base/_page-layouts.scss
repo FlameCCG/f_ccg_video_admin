@@ -1,71 +1,69 @@
 // Page Layout Utilities
-// 页面布局工具类 - 用于列表页等需要 flex 自适应高度的场景
+// 页面布局原语：页面外壳 / 头部区 / 筛选区 / 自适应表格区
 
-// 列表页面布局 - 搜索区固定，表格区自适应填充
+// —— 页面内缩只有一个来源 ——
+// DefaultLayout 的 .content-wrapper 已经统一给出
+// `padding: var(--spacing-page-y) var(--spacing-page-x)`。
+// 页面根节点不要再自己加 padding：此前 6 个视图各自写了一份
+// `padding: var(--spacing-4)`、看板写的是 `var(--spacing-6)`，
+// 叠在布局内缩之上就出现了 16/24、32/40、40/48 三种不同的内容框内缩，
+// 切标签时内容框会可见地左右上下跳动。
+// 本文件里的原语因此一律不带内边距，只负责纵向节奏与高度分配。
+
+// —— 块间节奏 ——
+// 统一为 --spacing-section（24px），与页面内缩同值：页面外缘留白与块间留白
+// 相等，视觉上才是同一套栅格，而不是「外面 24、里面 16」的两套。
+
+// 列表页外壳：头部与筛选区固定，表格区吃掉剩余高度
 .page-list {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  gap: var(--spacing-4);
+  gap: var(--spacing-section);
 
-  // 搜索/筛选区域 - 固定高度
-  &__search {
-    flex-shrink: 0;
-  }
-
-  // 表格区域 - 自适应填充剩余空间
-  &__table {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-
-    // 确保 NCard 内容区也是 flex 布局
-    :deep(.n-card__content) {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-    }
-  }
-
-  // 页面标题
-  &__title {
-    font-size: var(--text-lg);
-    font-weight: 500;
-    color: var(--color-text);
-  }
-
-  // 工具栏
-  &__toolbar {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-3);
-  }
-}
-
-// 详情页面布局
-.page-detail {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  gap: var(--spacing-4);
-
+  // 页面头部区：放 AppPageHeader（页面唯一的 <h1>）
   &__header {
     flex-shrink: 0;
   }
 
-  &__content {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
+  // 搜索/筛选区，固定高度。
+  // __filters 是语义更准的名字，__search 是 11 个视图已在使用的名字；
+  // 两者等价并存，不能只留一个（视图不在本次改动范围内）。
+  &__search,
+  &__filters {
+    flex-shrink: 0;
   }
 
-  &__footer {
-    flex-shrink: 0;
+  // 表格区：自适应填充剩余空间
+  &__table {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+
+    // NCard 的内容区也必须是 flex 容器，表格才能撑满卡片高度。
+    // 这条规则此前有两处失效，两处都会让「表格撑满」彻底不生效：
+    // 1) 写成了 :deep(...)。本文件是全局样式表，不经过 SFC scoped 编译，
+    //    :deep() 会原样输出成浏览器无法解析的选择器，整条规则被直接丢弃。
+    //    全局样式本就没有作用域，写后代/子选择器即可。
+    // 2) 类名写成了 .n-card__content。Naive UI 的内容区类名是
+    //    `n-card-content`（见 card/src/Card.mjs），双下划线那个名字不存在。
+    > .n-card-content {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
+    }
+  }
+
+  // 卡片头里的标题文字。
+  // 已废弃：页面标题应由 AppPageHeader 渲染成页面唯一的 <h1>。
+  // 保留原因：10 个视图仍在引用该选择器，删掉会让它们的卡片头掉样式。
+  // 等这些 <span> 随 AppPageHeader 接入一起删掉后，本规则即可移除。
+  &__title {
+    font-size: var(--text-lg);
+    font-weight: var(--font-medium);
+    color: var(--color-text);
   }
 }

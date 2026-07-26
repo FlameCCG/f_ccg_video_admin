@@ -27,8 +27,10 @@ export default {
     isOriginal: 'Original',
     createdAt: 'Published At',
     transcode: 'Transcode',
+    loadFailedHint: 'Could not load the video list. Please try again later.',
   },
   transcode: {
+    streamOffline: 'Transcode progress stream disconnected — click to reconnect',
     queued: 'Queued',
     running: 'Running',
     succeeded: 'Done',

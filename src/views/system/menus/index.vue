@@ -13,6 +13,7 @@ import { getMenus, createMenu, updateMenu, deleteMenu } from '@/api/rbac'
 import type { Menu, CreateMenuParams, UpdateMenuParams } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
 import { SvgIcon } from '@/components/common'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import MenuFormModal from './components/MenuFormModal.vue'
 
 const { t, locale } = useI18n()
@@ -25,10 +26,16 @@ const formModalVisible = ref(false)
 const editingMenu = ref<Menu | null>(null)
 const parentMenu = ref<Menu | null>(null)
 
-/** 获取菜单列表 */
+/**
+ * 获取菜单列表
+ * 接口一次返回整棵菜单树（表格不分页），queryKey 里没有可变参数，
+ * 增删改后统一由 invalidateQueries(['menuList']) 触发重新拉取。
+ */
 const {
   data: menuList,
-  isLoading,
+  isFetching,
+  isError,
+  error: listError,
   refetch,
 } = useQuery({
   queryKey: ['menuList'],
@@ -82,6 +89,9 @@ const deleteMutation = useMutation({
 const treeMenus = computed(() => {
   return (menuList.value ?? []) as unknown as Record<string, unknown>[]
 })
+
+/** 加载失败描述：优先服务端 msg，缺失时由 DataTable 兜底通用文案 */
+const loadErrorDescription = computed(() => listError.value?.message?.trim() || undefined)
 
 /** 获取菜单标题（根据当前语言） */
 function getMenuTitle(menu: Menu): string {
@@ -215,65 +225,62 @@ function handleRefresh(): void {
 
 <template>
   <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('rbac.menu.title')">
+      <template #actions>
+        <n-button type="primary" size="small" @click="handleCreate">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('rbac.menu.create') }}
+        </n-button>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 数据表格 -->
     <n-card :bordered="false" class="page-list__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="page-list__title">{{ t('rbac.menu.title') }}</span>
-          <n-space :size="8">
-            <n-button type="primary" size="small" @click="handleCreate">
-              <template #icon>
-                <n-icon>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </n-icon>
-              </template>
-              {{ t('rbac.menu.create') }}
-            </n-button>
-            <n-button size="small" secondary @click="handleRefresh">
-              <template #icon>
-                <n-icon>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <polyline points="23 4 23 10 17 10" />
-                    <polyline points="1 20 1 14 7 14" />
-                    <path
-                      d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                    />
-                  </svg>
-                </n-icon>
-              </template>
-              {{ t('common.refresh') }}
-            </n-button>
-          </n-space>
-        </n-space>
-      </template>
-
       <data-table
         :columns="columns"
         :data="treeMenus"
-        :loading="isLoading || deleteMutation.isPending.value"
+        :loading="isFetching || deleteMutation.isPending.value"
+        :error="isError"
+        :error-description="loadErrorDescription"
         :selectable="false"
         :pagination="false"
         :default-expand-all="true"
@@ -297,9 +304,8 @@ function handleRefresh(): void {
 </template>
 
 <style scoped lang="scss">
-.menu-list-page {
-  // 已迁移到全局 page-list 样式
-}
+// 页面外壳用全局 page-list 样式（原来这里留了一个空的 .menu-list-page 规则，
+// 根节点早已不再使用该类名，属于死代码）
 
 // 菜单树表格专属样式（缩进、层级与交互一致性）
 .menu-tree-table {

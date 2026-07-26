@@ -416,6 +416,21 @@ export function useNaiveTheme() {
         tdColorModal: surface,
         thColorModal: c('surface-2'),
         borderColorModal: borderSubtle,
+
+        // 固定列的边缘投影：Naive 把它硬编码成 rgba(0,0,0,.18/.36)，
+        // 深色主题下会糊成一条黑影。改为跟随主题的 overlay 色。
+        boxShadowBefore: `inset 12px 0 8px -12px ${c('overlay')}`,
+        boxShadowAfter: `inset -12px 0 8px -12px ${c('overlay')}`,
+
+        // 表格内部滚动条必须走 peers：Naive 的 useTheme 只从
+        // themeOverrides.DataTable.peers 里取 peerOverrides，
+        // 顶层的 Scrollbar 覆盖根本到不了表格内置的那个 NScrollbar。
+        peers: {
+          Scrollbar: {
+            color: c('scrollbar-thumb'),
+            colorHover: c('scrollbar-thumb-hover'),
+          },
+        },
       },
 
       Pagination: {

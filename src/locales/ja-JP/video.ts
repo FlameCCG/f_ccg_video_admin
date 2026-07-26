@@ -27,8 +27,10 @@ export default {
     isOriginal: 'オリジナル',
     createdAt: '投稿日時',
     transcode: 'トランスコード',
+    loadFailedHint: '動画一覧を取得できませんでした。しばらくしてから再試行してください。',
   },
   transcode: {
+    streamOffline: 'トランスコード進捗の配信が切断されました。クリックして再接続',
     queued: '待機中',
     running: '処理中',
     succeeded: '完了',

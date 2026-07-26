@@ -27,8 +27,10 @@ export default {
     isOriginal: '原创',
     createdAt: '发布时间',
     transcode: '转码',
+    loadFailedHint: '无法获取视频列表，请稍后重试',
   },
   transcode: {
+    streamOffline: '转码进度推送已断开，点击重连',
     queued: '排队中',
     running: '转码中',
     succeeded: '已完成',

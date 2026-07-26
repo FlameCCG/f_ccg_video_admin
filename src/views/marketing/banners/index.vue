@@ -40,6 +40,7 @@ import { useTableSelectionAction } from '@/composables'
 import { DataTable, TableActions, BatchActions } from '@/components/table'
 import { SearchForm, FilterSelect } from '@/components/form'
 import { AppStatusTag } from '@/components/common'
+import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import BannerFormModal from './components/BannerFormModal.vue'
 import UserBannerDefaultsDialog from './components/UserBannerDefaultsDialog.vue'
 
@@ -67,10 +68,18 @@ const editingBanner = ref<BannerItem | null>(null)
 const defaultBannerDialogVisible = ref(false)
 const selectedDefaultBannerIds = ref<number[]>([])
 
-/** 获取轮播图列表 */
+/**
+ * 获取轮播图列表
+ * searchParams（含 type / show / partitionId / 分页）就在 queryKey 里，改动即触发请求；
+ * 因此各 handler 里不再额外调 refetch()（那会让同一次交互打两个请求，
+ * 并且 refetch 无条件绕过 staleTime，等于让上面的 staleTime 彻底失效）。
+ */
 const {
   data: bannerData,
   isLoading,
+  isFetching,
+  isError,
+  error: listError,
   refetch,
 } = useQuery({
   queryKey: ['bannerList', searchParams],
@@ -173,6 +182,9 @@ const currentSiteConfig = computed<SiteConfig | null>(() => siteConfigData.value
 const registerDefaultBannerId = computed(() => currentSiteConfig.value?.defaultUserBannerID ?? null)
 const defaultUserBannerIds = computed(() => currentSiteConfig.value?.defaultUserBannerIDs ?? [])
 const checkedBannerIds = computed(() => checkedRowKeys.value.map((key) => Number(key)))
+
+/** 加载失败描述：优先服务端 msg，缺失时由 DataTable 兜底通用文案 */
+const loadErrorDescription = computed(() => listError.value?.message?.trim() || undefined)
 
 /** 获取分区列表 */
 const { data: partitionData } = useQuery({
@@ -402,7 +414,6 @@ const batchActions = computed(() => [
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
-  void refetch()
 }
 
 /** 处理重置 */
@@ -414,20 +425,17 @@ function handleReset(): void {
     page: 1,
     pageSize: 10,
   }
-  void refetch()
 }
 
 /** 处理页码变化 */
 function handlePageChange(page: number): void {
   searchParams.value.page = page
-  void refetch()
 }
 
 /** 处理每页数量变化 */
 function handlePageSizeChange(pageSize: number): void {
   searchParams.value.pageSize = pageSize
   searchParams.value.page = 1
-  void refetch()
 }
 
 /** 处理创建 */
@@ -597,6 +605,62 @@ function handleRefresh(): void {
 
 <template>
   <div class="page-list">
+    <app-page-header class="page-list__header" :title="t('banner.list.title')">
+      <template #actions>
+        <n-button type="primary" size="small" @click="handleCreate">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('banner.actions.create') }}
+        </n-button>
+        <n-button
+          size="small"
+          secondary
+          :disabled="checkedRowKeys.length === 0"
+          @click="handleOpenSelectedDefaultBannerDialog"
+        >
+          {{ t('banner.actions.manageDefaultUserBanners') }}
+        </n-button>
+        <n-button size="small" secondary :loading="isFetching" @click="handleRefresh">
+          <template #icon>
+            <n-icon>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </n-icon>
+          </template>
+          {{ t('common.refresh') }}
+        </n-button>
+      </template>
+    </app-page-header>
+
     <!-- 搜索表单 -->
     <n-card :bordered="false" class="page-list__search">
       <search-form :loading="isLoading" @search="handleSearch" @reset="handleReset">
@@ -638,67 +702,6 @@ function handleRefresh(): void {
 
     <!-- 数据表格 -->
     <n-card :bordered="false" class="page-list__table">
-      <template #header>
-        <n-space justify="space-between" align="center">
-          <span class="page-list__title">{{ t('banner.list.title') }}</span>
-          <n-space :size="8">
-            <n-button type="primary" size="small" @click="handleCreate">
-              <template #icon>
-                <n-icon>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </n-icon>
-              </template>
-              {{ t('banner.actions.create') }}
-            </n-button>
-            <n-button
-              size="small"
-              secondary
-              :disabled="checkedRowKeys.length === 0"
-              @click="handleOpenSelectedDefaultBannerDialog"
-            >
-              {{ t('banner.actions.manageDefaultUserBanners') }}
-            </n-button>
-            <n-button size="small" secondary @click="handleRefresh">
-              <template #icon>
-                <n-icon>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <polyline points="23 4 23 10 17 10" />
-                    <polyline points="1 20 1 14 7 14" />
-                    <path
-                      d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                    />
-                  </svg>
-                </n-icon>
-              </template>
-              {{ t('common.refresh') }}
-            </n-button>
-          </n-space>
-        </n-space>
-      </template>
-
       <div class="banner-summary">
         <div class="banner-summary__item">
           <span class="banner-summary__label">
@@ -741,11 +744,13 @@ function handleRefresh(): void {
         :columns="columns"
         :data="bannerList"
         :loading="
-          isLoading ||
+          isFetching ||
           deleteMutation.isPending.value ||
           setRegisterDefaultBannerMutation.isPending.value ||
           updateDefaultUserBannerListMutation.isPending.value
         "
+        :error="isError"
+        :error-description="loadErrorDescription"
         :selectable="true"
         :checked-row-keys="checkedRowKeys"
         :page="searchParams.page"
@@ -755,6 +760,7 @@ function handleRefresh(): void {
         @update:page="handlePageChange"
         @update:page-size="handlePageSizeChange"
         @update:checked-row-keys="onCheckedRowKeysChange"
+        @retry="handleRefresh"
       />
     </n-card>
 
