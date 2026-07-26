@@ -1,5 +1,14 @@
 import * as dashjs from 'dashjs'
-import type { ErrorEvent, MediaPlayerClass } from 'dashjs'
+import type { ErrorEvent, MediaPlayerClass, MediaPlayerSettingClass } from 'dashjs'
+
+/**
+ * dash.js v5 的 d.ts 把 `abr.throughput` 内的 `sampleSettings` / `ewma` 误标为必填，
+ * 但 `updateSettings()` 在运行时是深合并语义，只传增量即可。
+ * 这里仅为这一个子对象放开类型，避免为了过类型检查而硬编码 dash.js 的默认值。
+ */
+type AbrThroughputSettings = NonNullable<
+  NonNullable<MediaPlayerSettingClass['streaming']>['abr']
+>['throughput']
 
 // ============================================================================
 // MPEG-DASH 接入辅助（dash.js + 原生 <video>）
@@ -91,7 +100,8 @@ export const attachDashToVideo = (
     dash.updateSettings({
       streaming: {
         buffer: {
-          stableBufferTime: 25,
+          // dash.js v5 将 stableBufferTime 更名为 bufferTimeDefault
+          bufferTimeDefault: 25,
           bufferTimeAtTopQuality: 40,
           bufferTimeAtTopQualityLongForm: 60,
           longFormContentDurationThreshold: 300,
@@ -104,7 +114,8 @@ export const attachDashToVideo = (
           autoSwitchBitrate: { video: true },
           limitBitrateByPortal: false,
           usePixelRatioInLimitBitrateByPortal: false,
-          bandwidthSafetyFactor: 0.85,
+          // dash.js v5 将 bandwidthSafetyFactor 移入 abr.throughput
+          throughput: { bandwidthSafetyFactor: 0.85 } as AbrThroughputSettings,
         },
       },
     })
