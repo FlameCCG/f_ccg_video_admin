@@ -25,12 +25,17 @@ $easing: (
   // 非法的 timing-function 会让整条 transition 简写失效，
   // 也就是说那 18 个过渡从未真正生效过。
   'standard': cubic-bezier(0.2, 0, 0, 1),
+  // 离场曲线：加速离开视口。与 out-* 的减速入场构成非对称节奏
+  //（入场慢一点让人看清，离场快一点不挡路），值与 ease-in 相同但语义不同。
+  'exit': cubic-bezier(0.4, 0, 1, 1),
   // 自然减速曲线 - 高质感入场与状态反馈
   'out-quart': cubic-bezier(0.25, 1, 0.5, 1),
   'out-quint': cubic-bezier(0.22, 1, 0.36, 1),
   'out-expo': cubic-bezier(0.16, 1, 0.3, 1),
   // 弹性效果
   'bounce': cubic-bezier(0.68, -0.55, 0.265, 1.55),
+  // 轻微回弹：仅用于「操作成功」类正反馈，过冲幅度远小于 bounce
+  'spring': cubic-bezier(0.34, 1.56, 0.64, 1),
   // 平滑效果
   'smooth': cubic-bezier(0.25, 0.1, 0.25, 1),
 );
@@ -50,6 +55,11 @@ $motion-semantic: (
     'duration': map.get($duration, 'fast'),
     'easing': map.get($easing, 'ease-out'),
   ),
+  // 按压反馈：必须跟手，不做插值
+  'press': (
+      'duration': map.get($duration, 'instant'),
+      'easing': map.get($easing, 'linear'),
+    ),
   // 展开/收起
   'expand': (
       'duration': map.get($duration, 'normal'),
@@ -72,5 +82,23 @@ $motion-semantic: (
   'page': (
       'duration': map.get($duration, 'slow'),
       'easing': map.get($easing, 'smooth'),
+    ),
+  // 大面积内容揭示：抽屉、详情面板
+  'reveal': (
+      'duration': map.get($duration, 'slow'),
+      'easing': map.get($easing, 'out-quint'),
+    ),
+  // 指示器位移：Tab 下划线、菜单高亮条（比 enter 稍慢，才看得出「移动」）
+  'indicator': (
+      'duration': 240ms,
+      'easing': map.get($easing, 'out-quint'),
+    ),
+  // 成功确认：带轻微回弹的正反馈
+  'affirm': (
+      'duration': 320ms,
+      'easing': map.get($easing, 'spring'),
     )
 );
+
+// 列表/网格逐项入场的步进间隔（第 n 项延迟 = n * step）
+$stagger-step: 28ms;

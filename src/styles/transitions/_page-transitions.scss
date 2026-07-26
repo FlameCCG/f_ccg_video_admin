@@ -1,34 +1,29 @@
 // Page Transitions
-// 页面过渡动画样式
+// 全局 Vue <Transition> / <TransitionGroup> 类
+// 这是唯一由 main.scss 引入、会真正下发 CSS 的过渡文件，因此只放
+// 「跨组件复用的 transition name」。组件私有的过渡请在组件 <style> 里
+// @include interaction.enter-leave(...) 生成，不要往这里堆。
+// 已核对使用情况后删除了 4 组无人使用的过渡（slide-down / zoom / expand / list）：
+// 全仓 <Transition> 的 name 都是静态字面量，不存在动态拼接，可安全删除。
+// 现存 4 组的使用点：
+//   fade       -> chart/TrendChart.vue, video/VideoPlayer.vue
+//   fade-slide -> layouts/DefaultLayout.vue（该文件内还有一份 scoped 副本会遮蔽此处）
+//   fade-scale -> layouts/BlankLayout.vue
+//   slide-up   -> table/BatchActions.vue, video/VideoPlayer.vue
+// 新增 2 组供 Wave 2/3 使用：swap（同位状态互换）、rows（列表交错）。
+
+@use 'interaction' as ix;
 
 // ============================================
-// 1. Fade Slide (默认页面过渡)
+// 1. Fade（简单淡入淡出）
 // ============================================
 
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition:
-    opacity var(--duration-normal) var(--easing-ease-out),
-    transform var(--duration-normal) var(--easing-ease-out);
+.fade-enter-active {
+  transition: opacity ix.$enter-motion;
 }
 
-.fade-slide-enter-from {
-  opacity: 0;
-  transform: translateX(20px);
-}
-
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-
-// ============================================
-// 2. Fade (简单淡入淡出)
-// ============================================
-
-.fade-enter-active,
 .fade-leave-active {
-  transition: opacity var(--duration-normal) var(--easing-ease-out);
+  transition: opacity ix.$leave-motion;
 }
 
 .fade-enter-from,
@@ -37,19 +32,55 @@
 }
 
 // ============================================
-// 3. Fade Scale (缩放淡入淡出)
+// 2. Fade Slide（默认页面过渡）
 // ============================================
 
-.fade-scale-enter-active,
+// 唯一走 page 语义 token 的过渡。离场刻意用更快的 leave token：
+// DefaultLayout 的 <transition mode="out-in"> 会让离场与入场串行，
+// 两端都用 300ms 的话一次路由切换要等 600ms。
+.fade-slide-enter-active {
+  transition:
+    opacity ix.$page-motion,
+    transform ix.$page-motion;
+}
+
+.fade-slide-leave-active {
+  transition:
+    opacity ix.$leave-motion,
+    transform ix.$leave-motion;
+}
+
+// 位移量取自 spacing token：页面级过渡只需要「一点」纵向位移暗示层级更替，
+// 横向大位移会让人误以为是左右翻页。
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(var(--spacing-2));
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(calc(-1 * var(--spacing-1)));
+}
+
+// ============================================
+// 3. Fade Scale（缩放淡入淡出）
+// ============================================
+
+.fade-scale-enter-active {
+  transition:
+    opacity ix.$enter-motion,
+    transform ix.$enter-motion;
+}
+
 .fade-scale-leave-active {
   transition:
-    opacity var(--duration-normal) var(--easing-ease-out),
-    transform var(--duration-normal) var(--easing-ease-out);
+    opacity ix.$leave-motion,
+    transform ix.$leave-motion;
 }
 
 .fade-scale-enter-from {
   opacity: 0;
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
 .fade-scale-leave-to {
@@ -58,152 +89,106 @@
 }
 
 // ============================================
-// 4. Slide Up (从下往上滑入)
+// 4. Slide Up（从下往上滑入：底部批量操作条、播放器控制层）
 // ============================================
 
-.slide-up-enter-active,
+.slide-up-enter-active {
+  transition:
+    opacity ix.$enter-motion,
+    transform ix.$enter-motion;
+}
+
 .slide-up-leave-active {
   transition:
-    opacity var(--duration-normal) var(--easing-ease-out),
-    transform var(--duration-normal) var(--easing-ease-out);
+    opacity ix.$leave-motion,
+    transform ix.$leave-motion;
 }
 
-.slide-up-enter-from {
-  opacity: 0;
-  transform: translateY(24px);
-}
-
+// 两个使用点都是「贴底浮起」的条（批量操作条、播放器控制层），
+// 所以进入/离开都从下方来回，而不是穿过原位继续往上。
+.slide-up-enter-from,
 .slide-up-leave-to {
   opacity: 0;
-  transform: translateY(-12px);
+  transform: translateY(var(--spacing-3));
 }
 
 // ============================================
-// 5. Slide Down (从上往下滑入)
+// 5. Swap（同一位置的状态互换）
 // ============================================
 
-.slide-down-enter-active,
-.slide-down-leave-active {
+// 加载态 ↔ 内容、图标切换等「原地换人」的场景。
+// 宿主容器需要 position: relative。
+.swap-enter-active {
+  transition: opacity ix.$enter-motion;
+}
+
+.swap-leave-active {
+  // 离开态脱离文档流并与进入态完全重叠：两个状态同时存在也不会把容器
+  // 撑高一倍，也就不会出现切换瞬间的高度跳动。
+  position: absolute;
+  inset: 0;
+  transition: opacity ix.$leave-motion;
+}
+
+.swap-enter-from,
+.swap-leave-to {
+  opacity: 0;
+}
+
+// ============================================
+// 6. Rows（列表交错入场，配合 <TransitionGroup>）
+// ============================================
+
+// 用法：
+//   <TransitionGroup name="rows" tag="tbody">
+//     <tr v-for="(row, i) in rows" :key="row.id" :style="{ '--stagger-i': i }">
+// --stagger-step 是 tokens 侧发出的全局步进（28ms/项），减少动效下已被压到 0；
+// 行数很多时可在容器上局部覆盖它来压缩总时长。
+.rows-enter-active,
+.rows-leave-active {
   transition:
-    opacity var(--duration-normal) var(--easing-ease-out),
-    transform var(--duration-normal) var(--easing-ease-out);
+    opacity ix.$enter-motion,
+    transform ix.$enter-motion;
+  transition-delay: calc(var(--stagger-i, 0) * var(--stagger-step));
 }
 
-.slide-down-enter-from {
-  opacity: 0;
-  transform: translateY(-24px);
-}
-
-.slide-down-leave-to {
-  opacity: 0;
-  transform: translateY(12px);
-}
-
-// ============================================
-// 6. Zoom (缩放进入)
-// ============================================
-
-.zoom-enter-active,
-.zoom-leave-active {
+.rows-leave-active {
+  // 离开项脱离文档流，剩余项由 .rows-move 平滑补位；离场不做交错，
+  // 否则「删了一批」会拖很久才收敛。
+  position: absolute;
+  width: 100%;
   transition:
-    opacity var(--duration-fast) var(--easing-ease-out),
-    transform var(--duration-fast) var(--easing-ease-out);
+    opacity ix.$leave-motion,
+    transform ix.$leave-motion;
+  transition-delay: 0s;
 }
 
-.zoom-enter-from {
+.rows-enter-from,
+.rows-leave-to {
   opacity: 0;
-  transform: scale(0.9);
+  transform: translateY(var(--spacing-2));
 }
 
-.zoom-leave-to {
-  opacity: 0;
-  transform: scale(1.1);
-}
-
-// ============================================
-// 7. Expand (展开/收起)
-// ============================================
-
-.expand-enter-active,
-.expand-leave-active {
-  transition:
-    opacity var(--duration-normal) var(--easing-ease-out),
-    max-height var(--duration-normal) var(--easing-ease-out),
-    padding var(--duration-normal) var(--easing-ease-out);
-  overflow: hidden;
-}
-
-.expand-enter-from,
-.expand-leave-to {
-  opacity: 0;
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
+.rows-move {
+  transition: transform ix.$enter-motion;
 }
 
 // ============================================
-// 8. List Item (列表项动画)
+// Reduced Motion
 // ============================================
 
-.list-enter-active,
-.list-leave-active {
-  transition:
-    opacity var(--duration-normal) var(--easing-ease-out),
-    transform var(--duration-normal) var(--easing-ease-out);
-}
-
-.list-enter-from {
-  opacity: 0;
-  transform: translateX(-16px);
-}
-
-.list-leave-to {
-  opacity: 0;
-  transform: translateX(16px);
-}
-
-.list-move {
-  transition: transform var(--duration-normal) var(--easing-ease-out);
-}
-
-// ============================================
-// Reduced Motion Support
-// ============================================
-
+// 时长本身已由 tokens/themes.scss 在 prefers-reduced-motion 下统一压到 0，
+// 这里只把「位移/缩放」的起止态归零：0ms 的过渡仍会让元素在偏移位置闪现一帧。
+// 透明度反馈保留 —— 用户依然能看出内容发生了切换，只是不再有运动。
 @media (prefers-reduced-motion: reduce) {
-  .fade-slide-enter-active,
-  .fade-slide-leave-active,
-  .fade-enter-active,
-  .fade-leave-active,
-  .fade-scale-enter-active,
-  .fade-scale-leave-active,
-  .slide-up-enter-active,
-  .slide-up-leave-active,
-  .slide-down-enter-active,
-  .slide-down-leave-active,
-  .zoom-enter-active,
-  .zoom-leave-active,
-  .expand-enter-active,
-  .expand-leave-active,
-  .list-enter-active,
-  .list-leave-active,
-  .list-move {
-    transition: none;
-  }
-
   .fade-slide-enter-from,
   .fade-slide-leave-to,
   .fade-scale-enter-from,
   .fade-scale-leave-to,
   .slide-up-enter-from,
   .slide-up-leave-to,
-  .slide-down-enter-from,
-  .slide-down-leave-to,
-  .zoom-enter-from,
-  .zoom-leave-to,
-  .list-enter-from,
-  .list-leave-to {
-    opacity: 1;
+  .rows-enter-from,
+  .rows-leave-to {
     transform: none;
   }
 }

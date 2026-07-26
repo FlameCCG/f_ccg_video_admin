@@ -2,7 +2,6 @@
 // 从 Sass 变量生成运行时 CSS Variables
 
 @use 'sass:map';
-@use 'sass:meta';
 @use 'colors' as *;
 @use 'spacing' as *;
 @use 'typography' as *;
@@ -120,9 +119,12 @@
 
 :root {
   // 字体族
-  --font-sans: #{meta.inspect($font-family-sans)};
-  --font-mono: #{meta.inspect($font-family-mono)};
-  --font-display: #{meta.inspect($font-family-display)};
+  // 必须走 font-stack()：meta.inspect() 会把 sans-serif / monospace / serif /
+  // -apple-system 一起加上引号，通用族关键字被引号包住即失去关键字语义，
+  // 三套字体栈的兜底会全部失效（详见 _typography.scss 中的说明）。
+  --font-sans: #{font-stack($font-family-sans)};
+  --font-mono: #{font-stack($font-family-mono)};
+  --font-display: #{font-stack($font-family-display)};
 
   // 字体大小
   @each $size-name, $size-value in $font-size {
@@ -173,6 +175,41 @@
   @each $easing-name, $easing-value in $easing {
     --easing-#{$easing-name}: #{$easing-value};
   }
+
+  // 语义化动效（$motion-semantic）：此前只存在于 Sass 侧，从未生成 CSS 变量，
+  // 于是每个组件都自己拼一遍 duration + easing —— 入场/离场的非对称节奏
+  // （入场减速看得清、离场加速不挡路）根本无法统一。
+  // 成对输出 duration + easing，业务侧只需 var(--motion-enter-duration) 组合使用。
+  @each $role, $config in $motion-semantic {
+    --motion-#{$role}-duration: #{map.get($config, 'duration')};
+    --motion-#{$role}-easing: #{map.get($config, 'easing')};
+  }
+
+  // 列表/网格逐项入场的步进间隔
+  --stagger-step: #{$stagger-step};
+}
+
+// ============================================
+// 布局几何变量
+// ============================================
+
+// 外壳尺寸的唯一来源。此前「折叠态侧边栏宽度」被写死在两个地方且不相等
+// （DefaultLayout.vue 的 SIDEBAR_COLLAPSED_WIDTH = 72 与 AppMenu.vue 的
+// collapsed-width="64"），折叠后菜单图标与侧边栏对不齐。
+// 布局几何属于 token，改一处即全局生效。
+:root {
+  --layout-header-height: 56px;
+  --layout-tabbar-height: 36px;
+  --layout-sider-width: 260px;
+  --layout-sider-collapsed-width: 72px;
+  --layout-content-max: 1600px;
+
+  // 简写别名：与颜色语义别名同样的处理方式 —— 两个名字、一个值，
+  // 避免出现「两个 token 各写一个数」的老问题。
+  --layout-header-h: var(--layout-header-height);
+  --layout-tabbar-h: var(--layout-tabbar-height);
+  --layout-sider-w: var(--layout-sider-width);
+  --layout-sider-w-collapsed: var(--layout-sider-collapsed-width);
 }
 
 // ============================================
@@ -181,11 +218,18 @@
 
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --duration-instant: 0ms;
-    --duration-fast: 0ms;
-    --duration-normal: 0ms;
-    --duration-slow: 0ms;
-    --duration-slower: 0ms;
-    --duration-slowest: 0ms;
+    // 用循环生成：新增 duration / 语义动效时不必记得回来补一行，
+    // 漏一行就等于让那一档动效绕过了整个「减少动效」开关。
+    // 只清零时长，保留 easing —— 时长为 0 时曲线不再影响观感，
+    // 但变量仍然存在，引用它的 transition 简写不会因非法值整条失效。
+    @each $duration-name in map.keys($duration) {
+      --duration-#{$duration-name}: 0ms;
+    }
+
+    @each $role in map.keys($motion-semantic) {
+      --motion-#{$role}-duration: 0ms;
+    }
+
+    --stagger-step: 0ms;
   }
 }

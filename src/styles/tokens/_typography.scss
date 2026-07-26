@@ -2,6 +2,34 @@
 // 字体系统
 
 @use 'sass:map';
+@use 'sass:string';
+
+// 生成可直接赋给 font-family 的字体栈。
+// CSS 里 sans-serif / serif / monospace 是「通用族关键字」，-apple-system 是
+// 系统字体关键字：一旦被引号包住，它们就变成了「名叫 sans-serif 的字体」，
+// 浏览器必然找不到 —— 整条字体栈的兜底也就形同不存在。
+// 此前 themes.scss 用 meta.inspect() 输出列表，会给每一项都加上引号，
+// 三套字体栈因此全都没有可用的通用族兜底（-apple-system 同理失效）。
+// 规则：含空格的家族名必须加引号，其余（关键字、单词家族名）原样输出。
+@function font-stack($families) {
+  $stack: '';
+
+  @each $family in $families {
+    $token: '#{$family}';
+
+    @if string.index('#{$family}', ' ') {
+      $token: '"#{$family}"';
+    }
+
+    @if $stack == '' {
+      $stack: $token;
+    } @else {
+      $stack: '#{$stack}, #{$token}';
+    }
+  }
+
+  @return string.unquote($stack);
+}
 
 // 字体族
 $font-family-sans: (

@@ -9,8 +9,10 @@
 @use 'base/typography';
 @use 'base/accessibility';
 @use 'base/page-layouts';
+
+// 全局 <Transition> 类。交互动效已改为 mixin 层
+// (transitions/_interaction.scss)，由组件按需 @include，不在入口下发。
 @use 'transitions/page-transitions';
-@use 'transitions/micro-interactions';
 
 // ============================================
 // 2. Component Overrides (Naive UI 等)

@@ -1,0 +1,347 @@
+// Interaction Mixins
+// 交互动效 Mixin 层
+// 为什么是 mixin 而不是工具类：旧的 transitions/_micro-interactions.scss 提供了
+// 11 个工具类 (.interactive / .card-hover / .btn-press / .btn-glow / .icon-spin /
+// .link-underline / .focus-ring / .skeleton-shimmer / .ripple / .stagger-*)，
+// 共 334 行、全仓 0 个使用者，却跟着入口样式一起阻塞渲染地下发。
+// 同时 AGENTS.md 明确禁止 utility 框架。改成 mixin 后，动效词汇表由组件按需
+// @include，没人用就不产出任何 CSS。
+
+// 用法：
+//   @use '@/styles/transitions/interaction' as ix;
+//   .my-card {
+//     @include ix.interactive-surface;  // 已内置 feedback-transition + 焦点环
+//     @include ix.hover-lift;
+//   }
+
+// 组合规则（重要）：CSS 的 transition 是简写，同一个块里写两遍，后者会整条
+// 覆盖前者。所以「过渡声明」集中由 feedback-transition 负责
+// （interactive-surface 已内置），pressable / hover-lift / row-reveal 等
+// 只负责状态值。单独使用时这样写：
+//   .n-button { @include ix.feedback-transition; @include ix.pressable; }
+
+// 另外两条约定（改动前请先读）：
+// 1. 本文件只提供 mixin / Sass 变量，不产出任何顶层 CSS。这是它可以被 N 个组件
+//    <style lang="scss"> 同时 @use 而不重复下发样式的前提。需要「全局」Vue
+//    <Transition> 类（.fade / .fade-slide / .swap-* / .rows-*）请看
+//    transitions/_page-transitions.scss —— 那份才由 main.scss 引入。
+// 2. 本文件不写 @media (prefers-reduced-motion)：所有时长都收敛到 --motion-*
+//    token，减少动效由 tokens/themes.scss 统一处理，避免同一策略散落在十几个
+//    文件里各写一遍（旧文件就是这么坏掉的）。
+
+// ============================================
+// 语义动效简写
+// ============================================
+
+// tokens/_motion.scss 的 $motion-semantic 逐项发出
+// --motion-<role>-duration / --motion-<role>-easing。
+// 下面 9 个简写是本模块对外暴露的动效词汇表：组件写 transition 时应当引用它们，
+// 而不是自己拼 duration + easing —— 语义（这是 hover 还是离场？）决定时长与曲线，
+// 两者不该被分开选择。prefers-reduced-motion 下这些 duration 由 tokens 侧压到 0。
+$hover-motion: var(--motion-hover-duration) var(--motion-hover-easing);
+$press-motion: var(--motion-press-duration) var(--motion-press-easing);
+$focus-motion: var(--motion-focus-duration) var(--motion-focus-easing);
+$enter-motion: var(--motion-enter-duration) var(--motion-enter-easing);
+$leave-motion: var(--motion-leave-duration) var(--motion-leave-easing);
+$expand-motion: var(--motion-expand-duration) var(--motion-expand-easing);
+$reveal-motion: var(--motion-reveal-duration) var(--motion-reveal-easing);
+$indicator-motion: var(--motion-indicator-duration) var(--motion-indicator-easing);
+$page-motion: var(--motion-page-duration) var(--motion-page-easing);
+
+// ============================================
+// 0. 反馈过渡（每个块只 include 一次）
+// ============================================
+
+// 一次列出全部「可能被状态改变」的属性，后续 mixin 只改状态值不再碰 transition。
+// 属性写全的代价可忽略（未发生变化的属性不产生合成开销），换来的是各 mixin
+// 之间可以任意组合而不会互相吃掉过渡。
+@mixin feedback-transition($motion: $hover-motion) {
+  transition:
+    color $motion,
+    background-color $motion,
+    border-color $motion,
+    box-shadow $motion,
+    opacity $motion,
+    transform $motion;
+}
+
+// ============================================
+// 1. 焦点环（全项目唯一实现）
+// ============================================
+
+// 两层 box-shadow：内层用当前表面色「挖」出一圈间隙，外层才是焦点环，再叠一层
+// 柔和光晕。纯 outline 在 primary 着色的表面上会和背景糊在一起，这是它换成
+// box-shadow 的唯一原因。
+// 只挂 :focus-visible，永不挂裸 :focus —— 鼠标点击不该出现焦点环。
+// outline 被去掉的同时一定给了替代物，不允许「删掉不补」。
+// 焦点环本身不声明过渡：焦点反馈越即时越好；若宿主已 include
+// feedback-transition，box-shadow 自然会跟着一起过渡。
+@mixin focus-ring($offset: 2px, $width: 2px) {
+  outline: none;
+
+  &:focus-visible {
+    // 透明 outline：Windows 高对比度 / forced-colors 下 box-shadow 会被丢弃，
+    // 而 outline 会被强制上色，两种环境下焦点都可见。
+    outline: $width solid transparent;
+    outline-offset: $offset;
+    box-shadow:
+      0 0 0 $offset var(--color-surface),
+      0 0 0 calc(#{$offset} + #{$width}) var(--color-focus),
+      0 0 0 calc(#{$offset} + #{$width} * 3) var(--color-focus-ring);
+  }
+}
+
+// 内描边版焦点环：用于 overflow: hidden 的容器（表格行、列表项、菜单项），
+// 外扩阴影会被父级裁掉，只能画在内部。
+@mixin focus-ring-inset($width: 2px) {
+  outline: none;
+
+  &:focus-visible {
+    outline: $width solid transparent;
+    box-shadow: inset 0 0 0 $width var(--color-focus);
+  }
+}
+
+// ============================================
+// 2. 按压反馈
+// ============================================
+
+// hover 微抬 + active 下压。
+// 关键在于不对称：按下走 --motion-press-duration（瞬时，手指到哪状态到哪），
+// 松开回弹走 hover 时长与缓动。这种「按下即时、回弹有缓动」的差异才是
+// Linear / Raycast 那种手感的来源，两端同一时长会发黏。
+// 注意：本 mixin 已含 hover 位移，不要再叠 hover-lift（两者都写
+// &:hover { transform }，后者会整条覆盖前者）。需要更明显的抬升就改用
+// hover-lift，并把这里的 $lift 传 0 关掉位移。
+@mixin pressable($scale: 0.97, $lift: 1px) {
+  &:hover {
+    transform: translateY(calc(-1 * #{$lift}));
+  }
+
+  &:active {
+    transform: scale($scale);
+    transition-duration: var(--motion-press-duration);
+    transition-timing-function: var(--motion-press-easing);
+  }
+
+  // 禁用态不做任何位移，否则「能按」的暗示是假的
+  &:disabled,
+  &[aria-disabled='true'] {
+    transform: none;
+  }
+}
+
+// pressable 的别名：交互层文档里也叫 press-feedback，两个名字指同一实现。
+@mixin press-feedback($scale: 0.97, $lift: 1px) {
+  @include pressable($scale, $lift);
+}
+
+// ============================================
+// 3. 悬浮抬升
+// ============================================
+
+// 卡片/面板的 hover 抬升。位移量默认很小：后台列表卡片密度高，抬 4px 以上会
+// 带动周围一起「呼吸」，反而显廉价。
+@mixin hover-lift($distance: 2px, $shadow: var(--shadow-elev-2)) {
+  &:hover {
+    box-shadow: $shadow;
+    transform: translateY(calc(-1 * #{$distance}));
+  }
+}
+
+// ============================================
+// 4. 可交互表面
+// ============================================
+
+// 可点击容器（菜单项、下拉项、tab、卡片式选择器）的基础反馈：过渡声明 +
+// 颜色反馈 + 焦点环。位移反馈交给 pressable / hover-lift 叠加，于是「颜色反馈」
+// 与「位移反馈」可分别启用 —— 减少动效场景只保留前者。
+@mixin interactive-surface($radius: var(--radius-md)) {
+  position: relative;
+  cursor: pointer;
+  border-radius: $radius;
+
+  @include feedback-transition;
+  @include focus-ring;
+
+  &:hover {
+    background-color: var(--color-surface-hover);
+  }
+
+  &:active {
+    background-color: var(--color-surface-active);
+    transition-duration: var(--motion-active-duration);
+  }
+}
+
+// ============================================
+// 5. 行内操作按需显形
+// ============================================
+
+// 表格行/列表项的操作区默认隐形，hover 或行内任意元素获得焦点时显形。
+// 三个要点：
+// 1. 用 opacity 而非 visibility/display：元素始终占位，显形时不引起重排；
+//    也始终可聚焦，键盘用户 Tab 进去就能触发 :focus-within。
+// 2. :focus-within 是键盘可达性的关键 —— 只有 :hover 的实现对键盘用户等于
+//    「操作入口不存在」。
+// 3. 无 hover 能力的设备（触屏）常驻显示，否则同样不可达。
+@mixin row-reveal {
+  .is-row-action {
+    opacity: 0;
+    transition: opacity $hover-motion;
+  }
+
+  &:hover .is-row-action,
+  &:focus-within .is-row-action {
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    .is-row-action {
+      opacity: 1;
+    }
+  }
+}
+
+// ============================================
+// 6. 滚动容器
+// ============================================
+
+// 抽屉/弹窗/侧栏内部的滚动区必备：
+// - overscroll-behavior: contain 阻断滚动链，滚到底不会带着页面一起动
+//   （全仓 9 个抽屉，改造前 0 处设置）
+// - scrollbar-gutter: stable 预留滚动条槽位，内容出现/消失时布局不横跳
+@mixin scroll-container {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+// ============================================
+// 7. 骨架屏微光
+// ============================================
+
+// $cycle 由 token 推导（--duration-slowest 的 3 倍 ≈ 1.5s）：微光扫过必须明显
+// 慢于交互反馈，否则会被读成「出错了在闪」。
+// @keyframes 写在 mixin 内部而非全局：Vue scoped 样式会重写 scoped 块里的
+// @keyframes 名称与 animation-name 引用。若 keyframes 只存在于全局样式表，
+// scoped 组件里的引用会被改写成带 scopeId 的名字而找不到定义，动画直接不跑。
+// 放在一起两边被同步改写，无论 scoped 与否都成立（Sass 会自动把 @keyframes
+// 提到根层级，不需要 @at-root）。
+// 减少动效下 --duration-slowest 被压到 0，微光自然停下；若某处「正在加载」
+// 只有这一处指示，请给宿主元素加 data-motion-essential 豁免
+// （见 base/_accessibility.scss）。
+@mixin skeleton-shimmer($cycle: calc(var(--duration-slowest) * 3)) {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-skeleton);
+
+  &::after {
+    position: absolute;
+    inset: 0;
+    content: '';
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--color-skeleton-highlight) 50%,
+      transparent 100%
+    );
+    animation: shimmer-sweep $cycle var(--easing-linear) infinite;
+  }
+
+  @keyframes shimmer-sweep {
+    from {
+      transform: translateX(-100%);
+    }
+
+    to {
+      transform: translateX(100%);
+    }
+  }
+}
+
+// ============================================
+// 8. 滑动指示条
+// ============================================
+
+// tab / 分段控件的下划线指示条：位置与宽度由 JS 写入 --ind-x / --ind-w，
+// 只动 transform 与 width，不触发重排。
+// 指示条只是装饰，父级需自带可访问的选中语义（aria-selected 等）。
+@mixin sliding-indicator($thickness: 2px) {
+  position: relative;
+
+  &::after {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: var(--ind-w, 0);
+    height: $thickness;
+    content: '';
+    background-color: var(--color-primary);
+    border-radius: var(--radius-full);
+    transform: translateX(var(--ind-x, 0));
+    transition:
+      width $indicator-motion,
+      transform $indicator-motion,
+      opacity $hover-motion;
+    pointer-events: none;
+  }
+
+  // 无选中项时收起，避免指示条从 0 位置「飞出来」
+  &[data-indicator-hidden='true']::after {
+    opacity: 0;
+  }
+}
+
+// ============================================
+// 9. 进入/离开过渡生成器
+// ============================================
+
+// 为组件内的 <Transition name="$name"> 生成四个状态类。
+// 进入走 enter 语义 token（稍慢、减速入位），离开走 leave（更快、加速离场）——
+// 「进慢出快」是过渡不拖沓的通用做法。
+// 用法（组件 <style lang="scss"> 顶层）：
+//   @include ix.enter-leave('detail', translateX(var(--spacing-4)));
+@mixin enter-leave($name, $enter-from: none, $leave-to: none) {
+  .#{$name}-enter-active {
+    transition:
+      opacity $enter-motion,
+      transform $enter-motion;
+  }
+
+  .#{$name}-leave-active {
+    transition:
+      opacity $leave-motion,
+      transform $leave-motion;
+  }
+
+  .#{$name}-enter-from {
+    opacity: 0;
+    transform: $enter-from;
+  }
+
+  .#{$name}-leave-to {
+    opacity: 0;
+    transform: $leave-to;
+  }
+}
+
+// 展开/收起：高度走 grid-template-rows 过渡，无需预知内容高度
+// （max-height + 猜一个大值的老办法会让缓动曲线失真）。
+@mixin collapsible($name) {
+  .#{$name}-enter-active,
+  .#{$name}-leave-active {
+    display: grid;
+    grid-template-rows: 1fr;
+    overflow: hidden;
+    transition:
+      grid-template-rows $expand-motion,
+      opacity $expand-motion;
+  }
+
+  .#{$name}-enter-from,
+  .#{$name}-leave-to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
