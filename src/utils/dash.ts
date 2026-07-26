@@ -86,6 +86,31 @@ export const attachDashToVideo = (
   cleanUrl.searchParams.delete('response-content-type')
 
   const dash = dashjs.MediaPlayer().create()
+  // 与客户端一致：优先稳缓冲，避免 4K 顶档 ABR 乱切 / flush 造成卡顿
+  try {
+    dash.updateSettings({
+      streaming: {
+        buffer: {
+          stableBufferTime: 25,
+          bufferTimeAtTopQuality: 40,
+          bufferTimeAtTopQualityLongForm: 60,
+          longFormContentDurationThreshold: 300,
+          fastSwitchEnabled: false,
+          flushBufferAtTrackSwitch: false,
+          bufferToKeep: 20,
+          bufferPruningInterval: 12,
+        },
+        abr: {
+          autoSwitchBitrate: { video: true },
+          limitBitrateByPortal: false,
+          usePixelRatioInLimitBitrateByPortal: false,
+          bandwidthSafetyFactor: 0.85,
+        },
+      },
+    })
+  } catch (error) {
+    console.warn('[dash] updateSettings failed', error)
+  }
   dash.initialize(video, cleanUrl.toString(), false)
 
   let started = false
@@ -230,7 +255,7 @@ export const setDashQuality = (dash: MediaPlayerClass, dashIndex: number): void 
     dash.updateSettings({
       streaming: {
         abr: { autoSwitchBitrate: { video: true } },
-        buffer: { fastSwitchEnabled: true, flushBufferAtTrackSwitch: true },
+        buffer: { fastSwitchEnabled: false, flushBufferAtTrackSwitch: false },
       },
     })
   } else {
@@ -238,7 +263,7 @@ export const setDashQuality = (dash: MediaPlayerClass, dashIndex: number): void 
     dash.updateSettings({
       streaming: {
         abr: { autoSwitchBitrate: { video: false } },
-        buffer: { fastSwitchEnabled: true, flushBufferAtTrackSwitch: true },
+        buffer: { fastSwitchEnabled: false, flushBufferAtTrackSwitch: false },
       },
     })
     // 兼容 dash.js v4/v5 API
