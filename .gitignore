@@ -26,3 +26,6 @@ dist-ssr
 *.sln
 *.sw?
 .agents
+.mcp.json.
+.claude
+.playwright-mcp
