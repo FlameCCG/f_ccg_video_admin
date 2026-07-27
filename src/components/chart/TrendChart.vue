@@ -21,7 +21,7 @@
  */
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NCard, NSpin } from 'naive-ui'
+import { NSpin } from 'naive-ui'
 import { useTheme } from '@/composables/useTheme'
 
 interface TrendData {
@@ -138,6 +138,58 @@ const tooltipValueText = computed(() => exactFormatter.value.format(tooltip.valu
 
 // 后端 rates 已是百分数（0.5 表示 0.5%），除以 100 换回 Intl percent 需要的小数
 const tooltipRateText = computed(() => percentFormatter.value.format(tooltip.value.rate / 100))
+
+/** 卡片标题区展示末位值与真实环比，不必悬停也能读到当前状态。 */
+const latestValue = computed(() => props.data.values[props.data.values.length - 1])
+const latestRate = computed(() => props.data.rates?.[props.data.rates.length - 1])
+
+const latestValueText = computed(() => {
+  const value = latestValue.value
+  return value === undefined ? '—' : exactFormatter.value.format(value)
+})
+
+const latestRateText = computed(() => {
+  const rate = latestRate.value
+  return rate === undefined ? '' : percentFormatter.value.format(rate / 100)
+})
+
+const latestRateClass = computed(() => {
+  const rate = latestRate.value
+  if (rate === undefined || rate === 0) return 'is-flat'
+  return rate > 0 ? 'is-up' : 'is-down'
+})
+
+function parseSeriesLabel(label: string): Date | undefined {
+  const normalized = /^\d{4}-\d{2}$/.test(label) ? `${label}-01` : label
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return undefined
+  const date = new Date(`${normalized}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? undefined : date
+}
+
+/** 当前图表覆盖的时间范围，跟随语言环境格式化。 */
+const rangeText = computed(() => {
+  const firstLabel = props.data.x[0]
+  const lastLabel = props.data.x[props.data.x.length - 1]
+  if (!firstLabel || !lastLabel) return ''
+
+  const first = parseSeriesLabel(firstLabel)
+  const last = parseSeriesLabel(lastLabel)
+  if (!first || !last) return `${firstLabel} — ${lastLabel}`
+
+  const isMonthly = /^\d{4}-\d{2}$/.test(firstLabel)
+  const formatter = new Intl.DateTimeFormat(locale.value, {
+    year: isMonthly ? 'numeric' : undefined,
+    month: 'short',
+    day: isMonthly ? undefined : 'numeric',
+  })
+  return `${formatter.format(first)} — ${formatter.format(last)}`
+})
+
+const chartAriaLabel = computed(() => {
+  const parts = [props.title, rangeText.value]
+  if (latestValue.value !== undefined) parts.push(latestValueText.value)
+  return parts.filter(Boolean).join('，')
+})
 
 // ============================================
 // 主题色缓存
@@ -681,10 +733,30 @@ const anchorStyle = computed(() => ({
 </script>
 
 <template>
-  <n-card class="trend-chart" :bordered="false">
-    <template v-if="title" #header>
-      <span class="trend-chart__title">{{ title }}</span>
-    </template>
+  <section
+    class="trend-chart"
+    :style="{ '--trend-accent': color ?? 'var(--color-chart-1)' }"
+    :aria-label="chartAriaLabel"
+  >
+    <header class="trend-chart__header">
+      <div class="trend-chart__heading">
+        <span class="trend-chart__signal" aria-hidden="true" />
+        <div class="trend-chart__heading-copy">
+          <h3 v-if="title" class="trend-chart__title">{{ title }}</h3>
+          <span v-if="rangeText" class="trend-chart__range">{{ rangeText }}</span>
+        </div>
+      </div>
+      <div class="trend-chart__latest">
+        <strong class="trend-chart__latest-value">{{ latestValueText }}</strong>
+        <span
+          v-if="latestRate !== undefined"
+          class="trend-chart__latest-rate"
+          :class="latestRateClass"
+        >
+          {{ latestRateText }}
+        </span>
+      </div>
+    </header>
 
     <n-spin :show="loading">
       <div
@@ -694,7 +766,12 @@ const anchorStyle = computed(() => ({
         @mousemove="handleMouseMove"
         @mouseleave="handleMouseLeave"
       >
-        <canvas ref="canvasRef" class="trend-chart__canvas" role="img" :aria-label="title" />
+        <canvas
+          ref="canvasRef"
+          class="trend-chart__canvas"
+          role="img"
+          :aria-label="chartAriaLabel"
+        />
 
         <!-- 无数据：避免有数据的页面里夹着一张空白画布 -->
         <div v-if="!hasPoints && emptyText && !loading" class="trend-chart__empty">
@@ -715,36 +792,124 @@ const anchorStyle = computed(() => ({
         </div>
       </div>
     </n-spin>
-  </n-card>
+  </section>
 </template>
 
 <style scoped lang="scss">
 @use '@/styles/transitions/interaction' as ix;
 
 .trend-chart {
+  position: relative;
   height: 100%;
-  background-color: var(--color-surface);
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--trend-accent) 2%, var(--color-surface));
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-elev-1);
 
   @include ix.feedback-transition;
 
-  // 图表卡片不做位移 hover：鼠标停在上面是为了读 tooltip，卡片跟着动会打断阅读。
-  // 只提一档阴影，把「当前正在看这张图」讲清楚。
   &:hover {
+    border-color: color-mix(in srgb, var(--trend-accent) 24%, var(--color-border));
     box-shadow: var(--shadow-elev-2);
   }
 
+  &::before {
+    position: absolute;
+    top: 0;
+    left: var(--spacing-5);
+    width: var(--spacing-12);
+    height: 2px;
+    content: '';
+    background-color: var(--trend-accent);
+    border-radius: 0 0 var(--radius-full) var(--radius-full);
+  }
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-4);
+    padding: var(--spacing-5) var(--spacing-5) var(--spacing-2);
+  }
+
+  &__heading {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-2);
+    min-width: 0;
+  }
+
+  &__heading-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+    min-width: 0;
+  }
+
+  &__signal {
+    flex-shrink: 0;
+    width: var(--spacing-2);
+    height: var(--spacing-2);
+    margin-top: var(--spacing-1);
+    background-color: var(--trend-accent);
+    border-radius: var(--radius-full);
+    box-shadow: 0 0 0 var(--spacing-1) color-mix(in srgb, var(--trend-accent) 14%, transparent);
+  }
+
   &__title {
+    margin: 0;
     font-size: var(--text-base);
-    font-weight: var(--font-medium);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-tight);
     color: var(--color-text);
+  }
+
+  &__range {
+    overflow: hidden;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__latest {
+    display: flex;
+    flex-shrink: 0;
+    align-items: baseline;
+    gap: var(--spacing-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__latest-value {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-none);
+    color: var(--color-text);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  &__latest-rate {
+    font-size: var(--text-xs);
+    font-weight: var(--font-medium);
+
+    &.is-up {
+      color: var(--color-success-text);
+    }
+
+    &.is-down {
+      color: var(--color-danger-text);
+    }
+
+    &.is-flat {
+      color: var(--color-text-muted);
+    }
   }
 
   &__container {
     position: relative;
     width: 100%;
+    padding: 0 var(--spacing-2) var(--spacing-3);
   }
 
   &__canvas {

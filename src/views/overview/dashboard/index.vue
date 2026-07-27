@@ -1,33 +1,20 @@
 <script setup lang="ts">
-/**
- * 仪表盘页面 - 运营总览
- *
- * 三条设计约束（改动前请先读）：
- * 1. 有层级。登录后第一屏不能是 6 个等权重的方块：总用户数作为主指标
- *    （更宽、更大、带分类色顶边），今日脉搏两张次级卡，存量指标一排小卡。
- * 2. 环比数据必须真的喂进去。StatCard 的 trend / trendValue 早就实现了，
- *    但此前 6 张卡一张都没传，方向箭头与百分比是死代码。
- *    注意两种「环比」不是同一个量：
- *      - 今日新增类指标：直接用 daily.*.rates 末位（新增量自身的环比变化率）
- *      - 存量类指标：用「今日新增 / 昨日存量」推算存量增幅
- *    混用会给出错误数字，所以下面分成两个函数。
- * 3. 分类色只从 --color-chart-N 取。语义色（success / warning / danger）
- *    留给真实状态，不做装饰。
- */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery } from '@tanstack/vue-query'
-import { NGrid, NGi, NButton, NIcon } from 'naive-ui'
+import { NButton, NIcon } from 'naive-ui'
+import { CalendarClearOutline, PulseOutline, RefreshOutline } from '@vicons/ionicons5'
 import { getSiteStats } from '@/api/site'
-import { StatCard, TrendChart, ChartSkeleton } from '@/components/chart'
-import { AppEmpty } from '@/components/common'
 import type { TrendSeries } from '@/api/types'
+import { ChartSkeleton, StatCard, TrendChart } from '@/components/chart'
+import { AppEmpty } from '@/components/common'
+import { DAILY_TREND_DEFINITIONS } from './model'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
-/** 获取站点统计数据 */
 const {
   data: stats,
+  dataUpdatedAt,
   isLoading,
   isFetching,
   isError,
@@ -35,36 +22,13 @@ const {
 } = useQuery({
   queryKey: ['siteStats'],
   queryFn: getSiteStats,
-  staleTime: 5 * 60 * 1000, // 5 分钟
+  staleTime: 5 * 60 * 1000,
   retry: 2,
 })
 
-/** 空趋势数据 */
 const EMPTY_TREND: TrendSeries = { x: [], values: [], rates: [] }
+const MONTHLY_CHART_HEIGHT = 260
 
-/**
- * 网格间距（px）。n-grid 的 x-gap / y-gap 只接受数值，吃不了 CSS 变量，
- * 该值与 --spacing-card-gap（16px）同值，改 token 时需一并同步。
- */
-const GRID_GAP = 16
-
-/**
- * 网格列数与跨度：骨架屏与真实内容共用同一组常量。
- * 这是「骨架 → 内容」能淡入而不是重排一次的前提 —— 写两遍必然漂移。
- */
-const LEAD_COLS = 4
-const LEAD_HERO_SPAN = '4 s:4 m:2'
-const LEAD_SPAN = '4 s:2 m:1'
-const STOCK_COLS = 6
-const STOCK_SPAN = '6 s:3 m:2'
-const DAILY_COLS = 3
-const DAILY_SPAN = '3 m:1'
-
-/** 图表高度（px） */
-const DAILY_CHART_HEIGHT = 200
-const MONTHLY_CHART_HEIGHT = 240
-
-/** 概览指标的 key（也用于「是否有数据」判断） */
 const OVERVIEW_KEYS = [
   'totalUsers',
   'onlineUsers',
@@ -76,6 +40,7 @@ const OVERVIEW_KEYS = [
 
 type TrendDirection = 'up' | 'down' | 'flat'
 type SeriesIndex = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+type OverviewIcon = 'users' | 'videos' | 'comments' | 'views' | 'login' | 'register'
 
 interface Delta {
   trend: TrendDirection
@@ -86,24 +51,19 @@ interface OverviewCard {
   key: string
   title: string
   value: number
-  icon: 'users' | 'videos' | 'comments' | 'views' | 'likes'
-  /** 分类色序号，与对应趋势图的颜色保持一致 */
+  icon: OverviewIcon
   series: SeriesIndex
   trend?: TrendDirection
   trendValue?: number
 }
 
-/** 由变化率得出方向 */
 function toDelta(rate: number): Delta {
   if (rate > 0) return { trend: 'up', trendValue: rate }
   if (rate < 0) return { trend: 'down', trendValue: rate }
   return { trend: 'flat', trendValue: 0 }
 }
 
-/**
- * 「今日新增」类指标的环比：直接取序列末位的 rates。
- * 后端 rates 已是百分数（0.5 表示 0.5%），与 TrendChart 的提示框同口径。
- */
+/** 新增量指标直接使用后端末位 rates。 */
 function incrementDelta(series: TrendSeries | undefined): Delta | undefined {
   const rates = series?.rates
   if (!rates || rates.length === 0) return undefined
@@ -112,12 +72,7 @@ function incrementDelta(series: TrendSeries | undefined): Delta | undefined {
   return toDelta(rate)
 }
 
-/**
- * 存量类指标的环比增幅：今日新增 / 昨日存量。
- * 不能直接用 daily.*.rates —— 那是新增量自身的环比变化率，
- * 把它标在「总视频数」上会给出一个完全不同的数。
- * 前提：序列末位就是今天（后端 /admin/site/stats 按日聚合，末位为当日）。
- */
+/** 存量指标用「今日新增 / 昨日存量」推算，不能冒用新增量自身环比。 */
 function stockDelta(total: number, series: TrendSeries | undefined): Delta | undefined {
   const values = series?.values
   if (!values || values.length === 0) return undefined
@@ -129,7 +84,6 @@ function stockDelta(total: number, series: TrendSeries | undefined): Delta | und
   return toDelta((increment / previous) * 100)
 }
 
-/** 主指标：站点规模的头条数字 */
 const heroCard = computed<OverviewCard>(() => {
   const overview = stats.value?.overview
   const total = overview?.totalUsers ?? 0
@@ -145,18 +99,18 @@ const heroCard = computed<OverviewCard>(() => {
   }
 })
 
-/** 今日脉搏：与主指标同排，都有真实环比 */
 const todayCards = computed<OverviewCard[]>(() => {
   const overview = stats.value?.overview
   const daily = stats.value?.daily
-  const loginDelta = incrementDelta(daily?.visitUsers)
+  const loginDelta = incrementDelta(daily?.loginUsers)
   const registerDelta = incrementDelta(daily?.newUsers)
+
   return [
     {
       key: 'todayLoginUsers',
       title: t('dashboard.overview.todayLoginUsers'),
       value: overview?.todayLoginUsers ?? 0,
-      icon: 'users',
+      icon: 'login',
       series: 2,
       trend: loginDelta?.trend,
       trendValue: loginDelta?.trendValue,
@@ -165,7 +119,7 @@ const todayCards = computed<OverviewCard[]>(() => {
       key: 'todayRegisters',
       title: t('dashboard.overview.todayRegisters'),
       value: overview?.todayRegisters ?? 0,
-      icon: 'likes',
+      icon: 'register',
       series: 3,
       trend: registerDelta?.trend,
       trendValue: registerDelta?.trendValue,
@@ -173,10 +127,10 @@ const todayCards = computed<OverviewCard[]>(() => {
   ]
 })
 
-/** 存量指标：密度更高的一排，只有视频数能算出环比 */
 const stockCards = computed<OverviewCard[]>(() => {
   const overview = stats.value?.overview
   const videoDelta = stockDelta(overview?.totalVideos ?? 0, stats.value?.daily?.publishVideos)
+
   return [
     {
       key: 'onlineUsers',
@@ -204,32 +158,20 @@ const stockCards = computed<OverviewCard[]>(() => {
   ]
 })
 
-/** 每日趋势图表配置：颜色与对应卡片的分类色一致 */
+/**
+ * 四条 daily 序列全部由统一定义生成。loginUsers 在这里是独立图表，
+ * 不再被 visitUsers（含匿名访客的日 UV）错误替代或遗漏。
+ */
 const dailyCharts = computed(() => {
   const daily = stats.value?.daily
-  return [
-    {
-      key: 'visitUsers',
-      title: t('dashboard.trends.visitUsers'),
-      data: daily?.visitUsers ?? EMPTY_TREND,
-      color: 'var(--color-chart-2)',
-    },
-    {
-      key: 'newUsers',
-      title: t('dashboard.trends.newUsers'),
-      data: daily?.newUsers ?? EMPTY_TREND,
-      color: 'var(--color-chart-3)',
-    },
-    {
-      key: 'publishVideos',
-      title: t('dashboard.trends.publishVideos'),
-      data: daily?.publishVideos ?? EMPTY_TREND,
-      color: 'var(--color-chart-5)',
-    },
-  ]
+  return DAILY_TREND_DEFINITIONS.map((definition) => ({
+    ...definition,
+    title: t(definition.titleKey),
+    data: daily?.[definition.key] ?? EMPTY_TREND,
+    color: `var(--color-chart-${definition.series})`,
+  }))
 })
 
-/** 每月趋势图表配置 */
 const monthlyChart = computed(() => ({
   key: 'newVideos',
   title: t('dashboard.trends.newVideos'),
@@ -237,21 +179,15 @@ const monthlyChart = computed(() => ({
   color: 'var(--color-chart-5)',
 }))
 
-/**
- * 是否有数据。
- * 旧实现只看 overview.totalUsers > 0：有视频、有评论但还没有注册用户的站点
- * 会被判成「暂无数据」，整页统计被藏起来。任意概览指标非 0，
- * 或任意趋势序列有点位，都算有数据。
- */
 const hasData = computed(() => {
   const value = stats.value
   if (!value) return false
 
-  const overview = value.overview
-  if (OVERVIEW_KEYS.some((key) => (overview?.[key] ?? 0) > 0)) return true
+  if (OVERVIEW_KEYS.some((key) => (value.overview?.[key] ?? 0) > 0)) return true
 
   const series = [
     value.daily?.visitUsers,
+    value.daily?.loginUsers,
     value.daily?.publishVideos,
     value.daily?.newUsers,
     value.monthly?.newVideos,
@@ -259,10 +195,77 @@ const hasData = computed(() => {
   return series.some((item) => (item?.x.length ?? 0) > 0)
 })
 
-/** 空数据提示（同时给趋势图当占位文案） */
+function parsePeriodLabel(label: string): Date | undefined {
+  const normalized = /^\d{4}-\d{2}$/.test(label) ? `${label}-01` : label
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return undefined
+  const date = new Date(`${normalized}T00:00:00`)
+  return Number.isNaN(date.getTime()) ? undefined : date
+}
+
+function formatRange(labels: string[], monthly: boolean): string | undefined {
+  const firstLabel = labels[0]
+  const lastLabel = labels[labels.length - 1]
+  if (!firstLabel || !lastLabel) return undefined
+
+  const first = parsePeriodLabel(firstLabel)
+  const last = parsePeriodLabel(lastLabel)
+  if (!first || !last) return `${firstLabel} — ${lastLabel}`
+
+  const formatter = new Intl.DateTimeFormat(locale.value, {
+    year: monthly ? 'numeric' : undefined,
+    month: 'short',
+    day: monthly ? undefined : 'numeric',
+  })
+  return `${formatter.format(first)} — ${formatter.format(last)}`
+}
+
+const dailyLabels = computed(() => {
+  const daily = stats.value?.daily
+  const candidates = [
+    daily?.visitUsers.x,
+    daily?.loginUsers.x,
+    daily?.newUsers.x,
+    daily?.publishVideos.x,
+  ]
+  return candidates.find((labels) => labels && labels.length > 0) ?? []
+})
+
+const dailyRangeLabel = computed(
+  () => formatRange(dailyLabels.value, false) ?? t('dashboard.period.last7Days')
+)
+
+const monthlyRangeLabel = computed(
+  () =>
+    formatRange(stats.value?.monthly?.newVideos.x ?? [], true) ?? t('dashboard.period.last12Months')
+)
+
+const latestDayLabel = computed(() => {
+  const label = dailyLabels.value[dailyLabels.value.length - 1]
+  if (!label) return t('dashboard.status.awaitingData')
+  const date = parsePeriodLabel(label)
+  if (!date) return label
+  return new Intl.DateTimeFormat(locale.value, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(date)
+})
+
+const syncStatusText = computed(() =>
+  isFetching.value ? t('dashboard.status.syncing') : t('dashboard.status.synced')
+)
+
+const updatedAtText = computed(() => {
+  if (dataUpdatedAt.value <= 0) return t('dashboard.status.waiting')
+  const time = new Intl.DateTimeFormat(locale.value, {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(dataUpdatedAt.value))
+  return t('dashboard.status.updatedAt', { time })
+})
+
 const noDataText = computed(() => t('dashboard.empty.noData'))
 
-/** 刷新数据 */
 function handleRefresh(): void {
   void refetch()
 }
@@ -270,44 +273,47 @@ function handleRefresh(): void {
 
 <template>
   <div class="dashboard-page">
-    <!-- 页面标题 -->
-    <div class="dashboard-page__header">
-      <h1 class="dashboard-page__title">{{ t('dashboard.title') }}</h1>
-      <n-button
-        :loading="isFetching"
-        :disabled="isFetching"
-        size="small"
-        secondary
-        @click="handleRefresh"
-      >
-        <template #icon>
-          <n-icon>
-            <!-- 尺寸交给 n-icon（svg 继承 1em），不再写死 width / height -->
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-          </n-icon>
-        </template>
-        {{ t('dashboard.refresh') }}
-      </n-button>
-    </div>
+    <header class="dashboard-page__header">
+      <div class="dashboard-page__heading">
+        <div class="dashboard-page__eyebrow">
+          <n-icon :component="PulseOutline" aria-hidden="true" />
+          <span>{{ t('dashboard.eyebrow') }}</span>
+        </div>
+        <h1 class="dashboard-page__title">{{ t('dashboard.title') }}</h1>
+        <p class="dashboard-page__subtitle">{{ t('dashboard.subtitle') }}</p>
+      </div>
 
-    <!-- 四个分支同位互换：骨架 → 内容是淡入，不是硬切 -->
+      <div class="dashboard-page__header-actions">
+        <div class="dashboard-page__sync" aria-live="polite">
+          <span
+            class="dashboard-page__sync-dot"
+            :class="{ 'is-syncing': isFetching }"
+            aria-hidden="true"
+          />
+          <div class="dashboard-page__sync-copy">
+            <strong>{{ syncStatusText }}</strong>
+            <span>{{ updatedAtText }}</span>
+          </div>
+        </div>
+        <n-button
+          class="dashboard-page__refresh"
+          :loading="isFetching"
+          :disabled="isFetching"
+          secondary
+          size="medium"
+          @click="handleRefresh"
+        >
+          <template #icon>
+            <n-icon :component="RefreshOutline" />
+          </template>
+          {{ t('dashboard.refresh') }}
+        </n-button>
+      </div>
+    </header>
+
     <div class="dashboard-page__body">
       <Transition name="swap">
-        <!-- 错误状态 -->
-        <div v-if="isError" key="error">
+        <div v-if="isError" key="error" class="dashboard-page__state">
           <app-empty
             type="error"
             :description="t('dashboard.empty.loadFailed')"
@@ -316,102 +322,127 @@ function handleRefresh(): void {
           />
         </div>
 
-        <!-- 加载状态：栅格与真实内容完全同构 -->
         <div v-else-if="isLoading" key="loading" class="dashboard-page__sections">
-          <section class="dashboard-page__section">
-            <h2 class="dashboard-page__section-title">{{ t('dashboard.overview.title') }}</h2>
-            <div class="dashboard-page__overview">
-              <n-grid
-                :x-gap="GRID_GAP"
-                :y-gap="GRID_GAP"
-                :cols="LEAD_COLS"
-                responsive="screen"
-                item-responsive
-              >
-                <n-gi :span="LEAD_HERO_SPAN">
-                  <chart-skeleton type="stat" size="large" />
-                </n-gi>
-                <n-gi v-for="i in todayCards.length" :key="i" :span="LEAD_SPAN">
-                  <chart-skeleton type="stat" />
-                </n-gi>
-              </n-grid>
-              <n-grid
-                :x-gap="GRID_GAP"
-                :y-gap="GRID_GAP"
-                :cols="STOCK_COLS"
-                responsive="screen"
-                item-responsive
-              >
-                <n-gi v-for="i in stockCards.length" :key="i" :span="STOCK_SPAN">
-                  <chart-skeleton type="stat" size="small" />
-                </n-gi>
-              </n-grid>
+          <section class="summary-panel" :aria-label="t('dashboard.overview.title')">
+            <div class="summary-panel__header">
+              <div>
+                <span class="summary-panel__kicker">{{ t('dashboard.overview.kicker') }}</span>
+                <h2 class="summary-panel__title">{{ t('dashboard.overview.title') }}</h2>
+              </div>
+              <div class="summary-panel__date">
+                <n-icon :component="CalendarClearOutline" aria-hidden="true" />
+                <span>{{ t('dashboard.status.loadingSnapshot') }}</span>
+              </div>
+            </div>
+            <div class="summary-panel__body">
+              <div class="summary-panel__hero">
+                <chart-skeleton type="stat" size="large" embedded />
+              </div>
+              <div class="summary-panel__metrics">
+                <div
+                  v-for="i in todayCards.length"
+                  :key="`today-${i}`"
+                  class="summary-panel__metric summary-panel__metric--pulse"
+                >
+                  <chart-skeleton type="stat" embedded />
+                </div>
+                <div
+                  v-for="i in stockCards.length"
+                  :key="`stock-${i}`"
+                  class="summary-panel__metric summary-panel__metric--stock"
+                >
+                  <chart-skeleton type="stat" size="small" embedded />
+                </div>
+              </div>
             </div>
           </section>
 
           <section class="dashboard-page__section">
-            <h2 class="dashboard-page__section-title">{{ t('dashboard.trends.daily') }}</h2>
-            <n-grid
-              :x-gap="GRID_GAP"
-              :y-gap="GRID_GAP"
-              :cols="DAILY_COLS"
-              responsive="screen"
-              item-responsive
-            >
-              <n-gi v-for="i in dailyCharts.length" :key="i" :span="DAILY_SPAN">
-                <chart-skeleton type="line" :height="DAILY_CHART_HEIGHT" />
-              </n-gi>
-            </n-grid>
+            <div class="section-heading">
+              <div class="section-heading__copy">
+                <span class="section-heading__kicker">{{ t('dashboard.trends.dailyKicker') }}</span>
+                <h2 class="section-heading__title">{{ t('dashboard.trends.daily') }}</h2>
+                <p class="section-heading__description">
+                  {{ t('dashboard.trends.dailyDescription') }}
+                </p>
+              </div>
+              <div class="section-heading__period">
+                <n-icon :component="CalendarClearOutline" aria-hidden="true" />
+                <span>{{ t('dashboard.period.last7Days') }}</span>
+              </div>
+            </div>
+            <div class="dashboard-page__trend-grid">
+              <div
+                v-for="chart in dailyCharts"
+                :key="chart.key"
+                class="dashboard-page__trend-item"
+                :class="`dashboard-page__trend-item--${chart.layout}`"
+              >
+                <chart-skeleton type="line" :height="chart.height" />
+              </div>
+            </div>
           </section>
 
           <section class="dashboard-page__section">
-            <h2 class="dashboard-page__section-title">{{ t('dashboard.trends.monthly') }}</h2>
+            <div class="section-heading">
+              <div class="section-heading__copy">
+                <span class="section-heading__kicker">
+                  {{ t('dashboard.trends.monthlyKicker') }}
+                </span>
+                <h2 class="section-heading__title">{{ t('dashboard.trends.monthly') }}</h2>
+                <p class="section-heading__description">
+                  {{ t('dashboard.trends.monthlyDescription') }}
+                </p>
+              </div>
+              <div class="section-heading__period">
+                <n-icon :component="CalendarClearOutline" aria-hidden="true" />
+                <span>{{ t('dashboard.period.last12Months') }}</span>
+              </div>
+            </div>
             <chart-skeleton type="line" :height="MONTHLY_CHART_HEIGHT" />
           </section>
         </div>
 
-        <!-- 空数据状态 -->
-        <div v-else-if="!hasData" key="empty">
+        <div v-else-if="!hasData" key="empty" class="dashboard-page__state">
           <app-empty type="default" :description="noDataText" />
         </div>
 
-        <!-- 数据展示 -->
         <div v-else key="content" class="dashboard-page__sections">
-          <!-- 概览：主指标 + 今日脉搏 / 存量指标 -->
-          <section class="dashboard-page__section">
-            <h2 class="dashboard-page__section-title">{{ t('dashboard.overview.title') }}</h2>
-            <div class="dashboard-page__overview">
-              <n-grid
-                :x-gap="GRID_GAP"
-                :y-gap="GRID_GAP"
-                :cols="LEAD_COLS"
-                responsive="screen"
-                item-responsive
-              >
-                <n-gi
-                  class="dashboard-page__reveal"
-                  :span="LEAD_HERO_SPAN"
-                  :style="{ '--stagger-i': 0 }"
-                >
-                  <stat-card
-                    hero
-                    size="large"
-                    :title="heroCard.title"
-                    :value="heroCard.value"
-                    :icon="heroCard.icon"
-                    :series="heroCard.series"
-                    :trend="heroCard.trend"
-                    :trend-value="heroCard.trendValue"
-                  />
-                </n-gi>
-                <n-gi
+          <section class="summary-panel" :aria-label="t('dashboard.overview.title')">
+            <div class="summary-panel__header">
+              <div>
+                <span class="summary-panel__kicker">{{ t('dashboard.overview.kicker') }}</span>
+                <h2 class="summary-panel__title">{{ t('dashboard.overview.title') }}</h2>
+              </div>
+              <div class="summary-panel__date">
+                <n-icon :component="CalendarClearOutline" aria-hidden="true" />
+                <span>{{ latestDayLabel }}</span>
+              </div>
+            </div>
+            <div class="summary-panel__body">
+              <div class="summary-panel__hero dashboard-page__reveal" :style="{ '--stagger-i': 0 }">
+                <stat-card
+                  hero
+                  embedded
+                  size="large"
+                  :title="heroCard.title"
+                  :value="heroCard.value"
+                  :icon="heroCard.icon"
+                  :series="heroCard.series"
+                  :trend="heroCard.trend"
+                  :trend-value="heroCard.trendValue"
+                />
+              </div>
+
+              <div class="summary-panel__metrics">
+                <div
                   v-for="(card, i) in todayCards"
                   :key="card.key"
-                  class="dashboard-page__reveal"
-                  :span="LEAD_SPAN"
+                  class="summary-panel__metric summary-panel__metric--pulse dashboard-page__reveal"
                   :style="{ '--stagger-i': i + 1 }"
                 >
                   <stat-card
+                    embedded
                     :title="card.title"
                     :value="card.value"
                     :icon="card.icon"
@@ -419,23 +450,15 @@ function handleRefresh(): void {
                     :trend="card.trend"
                     :trend-value="card.trendValue"
                   />
-                </n-gi>
-              </n-grid>
-              <n-grid
-                :x-gap="GRID_GAP"
-                :y-gap="GRID_GAP"
-                :cols="STOCK_COLS"
-                responsive="screen"
-                item-responsive
-              >
-                <n-gi
+                </div>
+                <div
                   v-for="(card, i) in stockCards"
                   :key="card.key"
-                  class="dashboard-page__reveal"
-                  :span="STOCK_SPAN"
+                  class="summary-panel__metric summary-panel__metric--stock dashboard-page__reveal"
                   :style="{ '--stagger-i': i + 3 }"
                 >
                   <stat-card
+                    embedded
                     size="small"
                     :title="card.title"
                     :value="card.value"
@@ -444,26 +467,32 @@ function handleRefresh(): void {
                     :trend="card.trend"
                     :trend-value="card.trendValue"
                   />
-                </n-gi>
-              </n-grid>
+                </div>
+              </div>
             </div>
           </section>
 
-          <!-- 每日趋势图表 -->
           <section class="dashboard-page__section">
-            <h2 class="dashboard-page__section-title">{{ t('dashboard.trends.daily') }}</h2>
-            <n-grid
-              :x-gap="GRID_GAP"
-              :y-gap="GRID_GAP"
-              :cols="DAILY_COLS"
-              responsive="screen"
-              item-responsive
-            >
-              <n-gi
+            <div class="section-heading">
+              <div class="section-heading__copy">
+                <span class="section-heading__kicker">{{ t('dashboard.trends.dailyKicker') }}</span>
+                <h2 class="section-heading__title">{{ t('dashboard.trends.daily') }}</h2>
+                <p class="section-heading__description">
+                  {{ t('dashboard.trends.dailyDescription') }}
+                </p>
+              </div>
+              <div class="section-heading__period">
+                <n-icon :component="CalendarClearOutline" aria-hidden="true" />
+                <span>{{ dailyRangeLabel }}</span>
+              </div>
+            </div>
+
+            <div class="dashboard-page__trend-grid">
+              <div
                 v-for="(chart, i) in dailyCharts"
                 :key="chart.key"
-                class="dashboard-page__reveal"
-                :span="DAILY_SPAN"
+                class="dashboard-page__trend-item dashboard-page__reveal"
+                :class="`dashboard-page__trend-item--${chart.layout}`"
                 :style="{ '--stagger-i': i }"
               >
                 <trend-chart
@@ -473,26 +502,41 @@ function handleRefresh(): void {
                   :title="chart.title"
                   :data="chart.data"
                   :color="chart.color"
-                  :height="DAILY_CHART_HEIGHT"
+                  :height="chart.height"
                   :empty-text="noDataText"
                 />
-              </n-gi>
-            </n-grid>
+              </div>
+            </div>
           </section>
 
-          <!-- 每月趋势图表 -->
           <section class="dashboard-page__section">
-            <h2 class="dashboard-page__section-title">{{ t('dashboard.trends.monthly') }}</h2>
-            <trend-chart
-              type="area"
-              smooth
-              show-dots
-              :title="monthlyChart.title"
-              :data="monthlyChart.data"
-              :color="monthlyChart.color"
-              :height="MONTHLY_CHART_HEIGHT"
-              :empty-text="noDataText"
-            />
+            <div class="section-heading">
+              <div class="section-heading__copy">
+                <span class="section-heading__kicker">
+                  {{ t('dashboard.trends.monthlyKicker') }}
+                </span>
+                <h2 class="section-heading__title">{{ t('dashboard.trends.monthly') }}</h2>
+                <p class="section-heading__description">
+                  {{ t('dashboard.trends.monthlyDescription') }}
+                </p>
+              </div>
+              <div class="section-heading__period">
+                <n-icon :component="CalendarClearOutline" aria-hidden="true" />
+                <span>{{ monthlyRangeLabel }}</span>
+              </div>
+            </div>
+            <div class="dashboard-page__monthly-chart dashboard-page__reveal">
+              <trend-chart
+                type="area"
+                smooth
+                show-dots
+                :title="monthlyChart.title"
+                :data="monthlyChart.data"
+                :color="monthlyChart.color"
+                :height="MONTHLY_CHART_HEIGHT"
+                :empty-text="noDataText"
+              />
+            </div>
           </section>
         </div>
       </Transition>
@@ -501,29 +545,111 @@ function handleRefresh(): void {
 </template>
 
 <style scoped lang="scss">
-// 页面根节点不带内边距：DefaultLayout 的 .content-wrapper 已经统一给出
-// `padding: var(--spacing-page-y) var(--spacing-page-x)`，这里再加一份
-// 就会叠成 48px 的内容框内缩（见 base/_page-layouts.scss 顶部的说明）。
-// 块间节奏统一走 --spacing-section，与页面内缩同值。
-// 根节点保持块级：它是 .content-wrapper 的 grid 单元、会被拉伸到整格高度，
-// 改成 flex 列的话内容一超高子项就会被 flex-shrink 压扁。
 .dashboard-page {
+  container: dashboard / inline-size;
+  padding-bottom: var(--spacing-8);
+
   &__header {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
-    margin-bottom: var(--spacing-section);
+    gap: var(--spacing-8);
+    margin-bottom: var(--spacing-8);
+  }
+
+  &__heading {
+    min-width: 0;
+  }
+
+  &__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin-bottom: var(--spacing-2);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-none);
+    color: var(--color-primary-text);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+
+    .n-icon {
+      font-size: var(--text-base);
+    }
   }
 
   &__title {
     margin: 0;
-    font-size: var(--text-2xl);
+    font-size: var(--text-4xl);
     font-weight: var(--font-semibold);
-    letter-spacing: var(--tracking-tight);
+    line-height: var(--leading-tight);
     color: var(--color-text);
+    letter-spacing: var(--tracking-tighter);
   }
 
-  // swap 过渡的离场态是 position: absolute，宿主必须是定位上下文
+  &__subtitle {
+    max-width: 62ch;
+    margin: var(--spacing-2) 0 0;
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+    color: var(--color-text-muted);
+  }
+
+  &__header-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--spacing-3);
+  }
+
+  &__sync {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-3);
+    min-height: var(--spacing-10);
+    padding: var(--spacing-2) var(--spacing-3);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-elev-1);
+  }
+
+  &__sync-dot {
+    width: var(--spacing-2);
+    height: var(--spacing-2);
+    background-color: var(--color-success);
+    border-radius: var(--radius-full);
+    box-shadow: 0 0 0 var(--spacing-1) color-mix(in srgb, var(--color-success) 13%, transparent);
+
+    &.is-syncing {
+      background-color: var(--color-primary);
+      animation: sync-pulse var(--duration-slowest) var(--easing-ease-in-out) infinite alternate;
+    }
+  }
+
+  &__sync-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+    line-height: var(--leading-none);
+
+    strong {
+      font-size: var(--text-xs);
+      font-weight: var(--font-medium);
+      color: var(--color-text);
+    }
+
+    span {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+    }
+  }
+
+  &__refresh {
+    min-height: var(--spacing-10);
+    border-radius: var(--radius-full);
+  }
+
   &__body {
     position: relative;
   }
@@ -531,29 +657,222 @@ function handleRefresh(): void {
   &__sections {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-section);
+    gap: var(--spacing-10);
   }
 
-  // 概览区内部两排卡片的间距，与栅格 gap 同值
-  &__overview {
+  &__section {
     display: flex;
     flex-direction: column;
+    gap: var(--spacing-5);
+  }
+
+  &__state {
+    display: grid;
+    min-height: calc(var(--spacing-24) * 4);
+    place-items: center;
+  }
+
+  &__trend-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: var(--spacing-card-gap);
   }
 
-  &__section-title {
-    margin: 0 0 var(--spacing-4);
-    font-size: var(--text-lg);
-    font-weight: var(--font-medium);
-    color: var(--color-text);
+  &__trend-item {
+    min-width: 0;
+
+    &--wide {
+      grid-column: span 7;
+    }
+
+    &--narrow {
+      grid-column: span 5;
+    }
   }
 
-  // 逐项揭示：从左到右依次入场。
-  // backwards 填充让卡片在自己的延迟窗口里保持不可见，
-  // 否则会先闪一下再跳回起始态。
+  &__monthly-chart {
+    min-width: 0;
+  }
+
   &__reveal {
     animation: card-reveal var(--motion-enter-duration) var(--motion-enter-easing) backwards;
     animation-delay: calc(var(--stagger-i, 0) * var(--stagger-step));
+  }
+}
+
+.summary-panel {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-elev-1);
+
+  &::before {
+    position: absolute;
+    top: 0;
+    left: var(--spacing-6);
+    z-index: 1;
+    width: var(--spacing-16);
+    height: 2px;
+    content: '';
+    background-color: var(--color-chart-1);
+    border-radius: 0 0 var(--radius-full) var(--radius-full);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-5);
+    padding: var(--spacing-5) var(--spacing-6);
+  }
+
+  &__kicker {
+    display: block;
+    margin-bottom: var(--spacing-1);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-none);
+    color: var(--color-primary-text);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--text-xl);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-tight);
+    color: var(--color-text);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  &__date {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--spacing-2);
+    min-height: var(--spacing-8);
+    padding-inline: var(--spacing-3);
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    background-color: var(--color-surface-2);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-full);
+
+    .n-icon {
+      color: var(--color-primary-text);
+    }
+  }
+
+  &__body {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 8fr);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  &__hero {
+    position: relative;
+    min-height: calc(var(--spacing-24) * 2 + var(--spacing-8));
+    overflow: hidden;
+    background-color: color-mix(in srgb, var(--color-chart-1) 5%, var(--color-surface));
+    border-right: 1px solid var(--color-border-subtle);
+    isolation: isolate;
+
+    &::after {
+      position: absolute;
+      right: calc(-1 * var(--spacing-12));
+      bottom: calc(-1 * var(--spacing-12));
+      z-index: -1;
+      width: calc(var(--spacing-24) * 2);
+      height: calc(var(--spacing-24) * 2);
+      content: '';
+      border: 1px solid color-mix(in srgb, var(--color-chart-1) 18%, transparent);
+      border-radius: var(--radius-full);
+      box-shadow:
+        0 0 0 var(--spacing-6) color-mix(in srgb, var(--color-chart-1) 5%, transparent),
+        0 0 0 var(--spacing-12) color-mix(in srgb, var(--color-chart-1) 3%, transparent);
+    }
+  }
+
+  &__metrics {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-auto-rows: minmax(calc(var(--spacing-24) + var(--spacing-8)), 1fr);
+    gap: 1px;
+    background-color: var(--color-border-subtle);
+  }
+
+  &__metric {
+    min-width: 0;
+    background-color: var(--color-surface);
+
+    &--pulse {
+      grid-column: span 3;
+    }
+
+    &--stock {
+      grid-column: span 2;
+    }
+  }
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--spacing-6);
+
+  &__copy {
+    min-width: 0;
+  }
+
+  &__kicker {
+    display: block;
+    margin-bottom: var(--spacing-1);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-none);
+    color: var(--color-primary-text);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--text-2xl);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-tight);
+    color: var(--color-text);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  &__description {
+    max-width: 62ch;
+    margin: var(--spacing-2) 0 0;
+    font-size: var(--text-sm);
+    line-height: var(--leading-relaxed);
+    color: var(--color-text-muted);
+  }
+
+  &__period {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--spacing-2);
+    min-height: calc(var(--spacing-8) + var(--spacing-1));
+    padding-inline: var(--spacing-3);
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-elev-1);
+
+    .n-icon {
+      color: var(--color-primary-text);
+    }
   }
 }
 
@@ -564,10 +883,115 @@ function handleRefresh(): void {
   }
 }
 
-// 时长与步进已由 tokens 侧压到 0，这里直接停掉动画：
-// 0ms 的位移动画仍会让卡片在偏移位置闪现一帧。
+@keyframes sync-pulse {
+  to {
+    opacity: 0.35;
+    transform: scale(0.78);
+  }
+}
+
+@container dashboard (max-width: 64rem) {
+  .dashboard-page {
+    &__trend-item {
+      &--wide,
+      &--narrow {
+        grid-column: span 6;
+      }
+    }
+  }
+}
+
+@container dashboard (max-width: 52rem) {
+  .dashboard-page {
+    &__header {
+      align-items: flex-start;
+    }
+  }
+
+  .summary-panel {
+    &__body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    &__hero {
+      min-height: calc(var(--spacing-24) * 2);
+      border-right: 0;
+      border-bottom: 1px solid var(--color-border-subtle);
+    }
+  }
+}
+
+@container dashboard (max-width: 44rem) {
+  .dashboard-page {
+    &__header {
+      flex-direction: column;
+      gap: var(--spacing-5);
+    }
+
+    &__header-actions {
+      width: 100%;
+    }
+
+    &__sync {
+      flex: 1;
+    }
+
+    &__sections {
+      gap: var(--spacing-8);
+    }
+
+    &__trend-item {
+      &--wide,
+      &--narrow {
+        grid-column: 1 / -1;
+      }
+    }
+  }
+
+  .section-heading {
+    align-items: flex-start;
+  }
+}
+
+@container dashboard (max-width: 34rem) {
+  .dashboard-page {
+    &__header-actions {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    &__refresh {
+      width: 100%;
+    }
+
+    &__title {
+      font-size: var(--text-3xl);
+    }
+  }
+
+  .summary-panel {
+    &__header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    &__metric {
+      &--pulse,
+      &--stock {
+        grid-column: 1 / -1;
+      }
+    }
+  }
+
+  .section-heading {
+    flex-direction: column;
+    gap: var(--spacing-3);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .dashboard-page__reveal {
+  .dashboard-page__reveal,
+  .dashboard-page__sync-dot {
     animation: none;
   }
 }

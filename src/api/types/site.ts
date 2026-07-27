@@ -309,8 +309,10 @@ export interface SiteOverview {
  * 每日趋势数据
  */
 export interface DailyTrends {
-  /** 访问用户趋势 */
+  /** 访问用户趋势（站点打点日 UV，含未登录访客） */
   visitUsers: TrendSeries
+  /** 登录用户趋势（每日去重登录用户数，与 overview.todayLoginUsers 同口径） */
+  loginUsers: TrendSeries
   /** 发布视频趋势 */
   publishVideos: TrendSeries
   /** 新增用户趋势 */

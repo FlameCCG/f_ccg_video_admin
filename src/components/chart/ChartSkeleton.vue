@@ -26,6 +26,8 @@ interface Props {
   animated?: boolean
   /** 统计卡片尺寸（type=stat 时有效），与 StatCard 的 size 对齐 */
   size?: 'small' | 'medium' | 'large'
+  /** 是否嵌入统一面板，由父级承担表面与分隔线 */
+  embedded?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -34,6 +36,7 @@ const props = withDefaults(defineProps<Props>(), {
   showTitle: true,
   animated: true,
   size: 'medium',
+  embedded: false,
 })
 
 /**
@@ -82,7 +85,7 @@ const X_AXIS_STRIP = 30
     <template v-if="type === 'stat'">
       <n-card
         class="chart-skeleton__stat-card"
-        :class="`chart-skeleton__stat-card--${size}`"
+        :class="[`chart-skeleton__stat-card--${size}`, { 'is-embedded': embedded }]"
         :content-style="statContentStyle"
         :bordered="false"
       >
@@ -103,7 +106,7 @@ const X_AXIS_STRIP = 30
 
     <!-- 折线图骨架 -->
     <template v-else-if="type === 'line'">
-      <n-card class="chart-skeleton__chart" :bordered="false">
+      <n-card class="chart-skeleton__chart" :class="{ 'is-embedded': embedded }" :bordered="false">
         <template v-if="showTitle" #header>
           <n-skeleton :animated="animated" width="120px" height="20px" text />
         </template>
@@ -155,7 +158,7 @@ const X_AXIS_STRIP = 30
 
     <!-- 柱状图骨架 -->
     <template v-else-if="type === 'bar'">
-      <n-card class="chart-skeleton__chart" :bordered="false">
+      <n-card class="chart-skeleton__chart" :class="{ 'is-embedded': embedded }" :bordered="false">
         <template v-if="showTitle" #header>
           <n-skeleton :animated="animated" width="120px" height="20px" text />
         </template>
@@ -188,7 +191,7 @@ const X_AXIS_STRIP = 30
 
     <!-- 饼图骨架 -->
     <template v-else-if="type === 'pie'">
-      <n-card class="chart-skeleton__chart" :bordered="false">
+      <n-card class="chart-skeleton__chart" :class="{ 'is-embedded': embedded }" :bordered="false">
         <template v-if="showTitle" #header>
           <n-skeleton :animated="animated" width="120px" height="20px" text />
         </template>
@@ -221,6 +224,13 @@ const X_AXIS_STRIP = 30
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-elev-1);
+
+    &.is-embedded {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
   }
 
   // 图标占位尺寸与 StatCard 的 --stat-icon-box 逐档对齐，

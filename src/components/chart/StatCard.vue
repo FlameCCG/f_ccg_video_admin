@@ -18,16 +18,24 @@
  * 4. 加载态由骨架屏承担，这里不再渲染 '-' 占位符：占位符 → 真实值 → 动画
  *    是三段切换，而骨架屏 → 内容只有一段。
  */
-import { computed, type CSSProperties } from 'vue'
+import { computed, type Component, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NCard, NNumberAnimation } from 'naive-ui'
+import { NCard, NIcon, NNumberAnimation } from 'naive-ui'
+import {
+  ChatbubbleEllipsesOutline,
+  EyeOutline,
+  LogInOutline,
+  PeopleOutline,
+  PersonAddOutline,
+  VideocamOutline,
+} from '@vicons/ionicons5'
 import { useReducedMotion } from '@/composables/useReducedMotion'
 
 /** 趋势方向：这是「状态」，因此用语义色 */
 type TrendType = 'up' | 'down' | 'flat'
 
 /** 内置图标 */
-type StatIcon = 'users' | 'videos' | 'comments' | 'views' | 'likes' | 'custom'
+type StatIcon = 'users' | 'videos' | 'comments' | 'views' | 'login' | 'register' | 'custom'
 
 /** 分类色序号，对应 --color-chart-1 .. --color-chart-8 */
 type SeriesIndex = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
@@ -63,6 +71,8 @@ interface Props {
   size?: 'small' | 'medium' | 'large'
   /** 是否为主指标：撑满高度 + 顶部强调条 + 更大的数值 */
   hero?: boolean
+  /** 是否嵌入统一指标面板（由父级承担表面、边框与阴影） */
+  embedded?: boolean
   /** 数字滚动时长（ms），默认取 --duration-slowest */
   duration?: number
 }
@@ -81,6 +91,7 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
   size: 'medium',
   hero: false,
+  embedded: false,
   duration: undefined,
 })
 
@@ -117,6 +128,21 @@ const playCountUp = computed(() => props.animated && !props.loading && shouldAni
 
 /** 强调色：图标前景 + hero 顶部条 */
 const accentColor = computed(() => props.iconColor ?? `var(--color-chart-${props.series})`)
+
+/** 所有指标共用 Ionicons Outline，避免首页出现六套不同描边体系。 */
+const iconComponents: Record<Exclude<StatIcon, 'custom'>, Component> = {
+  users: PeopleOutline,
+  videos: VideocamOutline,
+  comments: ChatbubbleEllipsesOutline,
+  views: EyeOutline,
+  login: LogInOutline,
+  register: PersonAddOutline,
+}
+
+const iconComponent = computed(() => {
+  if (!props.icon || props.icon === 'custom') return undefined
+  return iconComponents[props.icon]
+})
 
 /** 趋势色：语义色的「文字版」，保证在表面上 >= 4.5:1 */
 const trendTone = computed(() => {
@@ -175,53 +201,28 @@ const contentStyle = computed<CSSProperties>(() => ({
 <template>
   <n-card
     class="stat-card"
-    :class="[`stat-card--${size}`, { 'is-hero': hero }]"
+    :class="[
+      `stat-card--${size}`,
+      {
+        'is-hero': hero,
+        'is-embedded': embedded,
+      },
+    ]"
     :style="{ '--stat-accent': accentColor }"
     :content-style="contentStyle"
     :bordered="false"
   >
     <div class="stat-card__content">
-      <!-- 图标：单一 svg 元素，尺寸与描边由 CSS 变量统一驱动 -->
-      <div v-if="icon" class="stat-card__icon">
-        <slot v-if="icon === 'custom'" name="icon" />
-        <svg
-          v-else
-          class="stat-card__glyph"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <g v-if="icon === 'users'">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </g>
-          <g v-else-if="icon === 'videos'">
-            <polygon points="23 7 16 12 23 17 23 7" />
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-          </g>
-          <g v-else-if="icon === 'comments'">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </g>
-          <g v-else-if="icon === 'views'">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-            <circle cx="12" cy="12" r="3" />
-          </g>
-          <g v-else-if="icon === 'likes'">
-            <path
-              d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"
-            />
-          </g>
-        </svg>
+      <div class="stat-card__heading">
+        <div class="stat-card__title">{{ title }}</div>
+        <div v-if="icon" class="stat-card__icon" aria-hidden="true">
+          <slot v-if="icon === 'custom'" name="icon" />
+          <n-icon v-else :component="iconComponent" class="stat-card__glyph" />
+        </div>
       </div>
 
       <!-- 数据 -->
       <div class="stat-card__data">
-        <div class="stat-card__title">{{ title }}</div>
         <!--
           不用 n-statistic：它的 .n-statistic-value__content 自带
           font-size: var(--n-value-font-size)，会盖掉 --stat-value-size，
@@ -272,34 +273,44 @@ const contentStyle = computed<CSSProperties>(() => ({
 @use '@/styles/transitions/interaction' as ix;
 
 .stat-card {
-  // 图标几何：全部从这里派生，避免每个 svg 各写一套 width / stroke-width
-  // （全仓 113 处内联 svg 粗细不一，是「不精致」最直接的观感来源）。
-  --stat-icon-box: var(--spacing-12);
-  --stat-icon-glyph: var(--spacing-6);
-  --stat-icon-stroke: 2;
-
-  // 趋势箭头只有 12px：stroke-width 是 viewBox 用户单位，缩放后同样按比例变细，
-  // 所以这里要比主图标粗，实际落到屏幕上约 1.5px。
+  --stat-icon-box: var(--spacing-10);
+  --stat-icon-glyph: var(--spacing-5);
   --stat-trend-stroke: 3;
-  --stat-value-size: var(--text-2xl);
-  --stat-gap: var(--spacing-4);
+  --stat-value-size: var(--text-3xl);
 
-  // 撑满网格单元，让同一行卡片底部对齐
   height: 100%;
+  overflow: hidden;
   background-color: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-elev-1);
 
-  // 过渡声明集中在 feedback-transition，hover-lift 只给状态值
   @include ix.feedback-transition;
-  @include ix.hover-lift;
+
+  &:hover:not(.is-embedded) {
+    border-color: var(--color-border);
+    box-shadow: var(--shadow-elev-2);
+  }
+
+  &.is-embedded {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 
   &__content {
     display: flex;
     flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__heading {
+    display: flex;
     align-items: flex-start;
-    gap: var(--stat-gap);
+    justify-content: space-between;
+    gap: var(--spacing-3);
     min-width: 0;
   }
 
@@ -311,49 +322,43 @@ const contentStyle = computed<CSSProperties>(() => ({
     width: var(--stat-icon-box);
     height: var(--stat-icon-box);
     color: var(--stat-accent);
-
-    // 分类色没有配套的 -subtle 档，用 color-mix 现兑：同一个色相在浅色主题
-    // 得到淡底、在深色主题得到暗底，四套主题都不需要各写一次。
-    // 12% 是实测上限：pearl 最亮的 chart-3 (#c9721b) 兑到 12% 后，
-    // 图标前景与底色仍有 3.09:1（图形元素的 WCAG 门槛是 3:1），再高就掉到线下。
-    background-color: color-mix(in srgb, var(--stat-accent) 12%, var(--color-surface));
-    border-radius: var(--radius-lg);
+    background-color: color-mix(in srgb, var(--stat-accent) 11%, var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--stat-accent) 22%, var(--color-surface));
+    border-radius: var(--radius-full);
   }
 
   &__glyph {
     width: var(--stat-icon-glyph);
     height: var(--stat-icon-glyph);
-    stroke-width: var(--stat-icon-stroke);
+    font-size: var(--stat-icon-glyph);
   }
 
   &__data {
     display: flex;
     flex: 1;
     flex-direction: column;
+    margin-top: var(--spacing-3);
     min-width: 0;
   }
 
   &__title {
-    margin-bottom: var(--spacing-1);
     overflow: hidden;
     font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    line-height: var(--leading-snug);
     color: var(--color-text-secondary);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  // 保持行内布局（不用 flex）：NNumberAnimation 渲染出的是「整数 / 小数点 /
-  // 小数」三个文本节点，flex 容器会把它们包进匿名 flex item，行为不如行内直观。
   &__value {
     font-size: var(--stat-value-size);
     font-weight: var(--font-semibold);
     line-height: var(--leading-tight);
     color: var(--color-text);
-
-    // 等宽数字：数字滚动逐帧改写文本，比例数字下卡片宽度会跟着抖
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum' 1;
-    letter-spacing: var(--tracking-tight);
+    letter-spacing: var(--tracking-tighter);
   }
 
   &__affix {
@@ -362,7 +367,6 @@ const contentStyle = computed<CSSProperties>(() => ({
     color: var(--color-text-secondary);
   }
 
-  // margin-top: auto 让趋势行贴底，同排卡片的趋势行落在同一条基线上
   &__trend {
     display: flex;
     align-items: center;
@@ -378,7 +382,6 @@ const contentStyle = computed<CSSProperties>(() => ({
     height: var(--spacing-3);
     stroke-width: var(--stat-trend-stroke);
 
-    // 一个箭头字形转出三种方向：三份 svg 必然出现粗细/尺寸漂移
     &.is-down {
       transform: rotate(180deg);
     }
@@ -400,43 +403,35 @@ const contentStyle = computed<CSSProperties>(() => ({
     white-space: nowrap;
   }
 
-  // 各档位的 stroke-width 按 2 × 24 ÷ 字形边长 反推，
-  // 保证三档图标落到屏幕上的描边都正好 2px —— 否则同一页里
-  // 小图标偏细、大图标偏粗，正是「图标粗细不统一」的来源。
   &--small {
-    --stat-icon-box: var(--spacing-10);
-    --stat-icon-glyph: var(--spacing-5);
-    --stat-icon-stroke: 2.4;
     --stat-value-size: var(--text-xl);
-    --stat-gap: var(--spacing-3);
+
+    .stat-card__data {
+      margin-top: var(--spacing-2);
+    }
   }
 
   &--large {
-    --stat-icon-box: calc(var(--spacing-12) + var(--spacing-2));
-    --stat-icon-glyph: calc(var(--spacing-6) + var(--spacing-1));
-    --stat-icon-stroke: 1.72;
-    --stat-value-size: var(--text-3xl);
+    --stat-icon-box: var(--spacing-12);
+    --stat-icon-glyph: var(--spacing-6);
+    --stat-value-size: var(--text-5xl);
   }
 
-  // 主指标：顶部描边加粗并着上分类色，把它与同色的那条趋势线绑在一起。
-  // 用 border 而不是 ::before：边框自动跟随卡片圆角，不需要 overflow: hidden，
-  // 也不引入新的长度值（边框宽度本就不在 token 词汇表里，1px 边框同理）。
   &.is-hero {
-    --stat-value-size: var(--text-4xl);
+    --stat-value-size: var(--text-6xl);
 
-    border-top: 3px solid var(--stat-accent);
+    .stat-card__data {
+      justify-content: flex-end;
+      margin-top: var(--spacing-8);
+    }
 
     .stat-card__title {
       font-size: var(--text-base);
     }
-  }
-}
 
-// hover 抬升是位移动效：全局的减少动效规则只会去掉过渡，
-// 不会去掉终态 —— 不显式关掉的话，卡片会「瞬移」2px。
-@media (prefers-reduced-motion: reduce) {
-  .stat-card:hover {
-    transform: none;
+    .stat-card__trend {
+      margin-top: var(--spacing-3);
+    }
   }
 }
 </style>
