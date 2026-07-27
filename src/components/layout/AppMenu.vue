@@ -270,6 +270,28 @@ function handleMenuSelect(key: string): void {
   // 而宽度动画已经把状态变化说清楚了，看不出这一层补间。
   @include ix.feedback-transition;
   @include ix.pressable(0.98, 0);
+
+  // 所有菜单项都预留同一条指示器，只改变合成层上的 opacity / transform。
+  // 切换菜单时不会再销毁后重建一根线，视觉上是稳定、连续的状态交接。
+  &::after {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    z-index: 2;
+    width: calc(var(--spacing-1) / 2);
+    height: var(--spacing-5);
+    content: '';
+    background: var(--color-primary);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    box-shadow: 0 0 var(--spacing-2) color-mix(in srgb, var(--color-primary) 50%, transparent);
+    opacity: 0;
+    transform: translateY(-50%) scaleY(0.35);
+    transform-origin: center;
+    transition:
+      opacity ix.$hover-motion,
+      transform ix.$indicator-motion;
+    pointer-events: none;
+  }
 }
 
 // 展开态才接管横向内边距。必须 !important：naive 把 padding-left 写在 inline style 上，
@@ -285,37 +307,29 @@ function handleMenuSelect(key: string): void {
 }
 
 :deep(.n-menu-item-content--selected) {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--color-primary) 12%, transparent) 0%,
-    color-mix(in srgb, var(--color-primary) 8%, transparent) 100%
-  );
-
-  // 左侧指示条。naive 用同一个 ::before 画它自己的选中底色，且有两处声明比这里更强
-  // （折叠选中态写了 !important，hover 选中态选择器更具体），
-  // 不加 !important 指示条会在折叠态和 hover 时被染成浅色 —— 这里没有别的办法。
+  // ::before 仍交给 Naive UI 负责选中表面；这里只换成 token 化渐变。
   &::before {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    width: 3px;
-    height: var(--spacing-5);
-    content: '';
-    background: var(--color-primary) !important;
-    border-radius: 0 2px 2px 0;
-    box-shadow: 0 0 var(--spacing-2) color-mix(in srgb, var(--color-primary) 50%, transparent);
-    transform: translateY(-50%);
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-primary) 13%, transparent) 0%,
+      color-mix(in srgb, var(--color-primary-hover) 7%, transparent) 100%
+    ) !important;
+  }
+
+  &::after {
+    opacity: 1;
+    transform: translateY(-50%) scaleY(1);
   }
 
   // 折叠态改成底部指示条
-  .n-menu--collapsed &::before {
+  .n-menu--collapsed &::after {
     top: auto;
     bottom: var(--spacing-1);
     left: 50%;
     width: var(--spacing-5);
-    height: 3px;
-    border-radius: 2px 2px 0 0;
-    transform: translateX(-50%);
+    height: calc(var(--spacing-1) / 2);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    transform: translateX(-50%) scaleX(1);
   }
 }
 
@@ -332,12 +346,9 @@ function handleMenuSelect(key: string): void {
   @include ix.feedback-transition;
 }
 
-// hover 放大。整条选择器必须写在同一个 :deep() 里：scoped 编译只给 :deep 之前的部分
-// 加 scopeId，而 .n-menu-item-content 不是任何组件的根元素、拿不到 scopeId ——
-// 原来 `.n-menu-item-content:hover &` 编译出的是 `.n-menu-item-content[data-v-x]:hover`，
-// 永远匹配不上，这个放大效果其实一直没生效。
+// 横向轻移比放大更克制，也不会让细线 SVG 在缩放时发虚。
 :deep(.n-menu-item-content:hover .n-menu-item-content__icon) {
-  transform: scale(1.08);
+  transform: translateX(calc(var(--spacing-1) / 2));
 }
 
 // 选中态图标着色。多写一个 .n-menu 是为了提高特异性：naive 在折叠态会给所有图标统一
@@ -347,15 +358,26 @@ function handleMenuSelect(key: string): void {
   color: var(--color-primary);
 }
 
+// 标题与指示器使用同一条 easing，选中反馈像一个整体，而不是各自动一下。
+:deep(.n-menu-item-content-header) {
+  transition:
+    color ix.$hover-motion,
+    opacity ix.$hover-motion,
+    transform ix.$indicator-motion;
+}
+
+:deep(.n-menu-item-content--selected .n-menu-item-content-header) {
+  transform: translateX(var(--spacing-1));
+}
+
 // 子菜单样式
 // 这里的 --n-item-height 是有效的：它声明在 .n-submenu-children 上，
 // 不与 .n-menu 的 inline style 竞争，而是被子项继承。
 :deep(.n-submenu-children) {
   --n-item-height: var(--spacing-10);
 
-  .n-menu-item-content::before {
+  .n-menu-item-content::after {
     left: var(--spacing-2);
-    width: 2px;
     height: var(--spacing-4);
   }
 }
@@ -365,8 +387,43 @@ function handleMenuSelect(key: string): void {
   padding-left: var(--spacing-5) !important;
 }
 
-// 展开箭头动画
-:deep(.n-base-icon) {
-  transition: transform ix.$expand-motion;
+// Naive UI 默认把子菜单的 max-height / opacity 都写死为 200ms。
+// 覆盖为“进慢出快”的语义 token：展开看得清，收起不拖沓。
+:deep(.n-submenu-children.fade-in-height-expand-transition-enter-active) {
+  transition:
+    max-height ix.$expand-motion,
+    opacity ix.$enter-motion,
+    margin-top ix.$expand-motion,
+    margin-bottom ix.$expand-motion;
+}
+
+:deep(.n-submenu-children.fade-in-height-expand-transition-leave-active) {
+  transition:
+    max-height ix.$leave-motion,
+    opacity ix.$leave-motion,
+    margin-top ix.$leave-motion,
+    margin-bottom ix.$leave-motion;
+}
+
+:deep(.n-menu-item-content__arrow) {
+  transition:
+    color ix.$hover-motion,
+    opacity ix.$hover-motion,
+    transform ix.$expand-motion;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :deep(.n-menu-item-content-header),
+  :deep(.n-menu-item-content__icon) {
+    transform: none;
+  }
+
+  :deep(.n-menu:not(.n-menu--collapsed) .n-menu-item-content::after) {
+    transform: translateY(-50%);
+  }
+
+  :deep(.n-menu--collapsed .n-menu-item-content::after) {
+    transform: translateX(-50%);
+  }
 }
 </style>

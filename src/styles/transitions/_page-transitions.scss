@@ -35,16 +35,19 @@
 // 2. Fade Slide（默认页面过渡）
 // ============================================
 
-// 唯一走 page 语义 token 的过渡。离场刻意用更快的 leave token：
-// DefaultLayout 的 <transition mode="out-in"> 会让离场与入场串行，
-// 两端都用 300ms 的话一次路由切换要等 600ms。
+// 唯一走 page 语义 token 的过渡。新旧页面在 DefaultLayout 的同一网格单元内
+// 交叠：入场用 out-expo 清晰落位，离场更快，不产生串行动画的空白等待。
 .fade-slide-enter-active {
+  z-index: 1;
+  will-change: opacity, transform;
   transition:
     opacity ix.$page-motion,
     transform ix.$page-motion;
 }
 
 .fade-slide-leave-active {
+  z-index: 0;
+  will-change: opacity, transform;
   transition:
     opacity ix.$leave-motion,
     transform ix.$leave-motion;
@@ -54,12 +57,12 @@
 // 横向大位移会让人误以为是左右翻页。
 .fade-slide-enter-from {
   opacity: 0;
-  transform: translateY(var(--spacing-2));
+  transform: translate3d(0, var(--spacing-2), 0);
 }
 
 .fade-slide-leave-to {
   opacity: 0;
-  transform: translateY(calc(-1 * var(--spacing-1)));
+  transform: translate3d(0, calc(-1 * var(--spacing-1)), 0);
 }
 
 // ============================================

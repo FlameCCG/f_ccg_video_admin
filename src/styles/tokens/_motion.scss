@@ -81,7 +81,8 @@ $motion-semantic: (
   // 页面过渡
   'page': (
       'duration': map.get($duration, 'slow'),
-      'easing': map.get($easing, 'smooth'),
+      // 大面积内容用强减速曲线快速完成主要位移，再柔和落位，避免匀速般的拖沓感。
+      'easing': map.get($easing, 'out-expo'),
     ),
   // 大面积内容揭示：抽屉、详情面板
   'reveal': (
