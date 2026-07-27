@@ -67,7 +67,7 @@ const keepCurrentView = computed(() => route.meta.keepAlive === true)
 
 /** 监听路由变化，自动添加标签 */
 watch(
-  () => route.path,
+  () => route.fullPath,
   () => {
     if (route.path && route.meta) {
       tabsStore.addTab(route)
@@ -111,7 +111,7 @@ watch(
             <transition name="fade-slide">
               <keep-alive :include="CACHED_VIEW_NAME" :max="MAX_CACHED_VIEWS">
                 <KeepAliveView v-if="keepCurrentView" :key="route.path">
-                  <component :is="Component" />
+                  <component :is="Component" :key="route.path" />
                 </KeepAliveView>
                 <component :is="Component" v-else :key="route.path" />
               </keep-alive>

@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { getSiteConfig, updateSiteConfig } from '@/api/site'
 import type {
   SiteConfigName,
+  SiteConfigMap,
   SiteConfig,
   LoggerConfig,
   EmailConfig,
@@ -42,6 +43,11 @@ const router = useRouter()
 const { t } = useI18n()
 const message = useMessage()
 const queryClient = useQueryClient()
+
+type SiteConfigQueryResult = {
+  name: SiteConfigName
+  value: SiteConfigMap[SiteConfigName]
+}
 
 // 当前配置类型，从路由路径或 query 参数获取
 const currentTab = computed(() => {
@@ -95,51 +101,76 @@ const thirdLoginFormData = ref<ThirdLoginConfig | null>(null)
 const jwtFormData = ref<JwtConfig | null>(null)
 const serverFormData = ref<ServerCorsConfig | null>(null)
 
+/**
+ * 把查询结果复制到可编辑表单。
+ *
+ * 这里不能在 queryFn 内赋值：TanStack Query 命中 staleTime 内的缓存时不会再次
+ * 执行 queryFn，新挂载的同类路由（例如 site -> logger）就会一直拿到 null 表单。
+ * 监听 query data 后，无论数据来自网络还是缓存，都会走同一条回填路径。
+ */
+function hydrateFormData(result: SiteConfigQueryResult): void {
+  const { name, value } = result
+
+  switch (name) {
+    case 'site':
+      siteFormData.value = normalizeSiteConfig(value as SiteConfig)
+      break
+    case 'logger':
+      loggerFormData.value = { ...(value as LoggerConfig) }
+      break
+    case 'email':
+      emailFormData.value = { ...(value as EmailConfig) }
+      break
+    case 'ai':
+      aiFormData.value = normalizeAIConfig(value as AIConfig)
+      break
+    case 'transcode':
+      transcodeFormData.value = normalizeTranscodeConfig(value as TranscodeConfig)
+      break
+    case 'thirdLogin':
+      thirdLoginFormData.value = normalizeThirdLoginConfig(value as ThirdLoginConfig)
+      break
+    case 'jwt':
+      jwtFormData.value = { ...(value as JwtConfig) }
+      break
+    case 'server':
+      serverFormData.value = {
+        corsOrigins: Array.isArray((value as ServerCorsConfig)?.corsOrigins)
+          ? [...(value as ServerCorsConfig).corsOrigins]
+          : [],
+      }
+      break
+  }
+}
+
 // 获取配置数据
-const { isLoading, refetch } = useQuery({
+const {
+  data: configQueryData,
+  isFetching,
+  refetch,
+} = useQuery({
   queryKey: ['siteConfig', currentTab],
-  queryFn: async () => {
+  queryFn: async (): Promise<SiteConfigQueryResult> => {
     const name = currentTab.value
-    const data = await getSiteConfig(name)
-    // 根据类型设置对应的表单数据（归一化后写入，避免缺字段 / 已删字段）
-    switch (name) {
-      case 'site':
-        siteFormData.value = normalizeSiteConfig(data as SiteConfig)
-        break
-      case 'logger':
-        loggerFormData.value = data as LoggerConfig
-        break
-      case 'email':
-        emailFormData.value = data as EmailConfig
-        break
-      case 'ai':
-        aiFormData.value = normalizeAIConfig(data as AIConfig)
-        break
-      case 'transcode':
-        transcodeFormData.value = normalizeTranscodeConfig(data as TranscodeConfig)
-        break
-      case 'thirdLogin':
-        thirdLoginFormData.value = normalizeThirdLoginConfig(data as ThirdLoginConfig)
-        break
-      case 'jwt':
-        jwtFormData.value = data as JwtConfig
-        break
-      case 'server':
-        serverFormData.value = {
-          corsOrigins: Array.isArray((data as ServerCorsConfig)?.corsOrigins)
-            ? [...(data as ServerCorsConfig).corsOrigins]
-            : [],
-        }
-        break
-    }
-    return data
+    const value = await getSiteConfig(name)
+    return { name, value }
   },
   staleTime: 30 * 1000,
 })
 
+watch(
+  configQueryData,
+  (result) => {
+    if (result) {
+      hydrateFormData(result)
+    }
+  },
+  { immediate: true }
+)
+
 // 更新配置 mutation
 const updateMutation = useMutation({
-  mutationFn: async () => {
+  mutationFn: async (): Promise<SiteConfigName> => {
     const name = currentTab.value
     let data: unknown
     switch (name) {
@@ -170,10 +201,11 @@ const updateMutation = useMutation({
     }
     if (!data) throw new Error('No data to save')
     await updateSiteConfig(name, data as never)
+    return name
   },
-  onSuccess: () => {
+  onSuccess: (name) => {
     message.success(t('siteConfig.actions.saveSuccess'))
-    void queryClient.invalidateQueries({ queryKey: ['siteConfig', currentTab.value] })
+    void queryClient.invalidateQueries({ queryKey: ['siteConfig', name] })
   },
   onError: (error: Error) => {
     message.error(error.message || t('siteConfig.actions.saveFailed'))
@@ -183,11 +215,26 @@ const updateMutation = useMutation({
 // 切换 tab - 跳转到对应的路由路径
 function handleTabChange(name: string): void {
   const tabName = name as SiteConfigName
-  // 保持当前已注册路由，使用 query 驱动 tab，避免未注册子路由导致 404
+
+  // 后端已经注册的配置子路由优先走真实路径，让侧边菜单、页面标题和顶部标签
+  // 保持同一个导航身份；AI / Server 等未注册项再安全回退到 query 驱动。
+  const parentPath = route.path.replace(/\/[^/]+$/, '')
+  const targetPath = `${parentPath}/${tabName}`
+  const hasRegisteredRoute = router
+    .resolve({ path: targetPath })
+    .matched.some((record) => record.path === targetPath)
+  const query = { ...route.query }
+  delete query.tab
+
+  if (hasRegisteredRoute) {
+    void router.push({ path: targetPath, query })
+    return
+  }
+
   void router.push({
     path: route.path,
     query: {
-      ...route.query,
+      ...query,
       tab: tabName,
     },
   })
@@ -199,14 +246,12 @@ function handleSave(): void {
 }
 
 // 重置配置
-function handleReset(): void {
-  void refetch()
+async function handleReset(): Promise<void> {
+  const result = await refetch()
+  if (result.data) {
+    hydrateFormData(result.data)
+  }
 }
-
-// 监听 tab 变化，重新加载数据
-watch(currentTab, () => {
-  void refetch()
-})
 </script>
 
 <template>
@@ -219,7 +264,7 @@ watch(currentTab, () => {
             <n-button
               size="small"
               secondary
-              :disabled="isLoading || updateMutation.isPending.value"
+              :disabled="isFetching || updateMutation.isPending.value"
               @click="handleReset"
             >
               {{ t('siteConfig.actions.reset') }}
@@ -228,7 +273,7 @@ watch(currentTab, () => {
               type="primary"
               size="small"
               :loading="updateMutation.isPending.value"
-              :disabled="isLoading"
+              :disabled="isFetching"
               @click="handleSave"
             >
               {{ t('siteConfig.actions.save') }}
@@ -237,15 +282,9 @@ watch(currentTab, () => {
         </n-space>
       </template>
 
-      <n-tabs :value="currentTab" type="line" @update:value="handleTabChange">
-        <n-tab-pane
-          v-for="tab in configTabs"
-          :key="tab.key"
-          :name="tab.key"
-          :tab="tab.label"
-          :disabled="isLoading"
-        >
-          <n-spin :show="isLoading" class="config-spin">
+      <n-tabs :value="currentTab" type="line" animated @update:value="handleTabChange">
+        <n-tab-pane v-for="tab in configTabs" :key="tab.key" :name="tab.key" :tab="tab.label">
+          <n-spin :show="isFetching" class="config-spin">
             <div class="config-content">
               <!-- 基础配置 -->
               <site-config-form

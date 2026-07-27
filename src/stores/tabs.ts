@@ -5,12 +5,17 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useStorage } from '@vueuse/core'
-import type { RouteLocationNormalized } from 'vue-router'
+import type { LocationQuery, RouteLocationNormalized } from 'vue-router'
+
+/** 可安全持久化并重新交给 Vue Router 的 query 结构 */
+export type PersistedTabQuery = Record<string, string | null | Array<string | null>>
 
 /** 标签页信息 */
 export interface TabItem {
-  /** 路由路径 */
+  /** 标签唯一标识：不含 query，同一页面始终只保留一个标签 */
   path: string
+  /** 最近一次访问的完整地址，用于恢复 query / hash 等页面上下文 */
+  fullPath?: string
   /** 标签标题 */
   title: string
   /** 标签标题（英文） */
@@ -22,7 +27,7 @@ export interface TabItem {
   /** 是否固定（不可关闭） */
   affix?: boolean
   /** 路由 query */
-  query?: Record<string, string>
+  query?: PersistedTabQuery
 }
 
 const TABS_STORAGE_KEY = 'admin-console-tabs'
@@ -31,10 +36,18 @@ const ACTIVE_TAB_KEY = 'admin-console-active-tab'
 /** 默认首页标签 */
 const HOME_TAB: TabItem = {
   path: '/overview',
+  fullPath: '/overview',
   title: '仪表盘',
   titleEn: 'Dashboard',
   titleJa: 'ダッシュボード',
   affix: true,
+}
+
+/** 复制 Vue Router 的只读 query，避免把路由对象本身塞进持久化状态 */
+function cloneQuery(query: LocationQuery): PersistedTabQuery {
+  return Object.fromEntries(
+    Object.entries(query).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value])
+  )
 }
 
 export const useTabsStore = defineStore('tabs', () => {
@@ -54,10 +67,16 @@ export const useTabsStore = defineStore('tabs', () => {
   /** 添加标签 */
   function addTab(route: RouteLocationNormalized): void {
     const path = route.path
+    const query = cloneQuery(route.query)
     // 检查是否已存在
-    const exists = tabs.value.some((tab) => tab.path === path)
-    if (exists) {
+    const existing = tabs.value.find((tab) => tab.path === path)
+    if (existing) {
+      // 标签身份仍按 path 去重，但导航目标必须跟随最近一次完整地址。
+      // 例如 /system-config/site?tab=ai 切走再回来时不能退回默认 site。
+      existing.fullPath = route.fullPath
+      existing.query = query
       activeTab.value = path
+      storedTabs.value = tabs.value
       storedActiveTab.value = path
       return
     }
@@ -66,12 +85,13 @@ export const useTabsStore = defineStore('tabs', () => {
     const meta = route.meta || {}
     const newTab: TabItem = {
       path,
+      fullPath: route.fullPath,
       title: (meta.titleZh as string) || (meta.title as string) || route.name?.toString() || path,
       titleEn: meta.titleEn as string,
       titleJa: meta.titleJa as string,
       icon: meta.icon as string,
       affix: meta.affix as boolean,
-      query: route.query as Record<string, string>,
+      query,
     }
 
     tabs.value.push(newTab)
@@ -187,8 +207,24 @@ export const useTabsStore = defineStore('tabs', () => {
     )
     if (staleHome) {
       staleHome.path = HOME_TAB.path
+      staleHome.fullPath = HOME_TAB.fullPath
       staleHome.titleEn = HOME_TAB.titleEn
       staleHome.titleJa = HOME_TAB.titleJa
+      storedTabs.value = tabs.value
+    }
+  }
+
+  /** 为旧版持久化标签补齐完整导航地址 */
+  function migrateTabLocations(): void {
+    let changed = false
+    for (const tab of tabs.value) {
+      if (!tab.fullPath && (!tab.query || Object.keys(tab.query).length === 0)) {
+        tab.fullPath = tab.path
+        changed = true
+      }
+    }
+
+    if (changed) {
       storedTabs.value = tabs.value
     }
   }
@@ -230,6 +266,7 @@ export const useTabsStore = defineStore('tabs', () => {
   // 初始化时修正旧路径并去重
   fixHomeTabPath()
   deduplicateTabs()
+  migrateTabLocations()
 
   return {
     tabs: computed(() => tabs.value),
