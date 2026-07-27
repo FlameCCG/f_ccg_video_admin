@@ -668,7 +668,7 @@ function handleRefresh(): void {
 
   &__state {
     display: grid;
-    min-height: calc(var(--spacing-24) * 4);
+    min-height: calc(var(--spacing-24) + var(--spacing-24) + var(--spacing-24) + var(--spacing-24));
     place-items: center;
   }
 
@@ -774,7 +774,7 @@ function handleRefresh(): void {
 
   &__hero {
     position: relative;
-    min-height: calc(var(--spacing-24) * 2 + var(--spacing-8));
+    min-height: calc(var(--spacing-24) + var(--spacing-24) + var(--spacing-8));
     overflow: hidden;
     background-color: color-mix(in srgb, var(--color-chart-1) 5%, var(--color-surface));
     border-right: 1px solid var(--color-border-subtle);
@@ -782,11 +782,11 @@ function handleRefresh(): void {
 
     &::after {
       position: absolute;
-      right: calc(-1 * var(--spacing-12));
-      bottom: calc(-1 * var(--spacing-12));
+      right: calc(0px - var(--spacing-12));
+      bottom: calc(0px - var(--spacing-12));
       z-index: -1;
-      width: calc(var(--spacing-24) * 2);
-      height: calc(var(--spacing-24) * 2);
+      width: calc(var(--spacing-24) + var(--spacing-24));
+      height: calc(var(--spacing-24) + var(--spacing-24));
       content: '';
       border: 1px solid color-mix(in srgb, var(--color-chart-1) 18%, transparent);
       border-radius: var(--radius-full);
@@ -914,7 +914,7 @@ function handleRefresh(): void {
     }
 
     &__hero {
-      min-height: calc(var(--spacing-24) * 2);
+      min-height: calc(var(--spacing-24) + var(--spacing-24));
       border-right: 0;
       border-bottom: 1px solid var(--color-border-subtle);
     }
