@@ -31,11 +31,12 @@
  * Requirements: 5.1, 5.2
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, defineComponent, h, ref } from 'vue'
 import type { RouteRecordRaw, RouteComponent } from 'vue-router'
 import { getCurrentUserMenus, getUserPermissions } from '@/api/rbac'
 import type { Menu, Permission } from '@/api/types'
 import type { LocaleType } from '@/locales'
+import MenuComponentBoundary from '@/components/rbac/MenuComponentBoundary.vue'
 
 /**
  * ============================================================================
@@ -152,6 +153,35 @@ export function resolveComponent(
 }
 
 /**
+ * 为菜单页面增加组件错误边界。
+ *
+ * 布局组件保持原始懒加载；实际页面则统一经过边界，以覆盖路径为空、
+ * 文件不存在、异步加载失败以及组件 setup/render 抛错四种情况。
+ */
+function createMenuRouteComponent(
+  menu: Menu,
+  title: string,
+  componentPath: string | undefined
+): RouteComponent {
+  if (componentPath && layoutModules[componentPath]) {
+    return layoutModules[componentPath]
+  }
+
+  const loader = resolveComponent(componentPath)
+  return defineComponent({
+    name: `MenuRouteBoundary${String(menu.id)}`,
+    setup() {
+      return () =>
+        h(MenuComponentBoundary, {
+          menuTitle: title,
+          componentPath,
+          loader,
+        })
+    },
+  })
+}
+
+/**
  * 根据当前语言获取菜单标题
  *
  * 【多语言支持】
@@ -238,8 +268,9 @@ function menuToRoute(menu: Menu, locale: LocaleType, isTopLevel = false): RouteR
 
   // 解析组件
   // 顶级菜单强制使用 Layout，即使后端配置了其他组件
-  const componentPath = isTopLevel && menu.component !== 'Layout' ? 'Layout' : menu.component
-  const component = resolveComponent(componentPath)
+  const componentPath =
+    isTopLevel && menu.children && menu.children.length > 0 ? 'Layout' : menu.component
+  const component = createMenuRouteComponent(menu, title, componentPath)
 
   // 递归处理子菜单
   let children: RouteRecordRaw[] | undefined
@@ -269,10 +300,14 @@ function menuToRoute(menu: Menu, locale: LocaleType, isTopLevel = false): RouteR
     children,
   }
 
-  // 添加重定向（如果后端提供了）
-  const route = (
-    menu.redirect ? { ...baseRoute, redirect: menu.redirect } : baseRoute
-  ) as RouteRecordRaw
+  // 父菜单是纯布局占位时，默认进入排序后的第一个有效子菜单。
+  // 使用命名路由避免手动拼接绝对/相对 path；后端显式 redirect 仍拥有最高优先级。
+  const isPlaceholderParent = Boolean(
+    children?.length && componentPath && layoutModules[componentPath]
+  )
+  const firstChildName = isPlaceholderParent ? children?.[0]?.name : undefined
+  const redirect = menu.redirect || (firstChildName ? { name: firstChildName } : undefined)
+  const route = (redirect ? { ...baseRoute, redirect } : baseRoute) as RouteRecordRaw
 
   // 特殊处理：Layout 组件但没有子路由的情况
   // 例如：仪表盘页面，顶级菜单直接对应一个页面
@@ -299,6 +334,16 @@ function menuToRoute(menu: Menu, locale: LocaleType, isTopLevel = false): RouteR
           path: '',
           name: `${menu.name || `menu-${menu.id}`}-index`,
           component: defaultComponent,
+          meta: { ...baseMeta },
+        },
+      ]
+    } else {
+      const expectedComponentPath = `views/${pathSegment}/index.vue`
+      route.children = [
+        {
+          path: '',
+          name: `${menu.name || `menu-${menu.id}`}-missing`,
+          component: createMenuRouteComponent(menu, title, expectedComponentPath),
           meta: { ...baseMeta },
         },
       ]

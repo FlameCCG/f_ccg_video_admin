@@ -321,7 +321,7 @@ function handleDeselectAll(): void {
             v-model:expanded-keys="expandedKeys"
             :data="treeOptions"
             checkable
-            cascade
+            :cascade="false"
             :block-line="true"
             key-field="key"
             label-field="label"

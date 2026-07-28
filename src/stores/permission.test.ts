@@ -4,7 +4,10 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import { usePermissionStore } from './permission'
+import { getCurrentUserMenus, getUserPermissions } from '@/api/rbac'
+import type { Menu } from '@/api/types'
 
 // Mock the API module
 vi.mock('@/api/rbac', () => ({
@@ -144,6 +147,109 @@ describe('permission store', () => {
       const store = usePermissionStore()
       const routes = store.generateRoutes()
       expect(routes).toEqual([])
+    })
+
+    it('redirects a placeholder parent to its first sorted valid child', async () => {
+      const store = usePermissionStore()
+      const menus = [
+        {
+          id: 3,
+          title: '社区治理',
+          titleEn: 'Community Moderation',
+          titleJa: 'コミュニティ管理',
+          icon: '',
+          path: '/community',
+          name: 'Community',
+          component: 'Layout',
+          parentId: null,
+          sortOrder: 3,
+          children: [
+            {
+              id: 32,
+              title: '评论管控',
+              titleEn: 'Comment Moderation',
+              titleJa: 'コメント管理',
+              icon: '',
+              path: 'comments',
+              name: 'CommentModeration',
+              component: 'views/community/comments/index.vue',
+              parentId: 3,
+              sortOrder: 2,
+            },
+            {
+              id: 31,
+              title: '举报处理',
+              titleEn: 'Report Handling',
+              titleJa: '通報対応',
+              icon: '',
+              path: 'reports',
+              name: 'ReportHandling',
+              component: 'views/community/reports/index.vue',
+              parentId: 3,
+              sortOrder: 1,
+            },
+          ],
+        },
+      ] satisfies Menu[]
+      vi.mocked(getCurrentUserMenus).mockResolvedValue(menus)
+      vi.mocked(getUserPermissions).mockResolvedValue([])
+
+      await store.fetchUserPermissions(1)
+      const [communityRoute] = store.routes
+
+      expect(communityRoute?.redirect).toEqual({ name: 'ReportHandling' })
+      expect(communityRoute?.children?.map((child) => child.name)).toEqual([
+        'ReportHandling',
+        'CommentModeration',
+      ])
+
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: communityRoute ? [communityRoute] : [],
+      })
+      void router.push('/community')
+      await router.isReady()
+      expect(router.currentRoute.value.fullPath).toBe('/community/reports')
+    })
+
+    it('keeps an explicit backend redirect ahead of the automatic child redirect', async () => {
+      const store = usePermissionStore()
+      const menus = [
+        {
+          id: 3,
+          title: '社区治理',
+          titleEn: 'Community Moderation',
+          titleJa: 'コミュニティ管理',
+          icon: '',
+          path: '/community',
+          name: 'Community',
+          component: 'Layout',
+          parentId: null,
+          sortOrder: 3,
+          redirect: '/community/comments',
+          children: [
+            {
+              id: 31,
+              title: '举报处理',
+              titleEn: 'Report Handling',
+              titleJa: '通報対応',
+              icon: '',
+              path: 'reports',
+              name: 'ReportHandling',
+              component: 'views/community/reports/index.vue',
+              parentId: 3,
+              sortOrder: 1,
+            },
+          ],
+        },
+      ] satisfies Menu[]
+      vi.mocked(getCurrentUserMenus).mockResolvedValue(menus)
+      vi.mocked(getUserPermissions).mockResolvedValue([])
+
+      await store.fetchUserPermissions(1)
+      const [communityRoute] = store.routes
+
+      expect(communityRoute?.redirect).toBe('/community/comments')
     })
   })
 })
