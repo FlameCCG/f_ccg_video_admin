@@ -51,6 +51,7 @@ export function normalizeAIConfig(raw: AIConfig): AIConfig {
     embeddingDimensions: rest.embeddingDimensions ?? 0,
     doubaoModelAPIKey: rest.doubaoModelAPIKey ?? '',
     systemPrompt: rest.systemPrompt ?? '',
+    menuGenerationSystemPrompt: rest.menuGenerationSystemPrompt ?? '',
     imageModel: rest.imageModel ?? '',
     imageModels: normalizeModelList(rest.imageModels),
     videoModel: rest.videoModel ?? '',

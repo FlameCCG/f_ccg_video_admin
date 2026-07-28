@@ -188,6 +188,8 @@ export interface AIConfig {
   embeddingDimensions: number
   doubaoModelAPIKey: string
   systemPrompt: string
+  /** 管理端创建菜单时生成字段所使用的独立系统提示词 */
+  menuGenerationSystemPrompt: string
   imageModel: string
   imageModels?: AIModelOption[]
   videoModel: string

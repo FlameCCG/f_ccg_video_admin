@@ -118,6 +118,9 @@ export default {
     embeddingDimensions: 'Embedding Dimensions',
     doubaoModelAPIKey: 'Doubao Model API Key',
     systemPrompt: 'System Prompt',
+    menuGenerationSystemPrompt: 'Menu Generation System Prompt',
+    menuGenerationSystemPromptTip:
+      'Leave blank to use the backend default; this is only used to generate menu fields',
     imageModel: 'Default Image Model',
     videoModel: 'Default Video Model',
     imageModels: 'Image Model List',

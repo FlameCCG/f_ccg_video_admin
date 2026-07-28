@@ -117,6 +117,9 @@ export default {
     embeddingDimensions: 'Embedding次元',
     doubaoModelAPIKey: 'Doubaoモデル API Key',
     systemPrompt: 'システムプロンプト',
+    menuGenerationSystemPrompt: 'メニュー生成システムプロンプト',
+    menuGenerationSystemPromptTip:
+      '空欄の場合はバックエンド既定値を使用し、メニュー項目の生成時だけ利用します',
     imageModel: 'デフォルト画像モデル',
     videoModel: 'デフォルト動画モデル',
     imageModels: '画像モデル一覧',

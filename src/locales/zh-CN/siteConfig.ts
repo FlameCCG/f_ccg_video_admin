@@ -117,6 +117,8 @@ export default {
     embeddingDimensions: 'Embedding 维度',
     doubaoModelAPIKey: '豆包模型 API Key',
     systemPrompt: '系统提示词',
+    menuGenerationSystemPrompt: '菜单生成系统提示词',
+    menuGenerationSystemPromptTip: '留空时使用后端内置提示词，仅用于创建菜单时生成字段',
     imageModel: '默认图像模型',
     videoModel: '默认视频模型',
     imageModels: '图像模型列表',

@@ -17,6 +17,7 @@ describe('site-config normalize', () => {
       embeddingDimensions: 2048,
       doubaoModelAPIKey: 'dk',
       systemPrompt: 'hi',
+      menuGenerationSystemPrompt: 'generate menu fields',
       imageModel: 'img',
       videoModel: 'vid',
       vectorIndex: 'idx',
@@ -51,6 +52,7 @@ describe('site-config normalize', () => {
     expect(next.thinkingEffort).toBe('')
     expect(next.thinkingEfforts).toEqual([])
     expect(next.chatModelBaseURL).toBe('https://chat.example')
+    expect(next.menuGenerationSystemPrompt).toBe('generate menu fields')
   })
 
   it('fills missing high-tier transcode ratios', () => {

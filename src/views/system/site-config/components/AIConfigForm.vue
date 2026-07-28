@@ -251,6 +251,18 @@ const thinkingEffortSelectOptions = computed(() =>
         </n-form-item>
       </n-grid-item>
 
+      <n-grid-item :span="2">
+        <n-form-item :label="t('siteConfig.ai.menuGenerationSystemPrompt')">
+          <n-input
+            :value="formData.menuGenerationSystemPrompt"
+            type="textarea"
+            :placeholder="t('siteConfig.ai.menuGenerationSystemPromptTip')"
+            :autosize="{ minRows: 3, maxRows: 10 }"
+            @update:value="(v) => updateField('menuGenerationSystemPrompt', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+
       <n-grid-item>
         <n-form-item :label="t('siteConfig.ai.timeoutSec')">
           <n-input-number
