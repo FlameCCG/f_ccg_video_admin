@@ -297,7 +297,7 @@ export const getDashRepresentations = (
   } catch {
     return []
   }
-  if (reps.length <= 1) return []
+  if (reps.length === 0) return []
 
   const labelMap = buildDashLabelMap(reps, mp4Labels ?? [])
 
