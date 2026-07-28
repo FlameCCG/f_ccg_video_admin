@@ -13,4 +13,12 @@ export default {
     title: '404 - Not Found',
     description: 'Sorry, the page you are looking for does not exist. Please check the URL.',
   },
+  menuComponent: {
+    missingPathTitle: 'No frontend component is configured for “{title}”',
+    unavailableTitle: 'The frontend file for “{title}” has not been created',
+    missingPath: 'Set the component field in Menu Management before opening this page.',
+    fileNotFound: 'The configured component file does not exist. Create it or correct the path.',
+    renderError: 'The component exists but failed to load or render. Check its frontend code.',
+    componentPath: 'Current component path',
+  },
 }

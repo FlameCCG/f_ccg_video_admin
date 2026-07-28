@@ -37,7 +37,7 @@ export interface Menu {
   /** 是否缓存 */
   keepAlive?: boolean
   /** 父菜单 ID */
-  parentId: number
+  parentId: number | null
   /** 排序顺序 */
   sortOrder: number
   /** 重定向的路由 */
@@ -228,6 +228,33 @@ export interface UpdateMenuParams {
   parentId?: number
   /** 排序顺序（可选） */
   sortOrder?: number
+}
+
+/** AI 生成菜单字段参数 */
+export interface GenerateMenuParams {
+  /** 必填中文标题 */
+  title: string
+  /** 可选父菜单 ID */
+  parentId?: number
+}
+
+/** AI 生成的菜单业务字段 */
+export interface MenuSuggestion {
+  titleEn: string
+  titleJa: string
+  icon: string
+  path: string
+  name: string
+  component: string
+  keepAlive: boolean
+  sortOrder: number
+}
+
+/** 菜单拖拽排序参数 */
+export interface MoveMenuParams {
+  id: number
+  targetId: number
+  position: 'before' | 'after'
 }
 
 /**

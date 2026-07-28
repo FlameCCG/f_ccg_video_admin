@@ -6,7 +6,7 @@
  * Requirements: 8.1, 9.1
  */
 import { computed, ref, watch } from 'vue'
-import type { CSSProperties } from 'vue'
+import type { CSSProperties, HTMLAttributes } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NDataTable, NPagination, NSpace } from 'naive-ui'
 import type { DataTableColumns, DataTableRowKey, ScrollbarProps } from 'naive-ui'
@@ -31,6 +31,8 @@ interface Props {
   loading?: boolean
   /** 行 key 字段 */
   rowKey?: string | ((row: unknown) => DataTableRowKey)
+  /** 自定义行属性（可用于拖拽、键盘或测试属性） */
+  rowProps?: (row: RowData, rowIndex: number) => HTMLAttributes
   /** 是否可选择 */
   selectable?: boolean
   /** 已选择的行 keys */
@@ -84,6 +86,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   rowKey: 'id',
+  rowProps: undefined,
   selectable: false,
   checkedRowKeys: () => [],
   pagination: true,
@@ -301,6 +304,7 @@ function handleRetry(): void {
         :columns="tableColumns"
         :data="data"
         :row-key="rowKeyFn"
+        :row-props="rowProps"
         :row-class-name="rowClassName"
         :checked-row-keys="selectable ? internalCheckedKeys : undefined"
         :max-height="maxHeight"

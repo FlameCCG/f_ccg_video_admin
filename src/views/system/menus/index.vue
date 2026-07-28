@@ -4,17 +4,19 @@
  * Menu Permissions Page
  * Requirements: 17.1-17.5 - 菜单管理
  */
-import { ref, computed, h } from 'vue'
+import { computed, h, shallowRef } from 'vue'
+import type { HTMLAttributes } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { NCard, NSpace, NButton, NIcon, NText, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { getMenus, createMenu, updateMenu, deleteMenu } from '@/api/rbac'
+import { getMenus, createMenu, updateMenu, deleteMenu, moveMenu } from '@/api/rbac'
 import type { Menu, CreateMenuParams, UpdateMenuParams } from '@/api/types'
 import { DataTable, TableActions } from '@/components/table'
 import { SvgIcon } from '@/components/common'
 import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import MenuFormModal from './components/MenuFormModal.vue'
+import { useDragAutoScroll } from './composables/useDragAutoScroll'
 
 const { t, locale } = useI18n()
 const message = useMessage()
@@ -22,9 +24,13 @@ const dialog = useDialog()
 const queryClient = useQueryClient()
 
 /** 表单弹窗状态 */
-const formModalVisible = ref(false)
-const editingMenu = ref<Menu | null>(null)
-const parentMenu = ref<Menu | null>(null)
+const formModalVisible = shallowRef(false)
+const editingMenu = shallowRef<Menu | null>(null)
+const parentMenu = shallowRef<Menu | null>(null)
+const draggingMenuId = shallowRef<number | null>(null)
+const dropTargetId = shallowRef<number | null>(null)
+const dropPosition = shallowRef<'before' | 'after'>('before')
+const dragAutoScroll = useDragAutoScroll()
 
 /**
  * 获取菜单列表
@@ -85,6 +91,18 @@ const deleteMutation = useMutation({
   },
 })
 
+/** 同层拖拽排序 mutation */
+const moveMutation = useMutation({
+  mutationFn: moveMenu,
+  onSuccess: () => {
+    message.success(t('rbac.menu.dragSuccess'))
+    void queryClient.invalidateQueries({ queryKey: ['menuList'] })
+  },
+  onError: (error: Error) => {
+    message.error(error.message || t('common.tips.operationFailed'))
+  },
+})
+
 /** 树形菜单数据 */
 const treeMenus = computed(() => {
   return (menuList.value ?? []) as unknown as Record<string, unknown>[]
@@ -92,6 +110,19 @@ const treeMenus = computed(() => {
 
 /** 加载失败描述：优先服务端 msg，缺失时由 DataTable 兜底通用文案 */
 const loadErrorDescription = computed(() => listError.value?.message?.trim() || undefined)
+
+/** 菜单 ID 索引，拖拽时用于验证源和目标是否处于同一层级 */
+const menuById = computed(() => {
+  const result = new Map<number, Menu>()
+  const visit = (menus: Menu[]): void => {
+    for (const menu of menus) {
+      result.set(menu.id, menu)
+      if (menu.children) visit(menu.children)
+    }
+  }
+  visit(menuList.value ?? [])
+  return result
+})
 
 /** 获取菜单标题（根据当前语言） */
 function getMenuTitle(menu: Menu): string {
@@ -110,6 +141,15 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
       const menu = row as unknown as Menu
       const hasSvgIcon = menu.icon && menu.icon.trim().startsWith('<svg')
       return h(NSpace, { align: 'center', size: 8, wrap: false }, () => [
+        h(
+          'span',
+          {
+            class: 'menu-drag-handle',
+            title: t('rbac.menu.dragHint'),
+            'aria-label': t('rbac.menu.dragHint'),
+          },
+          '⋮⋮'
+        ),
         hasSvgIcon ? h(SvgIcon, { svg: menu.icon, size: 16 }) : null,
         h('span', {}, getMenuTitle(menu)),
       ])
@@ -217,6 +257,91 @@ function handleFormSubmit(data: CreateMenuParams | UpdateMenuParams): void {
   }
 }
 
+function isSameMenuLevel(left: Menu, right: Menu): boolean {
+  return (left.parentId ?? 0) === (right.parentId ?? 0)
+}
+
+function handleDragStart(event: DragEvent, menu: Menu): void {
+  if (moveMutation.isPending.value) {
+    event.preventDefault()
+    return
+  }
+
+  draggingMenuId.value = menu.id
+  event.dataTransfer?.setData('text/plain', String(menu.id))
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+  }
+}
+
+function handleDragOver(event: DragEvent, target: Menu): void {
+  if (draggingMenuId.value) {
+    dragAutoScroll.update(event.currentTarget, event.clientY)
+  }
+
+  const source = draggingMenuId.value ? menuById.value.get(draggingMenuId.value) : undefined
+  if (!source || source.id === target.id || !isSameMenuLevel(source, target)) {
+    dropTargetId.value = null
+    return
+  }
+
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const row = event.currentTarget
+  if (row instanceof HTMLElement) {
+    const bounds = row.getBoundingClientRect()
+    dropPosition.value = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
+  }
+  dropTargetId.value = target.id
+}
+
+function handleDrop(event: DragEvent, target: Menu): void {
+  event.preventDefault()
+  const sourceId = draggingMenuId.value
+  const source = sourceId ? menuById.value.get(sourceId) : undefined
+  if (!source || source.id === target.id) {
+    resetDragState()
+    return
+  }
+
+  if (!isSameMenuLevel(source, target)) {
+    message.warning(t('rbac.menu.dragSameLevelOnly'))
+    resetDragState()
+    return
+  }
+
+  moveMutation.mutate({
+    id: source.id,
+    targetId: target.id,
+    position: dropPosition.value,
+  })
+  resetDragState()
+}
+
+function resetDragState(): void {
+  dragAutoScroll.stop()
+  draggingMenuId.value = null
+  dropTargetId.value = null
+  dropPosition.value = 'before'
+}
+
+function menuRowProps(row: Record<string, unknown>): HTMLAttributes {
+  const menu = row as unknown as Menu
+  const dropClass = dropTargetId.value === menu.id ? `is-drop-${dropPosition.value}` : undefined
+
+  return {
+    draggable: !moveMutation.isPending.value,
+    class: dropClass,
+    onDragstart: (event: DragEvent) => handleDragStart(event, menu),
+    onDragover: (event: DragEvent) => handleDragOver(event, menu),
+    onDrop: (event: DragEvent) => handleDrop(event, menu),
+    onDragend: resetDragState,
+  }
+}
+
 /** 处理刷新 */
 function handleRefresh(): void {
   void refetch()
@@ -227,6 +352,9 @@ function handleRefresh(): void {
   <div class="page-list">
     <app-page-header class="page-list__header" :title="t('rbac.menu.title')">
       <template #actions>
+        <n-text class="menu-drag-hint" depth="3">
+          {{ t('rbac.menu.dragHint') }}
+        </n-text>
         <n-button type="primary" size="small" @click="handleCreate">
           <template #icon>
             <n-icon>
@@ -278,7 +406,8 @@ function handleRefresh(): void {
       <data-table
         :columns="columns"
         :data="treeMenus"
-        :loading="isFetching || deleteMutation.isPending.value"
+        :loading="isFetching || deleteMutation.isPending.value || moveMutation.isPending.value"
+        :row-props="menuRowProps"
         :error="isError"
         :error-description="loadErrorDescription"
         :selectable="false"
@@ -307,8 +436,31 @@ function handleRefresh(): void {
 // 页面外壳用全局 page-list 样式（原来这里留了一个空的 .menu-list-page 规则，
 // 根节点早已不再使用该类名，属于死代码）
 
+.menu-drag-hint {
+  font-size: var(--text-xs);
+}
+
 // 菜单树表格专属样式（缩进、层级与交互一致性）
 .menu-tree-table {
+  :deep(.menu-drag-handle) {
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    cursor: grab;
+    user-select: none;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  :deep(.n-data-table-tr.is-drop-before > .n-data-table-td) {
+    border-top: 2px solid var(--color-primary);
+  }
+
+  :deep(.n-data-table-tr.is-drop-after > .n-data-table-td) {
+    border-bottom: 2px solid var(--color-primary);
+  }
+
   :deep(.n-data-table) {
     // 关闭通用 table 里的“子级竖线”实现（只在菜单树里用更精致的缩进线）
     .n-data-table-tr[data-level]:not([data-level='0']) {

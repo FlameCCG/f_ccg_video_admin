@@ -20,6 +20,9 @@ import type {
   RoleInheritsDetail,
   CreateMenuParams,
   UpdateMenuParams,
+  GenerateMenuParams,
+  MenuSuggestion,
+  MoveMenuParams,
   AssignMenuParams,
   RemoveMenuParams,
   GetRoleMenusParams,
@@ -184,6 +187,22 @@ export function createMenu(params: CreateMenuParams): Promise<EmptyData> {
  */
 export function updateMenu(params: UpdateMenuParams): Promise<EmptyData> {
   return request.put('/admin/rbac/menu', params)
+}
+
+/**
+ * AI 生成菜单表单字段
+ * POST /admin/rbac/menu/generate
+ */
+export function generateMenu(params: GenerateMenuParams): Promise<MenuSuggestion> {
+  return request.post('/admin/rbac/menu/generate', params)
+}
+
+/**
+ * 同层拖拽排序菜单
+ * PUT /admin/rbac/menu/move
+ */
+export function moveMenu(params: MoveMenuParams): Promise<EmptyData> {
+  return request.put('/admin/rbac/menu/move', params)
 }
 
 /**

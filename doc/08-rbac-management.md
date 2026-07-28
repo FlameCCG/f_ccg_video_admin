@@ -541,7 +541,7 @@ Base URL：/v1
 - 认证: 需要登录（客户端全局自动携带 Token）
 - 权限: 需要RBAC权限
 - 依赖接口: 无
-- 接口说明: 创建新菜单（需管理员权限）
+- 接口说明: 创建新菜单；同层排序冲突时，新菜单插入到原菜单之前并顺延后续菜单，同时自动授予创建者当前角色该菜单权限
 - HTTP 状态码: 200（业务码 code 判断成功/失败）
 - 响应结构: code=0 成功，code=1 失败；msg 为提示信息
 
@@ -611,6 +611,51 @@ Base URL：/v1
   "msg": "更新成功"
 }
 ```
+
+## [POST] AI 生成菜单字段
+
+- 接口路径: POST /admin/rbac/menu/generate
+- 认证: 需要登录（客户端全局自动携带 Token）
+- 权限: 需要RBAC权限
+- 依赖接口: 无
+- 接口说明: 根据必填中文标题、可选父菜单 ID 和 menus 表完整数据生成其余菜单字段
+- HTTP 状态码: 200（业务码 code 判断成功/失败）
+- 响应结构: code=0 成功，code=1 失败；msg 为提示信息
+
+请求参数:
+| 名称 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| title | body | string | 是 | 中文菜单标题 |
+| parentId | body | integer | 否 | 父菜单 ID |
+
+响应字段:
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| data.titleEn | string | 英文标题 |
+| data.titleJa | string | 日文标题 |
+| data.icon | string | 安全 SVG 图标 |
+| data.path | string | 路由路径 |
+| data.name | string | 路由名称 |
+| data.component | string | 前端组件路径/标识 |
+| data.keepAlive | boolean | 是否缓存 |
+| data.sortOrder | integer | 建议排序 |
+
+## [PUT] 拖拽排序菜单
+
+- 接口路径: PUT /admin/rbac/menu/move
+- 认证: 需要登录（客户端全局自动携带 Token）
+- 权限: 需要RBAC权限
+- 依赖接口: 无
+- 接口说明: 在同一父菜单下把菜单移动到目标菜单之前或之后，并原子地重建连续排序
+- HTTP 状态码: 200（业务码 code 判断成功/失败）
+- 响应结构: code=0 成功，code=1 失败；msg 为提示信息
+
+请求参数:
+| 名称 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| id | body | integer | 是 | 被拖动菜单 ID |
+| targetId | body | integer | 是 | 目标菜单 ID |
+| position | body | string | 是 | `before` 或 `after` |
 
 ## [DELETE] 删除菜单
 
