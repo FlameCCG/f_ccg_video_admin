@@ -73,6 +73,9 @@ export default {
     banTime: '封禁时间',
     expireTime: '到期时间',
     status: '状态',
+    isUnbanned: '是否解封',
+    unbanned: '已解封',
+    notUnbanned: '未解封',
     statusOptions: {
       active: '生效中',
       expired: '已过期',

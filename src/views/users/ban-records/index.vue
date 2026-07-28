@@ -59,7 +59,6 @@ const total = computed(() => recordData.value?.total ?? 0)
 
 /** 状态选项 */
 const statusOptions = computed(() => [
-  { value: 1, label: t('user.status.normal') },
   { value: 2, label: t('user.status.banned') },
   { value: 3, label: t('user.status.permanentBan') },
 ])
@@ -125,6 +124,18 @@ const columns = computed<DataTableColumns<BanRecordItem>>(() => [
       if (row.days === 0) return '-'
       return `${String(row.days)} ${t('user.ban.durationUnit')}`
     },
+  },
+  {
+    title: t('user.banRecord.isUnbanned'),
+    key: 'isUnbanned',
+    width: 110,
+    align: 'center',
+    render: (row) =>
+      h(AppStatusTag, {
+        type: row.isUnbanned ? 'success' : 'warning',
+        text: row.isUnbanned ? t('user.banRecord.unbanned') : t('user.banRecord.notUnbanned'),
+        dot: true,
+      }),
   },
   {
     title: t('user.banRecord.reason'),
