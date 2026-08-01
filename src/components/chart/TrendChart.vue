@@ -730,6 +730,31 @@ function handleMouseLeave(): void {
 const anchorStyle = computed(() => ({
   transform: `translate3d(${tooltip.value.x}px, ${tooltip.value.y}px, 0)`,
 }))
+
+/** 提示框的摆放策略：智能避免左右及上下超出图表卡片边界 */
+const tooltipPlacement = computed(() => {
+  const x = tooltip.value.x
+  const y = tooltip.value.y
+  const w = geometry.width || 300
+
+  let shiftX = '-50%'
+  if (w > 0) {
+    const ratioX = x / w
+    if (ratioX > 0.75) {
+      shiftX = '-100%'
+    } else if (ratioX < 0.25) {
+      shiftX = '0%'
+    }
+  }
+
+  // Y 轴靠近顶部时（< 65px），提示框展示在点下方；否则展示在点上方
+  const isBelow = y < 65
+
+  return {
+    shiftX,
+    isBelow,
+  }
+})
 </script>
 
 <template>
@@ -781,7 +806,17 @@ const anchorStyle = computed(() => ({
         <!-- 工具提示：锚点负责定位，内层负责进离场 -->
         <div class="trend-chart__anchor" :style="anchorStyle">
           <Transition name="tip">
-            <div v-if="tooltip.show && showTooltip" class="trend-chart__tooltip">
+            <div
+              v-if="tooltip.show && showTooltip"
+              class="trend-chart__tooltip"
+              :class="{ 'is-below': tooltipPlacement.isBelow }"
+              :style="{
+                '--tip-shift-x': tooltipPlacement.shiftX,
+                '--tip-shift-y': tooltipPlacement.isBelow
+                  ? 'calc(-1 * var(--spacing-1))'
+                  : 'var(--spacing-1)',
+              }"
+            >
               <div class="trend-chart__tooltip-label">{{ tooltip.label }}</div>
               <div class="trend-chart__tooltip-value">{{ tooltipValueText }}</div>
               <div v-if="tooltip.rate" class="trend-chart__tooltip-rate">
@@ -952,7 +987,12 @@ const anchorStyle = computed(() => ({
     border: 1px solid var(--color-border);
     border-radius: var(--radius-tooltip);
     box-shadow: var(--shadow-elev-2);
-    transform: translateX(-50%);
+    transform: translateX(var(--tip-shift-x, -50%));
+
+    &.is-below {
+      top: var(--spacing-3);
+      bottom: auto;
+    }
   }
 
   &__tooltip-label {
@@ -983,12 +1023,12 @@ const anchorStyle = computed(() => ({
   }
 }
 
-// 提示框进离场：基础态已带 translateX(-50%)，进场态必须把它一起写上，
-// 否则 transform 简写会把居偏移吃掉、提示框跳到数据点右侧。
+// 提示框进离场：基础态已带 translateX(var(--tip-shift-x, -50%))，进场态必须把它一起写上，
+// 否则 transform 简写会把居中偏移吃掉、提示框跳到数据点右侧。
 @include ix.enter-leave(
   'tip',
-  translateX(-50%) translateY(var(--spacing-1)),
-  translateX(-50%) translateY(var(--spacing-1))
+  translateX(var(--tip-shift-x, -50%)) translateY(var(--tip-shift-y, var(--spacing-1))),
+  translateX(var(--tip-shift-x, -50%)) translateY(var(--tip-shift-y, var(--spacing-1)))
 );
 
 // 时长由 --motion-* token 统一压到 0，这里只把位移归零：
@@ -996,7 +1036,7 @@ const anchorStyle = computed(() => ({
 @media (prefers-reduced-motion: reduce) {
   .tip-enter-from,
   .tip-leave-to {
-    transform: translateX(-50%);
+    transform: translateX(var(--tip-shift-x, -50%));
   }
 }
 </style>
