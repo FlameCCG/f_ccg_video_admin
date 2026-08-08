@@ -29,6 +29,7 @@ import {
   updateDefaultUserBannerList,
 } from '@/api/banner'
 import { getSiteConfig } from '@/api/site'
+import { normalizeResourceUrl } from '@/utils'
 import { getCommonPartitions } from '@/api/video'
 import type {
   BannerItem,
@@ -271,7 +272,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     width: 100,
     render: (row) =>
       h(NImage, {
-        src: row.cover as string,
+        src: normalizeResourceUrl(row.cover as string),
         objectFit: 'cover',
         lazy: true,
         previewDisabled: false,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatDateTime } from '@/utils'
+import { formatDateTime, normalizeResourceUrl } from '@/utils'
 /**
  * 弹幕列表页
  * Danmaku List Page
@@ -174,7 +174,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     width: 100,
     render: (row) => {
       return h(NImage, {
-        src: row.videoCover as string,
+        src: normalizeResourceUrl(row.videoCover as string),
         width: 80,
         height: 48,
         objectFit: 'cover',

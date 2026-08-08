@@ -142,8 +142,9 @@ export const attachDashToVideo = async (
   // 加载期间宿主已放弃本轮：连实例都不用建
   if (options.signal?.aborted) return null
 
-  // 剔除 URL 中的 response-content-type
-  const cleanUrl = new URL(url)
+  // 剔除 URL 中的 response-content-type。
+  // URL 可能是根相对路径（对外契约），显式给 base 解析为绝对地址后交给 dash.js。
+  const cleanUrl = new URL(url, window.location.origin)
   cleanUrl.searchParams.delete('response-content-type')
 
   const dash = dashjs.MediaPlayer().create()

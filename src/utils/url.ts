@@ -6,7 +6,9 @@ const ABSOLUTE_URL_RE = /^[a-zA-Z][a-zA-Z\d+\-.]*:/
 
 /**
  * 规范化资源 URL
- * 修复后端偶发返回的 `http:/host/...` / `https:/host/...` 这类协议斜杠缺失问题。
+ * 1. 修复后端偶发返回的 `http:/host/...` / `https:/host/...` 这类协议斜杠缺失问题；
+ * 2. 后端对外契约返回根相对路径（如 /user_files/images/x.jpg），
+ *    按 VITE_MEDIA_BASE 拼接 host；留空 = 同源（走网关/代理）。
  */
 export function normalizeResourceUrl(url?: string | null): string {
   if (!url) return ''
@@ -14,15 +16,29 @@ export function normalizeResourceUrl(url?: string | null): string {
   const trimmed = url.trim()
   if (!trimmed) return ''
 
-  if (/^https?:\/(?!\/)/i.test(trimmed)) {
-    return trimmed.replace(/^((?:https?)):\/(?!\/)/i, '$1://')
+  let result = trimmed
+
+  if (/^https?:\/(?!\/)/i.test(result)) {
+    result = result.replace(/^((?:https?)):\/(?!\/)/i, '$1://')
+  } else if (/^https?:\\(?!\\)/i.test(result)) {
+    result = result.replace(/^((?:https?)):\\(?!\\)/i, '$1://').replace(/\\/g, '/')
   }
 
-  if (/^https?:\\(?!\\)/i.test(trimmed)) {
-    return trimmed.replace(/^((?:https?)):\\(?!\\)/i, '$1://').replace(/\\/g, '/')
+  // 已携带协议 / 协议相对 / data / blob → 原样返回（含历史存量绝对 URL，兼容不改库）
+  if (
+    /^https?:\/\//i.test(result) ||
+    result.startsWith('//') ||
+    result.startsWith('data:') ||
+    result.startsWith('blob:')
+  ) {
+    return result
   }
 
-  return trimmed
+  // 其余视为后端返回的根相对路径：拼 VITE_MEDIA_BASE（默认空 = 同源）
+  const base = (import.meta.env.VITE_MEDIA_BASE as string | undefined)?.trim() ?? ''
+  if (!base) return result
+
+  return `${base.replace(/\/+$/, '')}/${result.replace(/^\/+/, '')}`
 }
 
 /**

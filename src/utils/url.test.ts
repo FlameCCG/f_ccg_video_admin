@@ -23,6 +23,16 @@ describe('normalizeResourceUrl', () => {
       'https://cdn.example.com/avatar.png'
     )
   })
+
+  it('keeps root-relative paths unchanged when no media base configured', () => {
+    expect(normalizeResourceUrl('/user_files/images/a.png')).toBe('/user_files/images/a.png')
+    expect(normalizeResourceUrl('/uploads/images/b.png')).toBe('/uploads/images/b.png')
+  })
+
+  it('keeps data/blob/protocol-relative urls unchanged', () => {
+    expect(normalizeResourceUrl('data:image/png;base64,AAAA')).toBe('data:image/png;base64,AAAA')
+    expect(normalizeResourceUrl('//cdn.example.com/a.png')).toBe('//cdn.example.com/a.png')
+  })
 })
 
 describe('normalizeExternalHref', () => {

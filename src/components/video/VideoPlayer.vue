@@ -7,6 +7,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NSlider, NDropdown, NIcon, NTooltip, NSpin, NTag } from 'naive-ui'
+import { normalizeResourceUrl } from '@/utils'
 import type { DropdownOption } from 'naive-ui'
 import {
   PlayCircle,
@@ -147,7 +148,7 @@ const pickBestMp4 = (): VideoResource | undefined => {
 const videoUrl = computed(() => {
   // DASH 模式下 URL 由 dash.js 管理，不设 src
   if (isDashActive.value) return ''
-  return currentResource.value?.fileUrl || ''
+  return normalizeResourceUrl(currentResource.value?.fileUrl) || ''
 })
 
 const qualityOptions = computed(() => {
@@ -540,7 +541,7 @@ function initPlayback(): void {
     dashQualityOptions.value = []
     dashLabelMap = new Map<number, string>()
 
-    void startDashPlayback(video, dashResource.value.fileUrl, signal).catch((error: unknown) => {
+    void startDashPlayback(video, normalizeResourceUrl(dashResource.value.fileUrl), signal).catch((error: unknown) => {
       console.error('[VideoPlayer] DASH 初始化异常', error)
       if (signal.aborted) return
       isDashActive.value = false
@@ -736,7 +737,7 @@ defineExpose({
       ref="videoRef"
       class="video-player__video"
       :src="isDashActive ? undefined : videoUrl"
-      :poster="poster"
+      :poster="normalizeResourceUrl(poster)"
       :autoplay="autoplay"
       preload="metadata"
       @play="onPlay"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatDateTime } from '@/utils'
+import { formatDateTime, normalizeResourceUrl } from '@/utils'
 /**
  * 动态管理页
  * Activity Management Page
@@ -119,7 +119,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
       const imageUrl = row.imageUrl as string
       if (!imageUrl) return h('span', { class: 'text-muted' }, '-')
       return h(NImage, {
-        src: imageUrl,
+        src: normalizeResourceUrl(imageUrl),
         width: 80,
         height: 80,
         objectFit: 'cover',

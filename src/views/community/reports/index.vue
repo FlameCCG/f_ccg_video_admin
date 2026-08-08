@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatDateTime } from '@/utils'
+import { formatDateTime, normalizeResourceUrl } from '@/utils'
 /**
  * 举报处理页
  * Report Handling Page
@@ -164,7 +164,7 @@ const videoColumns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     width: 120,
     render: (row) =>
       h(NImage, {
-        src: row.videoCover as string,
+        src: normalizeResourceUrl(row.videoCover as string),
         width: 100,
         height: 56,
         objectFit: 'cover',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatDateTime } from '@/utils'
+import { formatDateTime, normalizeResourceUrl } from '@/utils'
 /**
  * 稿件审核页
  * Submission Review Page
@@ -158,7 +158,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     width: 120,
     render: (row) =>
       h(NImage, {
-        src: row.cover as string,
+        src: normalizeResourceUrl(row.cover as string),
         width: 100,
         height: 56,
         objectFit: 'cover',

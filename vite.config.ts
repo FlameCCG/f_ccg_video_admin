@@ -48,6 +48,15 @@ export default defineConfig({
     port: 3001,
     host: true,
     proxy: {
+      // 媒体资源（同源方案）：/user_files → MinIO，/uploads → 后端本地静态目录
+      '/user_files': {
+        target: 'http://127.0.0.1:9002/videos',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
       '/v1': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,
