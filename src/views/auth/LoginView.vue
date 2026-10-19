@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
@@ -53,9 +53,6 @@ const captchaData = reactive({
 const showCaptchaModal = ref(false)
 const shouldNavigateAfterCaptcha = ref(false)
 
-const CAPTCHA_SUCCESS_FEEDBACK_DURATION = 500
-let captchaSuccessTimer: ReturnType<typeof setTimeout> | undefined
-
 /** 滑块验证码是否启用（默认 true，安全优先） */
 const slideCaptchaEnabled = ref(true)
 
@@ -81,10 +78,6 @@ const rules: FormRules = {
 onMounted(() => {
   void fetchPublicSiteConfig()
   void focusUsernameInput()
-})
-
-onBeforeUnmount(() => {
-  if (captchaSuccessTimer) clearTimeout(captchaSuccessTimer)
 })
 
 async function focusUsernameInput(): Promise<void> {
@@ -143,7 +136,6 @@ async function handleLoginClick(): Promise<void> {
 
     if (slideCaptchaEnabled.value) {
       shouldNavigateAfterCaptcha.value = false
-      if (captchaSuccessTimer) clearTimeout(captchaSuccessTimer)
       showCaptchaModal.value = true
     } else {
       captchaData.verified = true
@@ -177,9 +169,6 @@ async function doLogin(): Promise<void> {
     if (slideCaptchaEnabled.value) {
       shouldNavigateAfterCaptcha.value = true
       captchaRef.value?.success()
-      captchaSuccessTimer = setTimeout(() => {
-        showCaptchaModal.value = false
-      }, CAPTCHA_SUCCESS_FEEDBACK_DURATION)
     } else {
       message.success(t('auth.tips.loginSuccess'))
       void router.push({ path: '/' })
@@ -202,6 +191,10 @@ async function doLogin(): Promise<void> {
       message.error(errorMessage)
     }
   }
+}
+
+function handleCaptchaSettled(): void {
+  if (shouldNavigateAfterCaptcha.value) showCaptchaModal.value = false
 }
 
 function handleCaptchaAfterLeave(): void {
@@ -359,6 +352,7 @@ function handleEnterSubmit(): void {
     <n-modal
       v-model:show="showCaptchaModal"
       preset="card"
+      transform-origin="center"
       class="captcha-modal"
       header-class="captcha-modal__header"
       content-class="captcha-modal__content"
@@ -366,7 +360,8 @@ function handleEnterSubmit(): void {
       :style="{ width: 'min(22.5rem, calc(100vw - var(--spacing-8)))' }"
       :bordered="false"
       :mask-closable="false"
-      :close-on-esc="!isLoading"
+      :closable="!isLoading && !shouldNavigateAfterCaptcha"
+      :close-on-esc="!isLoading && !shouldNavigateAfterCaptcha"
       @after-leave="handleCaptchaAfterLeave"
     >
       <SlideCaptcha
@@ -375,6 +370,7 @@ function handleEnterSubmit(): void {
         @confirm="handleCaptchaConfirm"
         @fail="handleCaptchaFail"
         @refresh="handleCaptchaRefresh"
+        @settled="handleCaptchaSettled"
       />
     </n-modal>
   </div>

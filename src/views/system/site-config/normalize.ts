@@ -105,6 +105,7 @@ export function normalizeThirdLoginConfig(raw: ThirdLoginConfig): ThirdLoginConf
 
 export function normalizeSiteConfig(raw: SiteConfig): SiteConfig {
   return {
+    disableUserSubmission: raw.disableUserSubmission ?? false,
     defaultUserBannerID: raw.defaultUserBannerID ?? 0,
     defaultUserBannerIDs: Array.isArray(raw.defaultUserBannerIDs) ? raw.defaultUserBannerIDs : [],
     contentReview: {
@@ -134,6 +135,9 @@ export function normalizeSiteConfig(raw: SiteConfig): SiteConfig {
       chunkSize: raw.storage?.chunkSize ?? 0,
       maxFileSize: raw.storage?.maxFileSize ?? 0,
       maxUploadNum: raw.storage?.maxUploadNum ?? 0,
+      dailyUploadLimit: raw.storage?.dailyUploadLimit ?? 10,
+      unmergedChunkRetentionHours: raw.storage?.unmergedChunkRetentionHours ?? 2,
+      unpublishedSourceRetentionHours: raw.storage?.unpublishedSourceRetentionHours ?? 1,
       chunkDir: raw.storage?.chunkDir ?? '',
       local: raw.storage?.local
         ? {

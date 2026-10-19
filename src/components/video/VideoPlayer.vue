@@ -541,13 +541,15 @@ function initPlayback(): void {
     dashQualityOptions.value = []
     dashLabelMap = new Map<number, string>()
 
-    void startDashPlayback(video, normalizeResourceUrl(dashResource.value.fileUrl), signal).catch((error: unknown) => {
-      console.error('[VideoPlayer] DASH 初始化异常', error)
-      if (signal.aborted) return
-      isDashActive.value = false
-      dashDisabled = true
-      fallbackToMp4(video, signal)
-    })
+    void startDashPlayback(video, normalizeResourceUrl(dashResource.value.fileUrl), signal).catch(
+      (error: unknown) => {
+        console.error('[VideoPlayer] DASH 初始化异常', error)
+        if (signal.aborted) return
+        isDashActive.value = false
+        dashDisabled = true
+        fallbackToMp4(video, signal)
+      }
+    )
   } else {
     fallbackToMp4(video, signal)
   }

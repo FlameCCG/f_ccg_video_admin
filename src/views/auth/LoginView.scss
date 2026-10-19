@@ -600,9 +600,10 @@
 }
 
 :global(.captcha-modal.fade-in-scale-up-transition-leave-active) {
+  pointer-events: none;
   transition:
-    opacity var(--duration-slow) var(--easing-ease-in),
-    transform var(--duration-slow) var(--easing-ease-in) !important;
+    opacity var(--duration-normal) var(--easing-out-quart),
+    transform var(--duration-normal) var(--easing-out-quart) !important;
 }
 
 :global(.captcha-modal.fade-in-scale-up-transition-enter-from) {
@@ -618,7 +619,7 @@
 
 :global(.captcha-modal.fade-in-scale-up-transition-leave-to) {
   opacity: 0;
-  transform: translateY(calc(var(--spacing-1) * -1)) scale(0.992);
+  transform: translateY(calc(var(--spacing-1) * 0.5)) scale(0.985);
 }
 
 :global(.captcha-modal__header) {
@@ -640,6 +641,10 @@
 :global(.n-modal-scroll-content:has(.captcha-modal) > .n-modal-mask) {
   background-color: color-mix(in srgb, var(--color-overlay) 88%, transparent);
   backdrop-filter: blur(4px) saturate(0.82);
+}
+
+:global(.n-modal-scroll-content:has(.captcha-modal) > .n-modal-mask.fade-in-transition-leave-active) {
+  transition: opacity var(--duration-normal) var(--easing-out-quart) !important;
 }
 
 @keyframes login-reveal {

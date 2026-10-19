@@ -29,7 +29,10 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 type EditableSiteSection = 'contentReview' | 'login' | 'register'
-type EditableSiteRootField = 'defaultUserBannerID' | 'defaultUserBannerIDs'
+type EditableSiteRootField =
+  | 'defaultUserBannerID'
+  | 'defaultUserBannerIDs'
+  | 'disableUserSubmission'
 
 const formData = computed({
   get: () => props.modelValue,
@@ -101,10 +104,27 @@ function handleDefaultBannerIDsChange(value: string): void {
     .filter((item) => Number.isInteger(item) && item > 0)
   updateRootField('defaultUserBannerIDs', ids)
 }
+function handleSubmissionPolicyChange(value: boolean): void {
+  updateRootField('disableUserSubmission', value)
+}
 </script>
 
 <template>
   <n-form v-if="formData" label-placement="left" label-width="180" :disabled="loading">
+    <n-divider title-placement="left">
+      <n-text strong>{{ t('siteConfig.site.submission.title') }}</n-text>
+    </n-divider>
+    <n-form-item :label="t('siteConfig.site.submission.disableUserSubmission')">
+      <n-switch
+        :value="formData.disableUserSubmission ?? false"
+        :aria-label="t('siteConfig.site.submission.disableUserSubmission')"
+        @update:value="handleSubmissionPolicyChange"
+      />
+      <n-text class="ml-3 text-muted" depth="3">
+        {{ t('siteConfig.site.submission.tip') }}
+      </n-text>
+    </n-form-item>
+
     <!-- 内容审核 -->
     <n-divider title-placement="left">
       <n-text strong>{{ t('siteConfig.site.contentReview.title') }}</n-text>
@@ -335,6 +355,40 @@ function handleDefaultBannerIDsChange(value: string): void {
             :max="100"
             @update:value="(v) => updateStorageRootField('maxUploadNum', v ?? 10)"
           />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.storage.dailyUploadLimit')">
+          <n-input-number
+            :value="formData.storage.dailyUploadLimit"
+            :min="1"
+            :max="10000"
+            @update:value="(v) => updateStorageRootField('dailyUploadLimit', v ?? 10)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.storage.unmergedChunkRetentionHours')">
+          <n-input-number
+            :value="formData.storage.unmergedChunkRetentionHours"
+            :min="1"
+            :max="720"
+            @update:value="(v) => updateStorageRootField('unmergedChunkRetentionHours', v ?? 2)"
+          >
+            <template #suffix>h</template>
+          </n-input-number>
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.storage.unpublishedSourceRetentionHours')">
+          <n-input-number
+            :value="formData.storage.unpublishedSourceRetentionHours"
+            :min="1"
+            :max="720"
+            @update:value="(v) => updateStorageRootField('unpublishedSourceRetentionHours', v ?? 1)"
+          >
+            <template #suffix>h</template>
+          </n-input-number>
         </n-form-item>
       </n-grid-item>
       <n-grid-item :span="2">

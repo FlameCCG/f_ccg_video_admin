@@ -16,6 +16,11 @@ export default {
   // Basic Settings
   site: {
     title: 'Basic Settings',
+    submission: {
+      title: 'Video submissions',
+      disableUserSubmission: 'Disable user submissions',
+      tip: 'When enabled, only administrators can upload videos and covers, publish, or edit videos. Takes effect after saving.',
+    },
     contentReview: {
       title: 'Content Review',
       enable: 'Enable Content Review',
@@ -53,7 +58,10 @@ export default {
       maxChunkSize: 'Max Chunk Size',
       chunkSize: 'Chunk Size',
       maxFileSize: 'Max File Size',
-      maxUploadNum: 'Max Upload Count',
+      maxUploadNum: 'Parts per Work Limit',
+      dailyUploadLimit: 'Daily File Limit for Users',
+      unmergedChunkRetentionHours: 'Unmerged Chunk Retention',
+      unpublishedSourceRetentionHours: 'Unpublished Source Retention',
       chunkDir: 'Chunk Directory',
       local: {
         title: 'Local Storage',

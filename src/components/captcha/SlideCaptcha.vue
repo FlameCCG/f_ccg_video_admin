@@ -40,19 +40,24 @@ const emit = defineEmits<{
   fail: []
   /** 刷新验证码 */
   refresh: []
+  /** 成功画面已完成，可以开始弹层离场 */
+  settled: []
 }>()
 
 const { t } = useI18n()
 
 const DEFAULT_SLIDER_WIDTH = 44
 const FAILURE_RESET_DELAY = 1100
+const RECOIL_DURATION = 200
+const ARIA_SYNC_INTERVAL = 150
 
 const captchaData = ref<SlideCaptcha | null>(null)
 const loading = ref(false)
 const isDragging = ref(false)
+const isReturning = ref(false)
+const imageHeight = ref(160)
 const sliderX = ref(0)
 const scale = ref(1)
-const startX = ref(0)
 const verifyStatus = ref<VerifyStatus>('idle')
 const containerWidth = ref(280)
 const sliderWidth = ref(DEFAULT_SLIDER_WIDTH)
@@ -64,7 +69,15 @@ const masterImageRef = ref<HTMLImageElement | null>(null)
 
 let resizeObserver: ResizeObserver | undefined
 let failureResetTimer: ReturnType<typeof setTimeout> | undefined
+let returnTimer: ReturnType<typeof setTimeout> | undefined
+let settleTimer: ReturnType<typeof setTimeout> | undefined
+let settleArmed = false
 let captchaRequestId = 0
+let rawX = 0
+let pointerOrigin = 0
+let activePointerId: number | null = null
+let dragFrame = 0
+let lastAriaSync = 0
 
 const maxSlideDistance = computed(() => Math.max(containerWidth.value - sliderWidth.value, 0))
 const maxSlideDistanceRounded = computed(() => Math.round(maxSlideDistance.value))
@@ -72,13 +85,13 @@ const progressPercentage = computed(() => {
   if (maxSlideDistance.value <= 0) return 0
   return Math.round((sliderX.value / maxSlideDistance.value) * 100)
 })
-const fillScale = computed(() => {
-  if (containerWidth.value <= 0) return 0
-  return Math.min((sliderX.value + sliderWidth.value) / containerWidth.value, 1)
-})
 const showSuccessResult = computed(() => verifyStatus.value === 'success')
 const isInteractive = computed(
-  () => !loading.value && Boolean(captchaData.value) && verifyStatus.value === 'idle'
+  () =>
+    props.visible && !loading.value && Boolean(captchaData.value) && verifyStatus.value === 'idle'
+)
+const canRefresh = computed(
+  () => !loading.value && verifyStatus.value !== 'verifying' && verifyStatus.value !== 'success'
 )
 const tipText = computed(() => {
   switch (verifyStatus.value) {
@@ -92,43 +105,85 @@ const tipText = computed(() => {
       return t('auth.captcha.tip')
   }
 })
-const sliderStyle = computed(() => ({
-  transform: `translate3d(${sliderX.value}px, 0, 0)`,
-}))
 const tileStyle = computed(() => ({
-  transform: `translate3d(${sliderX.value}px, ${(captchaData.value?.thumbY ?? 0) * scale.value}px, 0) scale(${scale.value})`,
+  transform: `translate3d(var(--captcha-x, 0px), ${(captchaData.value?.thumbY ?? 0) * scale.value}px, 0) scale(${scale.value})`,
   transformOrigin: 'left top',
-}))
-const fillStyle = computed(() => ({
-  transform: `scaleX(${fillScale.value})`,
 }))
 
 function clearFailureTimers(): void {
   if (failureResetTimer) clearTimeout(failureResetTimer)
+  if (returnTimer) clearTimeout(returnTimer)
   failureResetTimer = undefined
+  returnTimer = undefined
+}
+
+function clearSettleTimer(): void {
+  if (settleTimer) clearTimeout(settleTimer)
+  settleTimer = undefined
+  settleArmed = false
+}
+
+function handleSettled(): void {
+  if (!settleArmed || verifyStatus.value !== 'success' || !props.visible) return
+  clearSettleTimer()
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  settleTimer = setTimeout(() => {
+    settleTimer = undefined
+    if (props.visible && verifyStatus.value === 'success') emit('settled')
+  }, reducedMotion ? 0 : 100)
+}
+
+function flushPosition(): void {
+  dragFrame = 0
+  const root = containerRef.value
+  if (!root) return
+  root.style.setProperty('--captcha-x', `${rawX}px`)
+  root.style.setProperty(
+    '--captcha-fill',
+    String(Math.min((rawX + sliderWidth.value) / (containerWidth.value || 1), 1))
+  )
+}
+
+function cancelFrame(): void {
+  if (dragFrame) cancelAnimationFrame(dragFrame)
+  dragFrame = 0
+}
+
+function stopDragging(): void {
+  const pointerId = activePointerId
+  activePointerId = null
+  isDragging.value = false
+  cancelFrame()
+  if (pointerId !== null && sliderRef.value?.hasPointerCapture?.(pointerId)) {
+    sliderRef.value.releasePointerCapture(pointerId)
+  }
 }
 
 function measureCaptcha(): void {
   if (containerRef.value) {
-    containerWidth.value = containerRef.value.getBoundingClientRect().width
+    containerWidth.value = containerRef.value.getBoundingClientRect().width || containerWidth.value
   }
   if (sliderRef.value) {
     sliderWidth.value = sliderRef.value.getBoundingClientRect().width || DEFAULT_SLIDER_WIDTH
   }
   if (masterImageRef.value?.naturalWidth) {
-    scale.value =
-      masterImageRef.value.getBoundingClientRect().width / masterImageRef.value.naturalWidth
+    const rect = masterImageRef.value.getBoundingClientRect()
+    if (rect.width > 0) scale.value = rect.width / masterImageRef.value.naturalWidth
+    if (rect.height > 0) imageHeight.value = rect.height
   }
-  sliderX.value = Math.min(sliderX.value, maxSlideDistance.value)
+  moveSliderTo(rawX)
 }
 
 async function fetchCaptcha(): Promise<void> {
+  if (!props.visible) return
   const requestId = ++captchaRequestId
   clearFailureTimers()
+  clearSettleTimer()
+  stopDragging()
   loading.value = true
   verifyStatus.value = 'idle'
-  isDragging.value = false
-  sliderX.value = 0
+  isReturning.value = false
+  moveSliderTo(0)
   lastResult.value = null
 
   try {
@@ -138,6 +193,7 @@ async function fetchCaptcha(): Promise<void> {
     await nextTick()
     measureCaptcha()
   } catch {
+    if (requestId === captchaRequestId) captchaData.value = null
     // 错误已在 request 层归一化处理
   } finally {
     if (requestId === captchaRequestId) loading.value = false
@@ -145,6 +201,7 @@ async function fetchCaptcha(): Promise<void> {
 }
 
 function handleRefresh(): void {
+  if (!canRefresh.value) return
   emit('refresh')
   void fetchCaptcha()
 }
@@ -153,17 +210,24 @@ function onImageLoad(event: Event): void {
   const image = event.target as HTMLImageElement
   if (!image.naturalWidth) return
   scale.value = image.getBoundingClientRect().width / image.naturalWidth
+  measureCaptcha()
 }
 
 function moveSliderTo(position: number): void {
-  sliderX.value = Math.max(0, Math.min(position, maxSlideDistance.value))
+  cancelFrame()
+  rawX = Math.max(0, Math.min(position, maxSlideDistance.value))
+  sliderX.value = rawX
+  flushPosition()
 }
 
 function handlePointerDown(event: PointerEvent): void {
-  if (!isInteractive.value) return
+  if (!isInteractive.value || isDragging.value || event.button !== 0 || event.isPrimary === false)
+    return
 
+  activePointerId = event.pointerId
   isDragging.value = true
-  startX.value = event.clientX - sliderX.value
+  pointerOrigin = event.clientX - rawX
+  lastAriaSync = 0
   if (event.currentTarget instanceof HTMLElement) {
     event.currentTarget.setPointerCapture?.(event.pointerId)
   }
@@ -171,37 +235,33 @@ function handlePointerDown(event: PointerEvent): void {
 }
 
 function handlePointerMove(event: PointerEvent): void {
-  if (!isDragging.value) return
-  moveSliderTo(event.clientX - startX.value)
+  if (!isDragging.value || event.pointerId !== activePointerId) return
+  rawX = Math.max(0, Math.min(event.clientX - pointerOrigin, maxSlideDistance.value))
+  if (!dragFrame) dragFrame = requestAnimationFrame(flushPosition)
+  if (event.timeStamp - lastAriaSync >= ARIA_SYNC_INTERVAL) {
+    lastAriaSync = event.timeStamp
+    sliderX.value = rawX
+  }
   event.preventDefault()
 }
 
-function releasePointer(event: PointerEvent): void {
-  if (
-    event.currentTarget instanceof HTMLElement &&
-    event.currentTarget.hasPointerCapture?.(event.pointerId)
-  ) {
-    event.currentTarget.releasePointerCapture(event.pointerId)
-  }
-}
-
 function handlePointerUp(event: PointerEvent): void {
-  if (!isDragging.value) return
-  isDragging.value = false
-  releasePointer(event)
+  if (!isDragging.value || event.pointerId !== activePointerId) return
+  moveSliderTo(event.clientX - pointerOrigin)
+  stopDragging()
   verifySlider()
 }
 
 function handlePointerCancel(event: PointerEvent): void {
-  if (!isDragging.value) return
-  isDragging.value = false
-  releasePointer(event)
+  if (!isDragging.value || event.pointerId !== activePointerId) return
+  stopDragging()
+  moveSliderTo(rawX)
 }
 
 function handleSliderKeydown(event: KeyboardEvent): void {
-  if (!isInteractive.value) return
+  if (!isInteractive.value || isDragging.value) return
 
-  const step = Math.max(Math.round(maxSlideDistance.value / 20), 1)
+  const step = event.shiftKey ? 1 : Math.max(Math.round(maxSlideDistance.value / 20), 1)
   let handled = true
 
   switch (event.key) {
@@ -231,7 +291,7 @@ function handleSliderKeydown(event: KeyboardEvent): void {
 }
 
 function verifySlider(): void {
-  if (!captchaData.value || !isInteractive.value) return
+  if (!captchaData.value || !isInteractive.value || rawX <= 0) return
 
   const result: CaptchaResult = {
     token: captchaData.value.token,
@@ -262,14 +322,23 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   captchaRequestId += 1
+  stopDragging()
   resizeObserver?.disconnect()
   clearFailureTimers()
+  clearSettleTimer()
 })
 
 watch(
   () => props.visible,
   (visible) => {
-    if (visible) void fetchCaptcha()
+    if (visible) {
+      void fetchCaptcha()
+      return
+    }
+    captchaRequestId += 1
+    stopDragging()
+    clearFailureTimers()
+    clearSettleTimer()
   }
 )
 
@@ -277,16 +346,36 @@ defineExpose({
   reset,
   refresh: handleRefresh,
   success: () => {
+    if (!props.visible) return
     clearFailureTimers()
-    isDragging.value = false
+    clearSettleTimer()
+    stopDragging()
     verifyStatus.value = 'success'
+    settleArmed = true
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    // animationend 正常收尾，减动效或动画被打断时由定时器兜底。
+    settleTimer = setTimeout(handleSettled, reducedMotion ? 160 : 900)
     if (lastResult.value) emit('success', lastResult.value)
   },
   fail: () => {
+    if (!props.visible) return
     clearFailureTimers()
+    clearSettleTimer()
     verifyStatus.value = 'fail'
-    isDragging.value = false
-    sliderX.value = 0
+    stopDragging()
+    emit('fail')
+
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reducedMotion) {
+      moveSliderTo(0)
+    } else {
+      returnTimer = setTimeout(() => {
+        isReturning.value = true
+        void nextTick(() => {
+          if (verifyStatus.value === 'fail') moveSliderTo(0)
+        })
+      }, RECOIL_DURATION)
+    }
 
     failureResetTimer = setTimeout(() => {
       void fetchCaptcha()
@@ -296,7 +385,13 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="containerRef" class="slide-captcha">
+  <div
+    ref="containerRef"
+    class="slide-captcha"
+    :class="{ 'slide-captcha--returning': isReturning }"
+    :style="{ '--captcha-image-height': `${imageHeight}px` }"
+    :aria-busy="loading || verifyStatus === 'verifying'"
+  >
     <div
       class="slide-captcha__image-wrapper"
       :class="{
@@ -326,8 +421,16 @@ defineExpose({
           />
 
           <div v-if="!captchaData && !loading" class="slide-captcha__placeholder">
-            {{ t('auth.captcha.loading') }}
+            <n-button :disabled="!canRefresh" @click="handleRefresh">
+              {{ t('auth.captcha.refresh') }}
+            </n-button>
           </div>
+
+          <Transition name="captcha-result">
+            <div v-if="verifyStatus === 'verifying'" class="slide-captcha__scan" aria-hidden="true">
+              <div class="slide-captcha__result-scan" />
+            </div>
+          </Transition>
 
           <Transition name="captcha-result">
             <div
@@ -336,7 +439,6 @@ defineExpose({
               role="status"
               aria-live="polite"
             >
-              <div class="slide-captcha__result-scan" aria-hidden="true" />
               <svg class="slide-captcha__result-mark" viewBox="0 0 64 64" aria-hidden="true">
                 <circle class="slide-captcha__result-ring" cx="32" cy="32" r="25" />
                 <path
@@ -344,7 +446,9 @@ defineExpose({
                   d="M20 33.5 28.5 42 45 23.5"
                 />
               </svg>
-              <span class="slide-captcha__result-text">{{ tipText }}</span>
+              <span class="slide-captcha__result-text" @animationend.self="handleSettled">
+                {{ tipText }}
+              </span>
             </div>
           </Transition>
         </div>
@@ -355,7 +459,7 @@ defineExpose({
         quaternary
         circle
         size="small"
-        :disabled="loading || verifyStatus === 'verifying' || verifyStatus === 'success'"
+        :disabled="!canRefresh"
         @click="handleRefresh"
       >
         <template #icon>
@@ -376,7 +480,7 @@ defineExpose({
         'slide-captcha__track--fail': verifyStatus === 'fail',
       }"
     >
-      <div class="slide-captcha__track-fill" :style="fillStyle" />
+      <div class="slide-captcha__track-fill" />
 
       <Transition name="captcha-tip" mode="out-in">
         <span
@@ -399,7 +503,6 @@ defineExpose({
           'slide-captcha__slider--success': verifyStatus === 'success',
           'slide-captcha__slider--fail': verifyStatus === 'fail',
         }"
-        :style="sliderStyle"
         role="slider"
         :tabindex="isInteractive ? 0 : -1"
         :aria-label="t('auth.captcha.tip')"
@@ -412,6 +515,7 @@ defineExpose({
         @pointermove="handlePointerMove"
         @pointerup="handlePointerUp"
         @pointercancel="handlePointerCancel"
+        @lostpointercapture="handlePointerCancel"
         @keydown="handleSliderKeydown"
       >
         <svg class="slide-captcha__slider-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -451,6 +555,7 @@ defineExpose({
   &__image-container {
     position: relative;
     width: 100%;
+    min-height: var(--captcha-image-height);
     overflow: hidden;
     isolation: isolate;
     background-color: var(--color-surface-hover);
@@ -572,7 +677,7 @@ defineExpose({
       color-mix(in srgb, var(--color-primary) 22%, transparent)
     );
     pointer-events: none;
-    transform: scaleX(0);
+    transform: scaleX(var(--captcha-fill, 0));
     transform-origin: left center;
     transition:
       background-color var(--duration-normal) var(--easing-out-quart),
@@ -644,7 +749,7 @@ defineExpose({
     border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-elev-1);
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(var(--captcha-x, 0px), 0, 0);
     transition:
       color var(--duration-fast) var(--easing-out-quart),
       background-color var(--duration-fast) var(--easing-out-quart),
@@ -661,6 +766,11 @@ defineExpose({
 
     &:active:not([aria-disabled='true']) {
       box-shadow: var(--shadow-elev-1);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: -3px;
     }
 
     &--dragging {
@@ -711,6 +821,12 @@ defineExpose({
     stroke-width: 1.8;
   }
 
+  &--returning &__slider,
+  &--returning &__tile-image,
+  &--returning &__track-fill {
+    transition: transform var(--duration-slower) var(--easing-out-quint);
+  }
+
   &__slider-arrow,
   &__slider-check {
     transition:
@@ -732,19 +848,32 @@ defineExpose({
 
   &__result {
     position: absolute;
-    inset: 0;
+    right: var(--spacing-2);
+    bottom: var(--spacing-2);
     z-index: 10;
     display: flex;
-    flex-direction: column;
+    gap: var(--spacing-2);
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    padding: var(--spacing-2) var(--spacing-3);
     background-color: color-mix(in srgb, var(--color-surface) 91%, transparent);
-    backdrop-filter: blur(2px);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-elev-1);
+    pointer-events: none;
 
     &--success {
       color: var(--color-success);
     }
+  }
+
+  &__scan {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    overflow: hidden;
+    color: var(--color-primary);
+    pointer-events: none;
   }
 
   &__result-scan {
@@ -761,13 +890,14 @@ defineExpose({
     );
   }
 
-  &__result--success &__result-scan {
-    animation: captcha-security-scan var(--duration-slowest) var(--easing-out-quart) both;
+  &__scan &__result-scan {
+    animation: captcha-security-scan calc(var(--duration-slowest) * 2) var(--easing-out-quart)
+      infinite;
   }
 
   &__result-mark {
-    width: var(--spacing-16);
-    height: var(--spacing-16);
+    width: var(--spacing-6);
+    height: var(--spacing-6);
     overflow: visible;
     fill: none;
     stroke: currentcolor;
@@ -794,8 +924,7 @@ defineExpose({
   }
 
   &__result-text {
-    margin-top: var(--spacing-2);
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
     font-weight: var(--font-semibold);
     letter-spacing: var(--tracking-wide);
     opacity: 0;
@@ -940,6 +1069,7 @@ defineExpose({
 
     &__tile-image,
     &__slider,
+    &__track-fill,
     &__result,
     &__tip {
       transition: none;
@@ -950,8 +1080,15 @@ defineExpose({
     }
 
     &__result-ring,
-    &__result-symbol {
+    &__result-symbol,
+    &__slider-check {
       stroke-dashoffset: 0;
+    }
+
+    &--returning &__slider,
+    &--returning &__tile-image,
+    &--returning &__track-fill {
+      transition: none;
     }
 
     &__result-text {

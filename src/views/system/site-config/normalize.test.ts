@@ -96,11 +96,38 @@ describe('site-config normalize', () => {
     expect(next.x.redirect).toBe('')
   })
 
+  it('preserves the submission restriction when loading and saving site config', () => {
+    const next = normalizeSiteConfig({ disableUserSubmission: true } as SiteConfig)
+    expect(next.disableUserSubmission).toBe(true)
+    expect(
+      normalizeSiteConfig({ ...next, disableUserSubmission: false }).disableUserSubmission
+    ).toBe(false)
+  })
+
   it('fills site nested defaults', () => {
     const next = normalizeSiteConfig({} as SiteConfig)
+    expect(next.disableUserSubmission).toBe(false)
     expect(next.contentReview.enable).toBe(false)
     expect(next.login.gitHubLogin).toBe(false)
     expect(next.register.slideCaptchaTTL).toBe(300)
     expect(next.defaultUserBannerIDs).toEqual([])
+    expect(next.storage.dailyUploadLimit).toBe(10)
+    expect(next.storage.unmergedChunkRetentionHours).toBe(2)
+    expect(next.storage.unpublishedSourceRetentionHours).toBe(1)
+  })
+
+  it('keeps the daily limit separate from the per-work part limit', () => {
+    const next = normalizeSiteConfig({
+      storage: {
+        maxUploadNum: 6,
+        dailyUploadLimit: 15,
+        unmergedChunkRetentionHours: 3,
+        unpublishedSourceRetentionHours: 4,
+      },
+    } as SiteConfig)
+    expect(next.storage.maxUploadNum).toBe(6)
+    expect(next.storage.dailyUploadLimit).toBe(15)
+    expect(next.storage.unmergedChunkRetentionHours).toBe(3)
+    expect(next.storage.unpublishedSourceRetentionHours).toBe(4)
   })
 })

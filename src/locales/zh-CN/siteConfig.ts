@@ -16,6 +16,11 @@ export default {
   // 基础配置
   site: {
     title: '基础配置',
+    submission: {
+      title: '视频投稿',
+      disableUserSubmission: '禁止普通用户投稿',
+      tip: '开启后，仅管理员可上传视频、上传封面、发布及修改视频。保存后生效。',
+    },
     contentReview: {
       title: '内容审核',
       enable: '启用内容审核',
@@ -53,7 +58,10 @@ export default {
       maxChunkSize: '最大分片大小',
       chunkSize: '分片大小',
       maxFileSize: '最大文件大小',
-      maxUploadNum: '最大上传数量',
+      maxUploadNum: '单个作品分P上限',
+      dailyUploadLimit: '普通用户每日上传文件上限',
+      unmergedChunkRetentionHours: '未合并分片保留时间',
+      unpublishedSourceRetentionHours: '未发布源视频保留时间',
       chunkDir: '分片目录',
       local: {
         title: '本地存储',

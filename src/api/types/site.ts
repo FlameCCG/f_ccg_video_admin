@@ -60,6 +60,8 @@ export interface PublicContentReviewConfig {
 
 /** 公开站点配置 */
 export interface PublicSiteConfig {
+  /** 开启后仅管理员可上传、投稿和改稿 */
+  disableUserSubmission?: boolean
   login: PublicLoginConfig
   register: PublicRegisterConfig
   storage: PublicStorageConfig
@@ -125,6 +127,9 @@ export interface StorageConfig {
   chunkSize: number
   maxFileSize: number
   maxUploadNum: number
+  dailyUploadLimit: number
+  unmergedChunkRetentionHours: number
+  unpublishedSourceRetentionHours: number
   chunkDir?: string
   local?: LocalStorageConfig
   minio?: MinioStorageConfig
@@ -132,6 +137,8 @@ export interface StorageConfig {
 
 /** 基础站点配置 */
 export interface SiteConfig {
+  /** 开启后仅管理员可上传、投稿和改稿 */
+  disableUserSubmission?: boolean
   /** 用户注册时主页默认横幅 ID */
   defaultUserBannerID: number
   /** 系统默认提供的用户主页横幅 ID 列表 */

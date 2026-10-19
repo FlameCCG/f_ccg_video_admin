@@ -16,6 +16,11 @@ export default {
   // 基本設定
   site: {
     title: '基本設定',
+    submission: {
+      title: '動画投稿',
+      disableUserSubmission: '一般ユーザーの投稿を禁止',
+      tip: '有効にすると、動画・カバーのアップロード、公開、編集は管理者のみ可能になります。保存後に反映されます。',
+    },
     contentReview: {
       title: 'コンテンツ審査',
       enable: 'コンテンツ審査を有効化',
@@ -53,7 +58,10 @@ export default {
       maxChunkSize: '最大チャンクサイズ',
       chunkSize: 'チャンクサイズ',
       maxFileSize: '最大ファイルサイズ',
-      maxUploadNum: '最大アップロード数',
+      maxUploadNum: '作品ごとの分P上限',
+      dailyUploadLimit: '一般ユーザーの1日あたりのファイル上限',
+      unmergedChunkRetentionHours: '未結合チャンクの保持期間',
+      unpublishedSourceRetentionHours: '未公開元動画の保持期間',
       chunkDir: 'チャンクディレクトリ',
       local: {
         title: 'ローカルストレージ',
