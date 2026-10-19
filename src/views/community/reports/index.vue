@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { formatDateTime, normalizeResourceUrl } from '@/utils'
+import { formatDateTime } from '@/utils'
+import AppImage from '@/components/common/AppImage.vue'
 /**
  * 举报处理页
  * Report Handling Page
@@ -16,7 +17,6 @@ import {
   NIcon,
   NGi,
   NFormItem,
-  NImage,
   NModal,
   NForm,
   NInput,
@@ -163,14 +163,12 @@ const videoColumns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     key: 'videoCover',
     width: 120,
     render: (row) =>
-      h(NImage, {
-        src: normalizeResourceUrl(row.videoCover as string),
+      h(AppImage, {
+        src: row.videoCover as string,
         width: 100,
         height: 56,
-        objectFit: 'cover',
         lazy: true,
         previewDisabled: false,
-        style: { borderRadius: '4px' },
       }),
   },
   {

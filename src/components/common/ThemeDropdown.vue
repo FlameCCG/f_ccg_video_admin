@@ -8,6 +8,7 @@ import { computed } from 'vue'
 import { NPopover, NIcon } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, type ThemeName, themeConfigs } from '@/stores/app'
+import IconCyberpunk from '@/components/icons/IconCyberpunk.vue'
 
 interface Props {
   /** 鏄惁鏄剧ず褰撳墠涓婚鍚嶇О */
@@ -100,21 +101,7 @@ function handleThemeChange(name: ThemeName): void {
           >
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
-          <!-- Cyberpunk: Hexagon/Chip -->
-          <svg
-            v-else-if="currentTheme === 'cyberpunk'"
-            xmlns="http://www.w3.org/2000/svg"
-            width="1em"
-            height="1em"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-          </svg>
+          <IconCyberpunk v-else-if="currentTheme === 'cyberpunk'" />
           <!-- Sakura: Flower -->
           <svg
             v-else-if="currentTheme === 'sakura'"
@@ -205,20 +192,7 @@ function handleThemeChange(name: ThemeName): void {
             >
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
             </svg>
-            <svg
-              v-else-if="config.name === 'cyberpunk'"
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-            </svg>
+            <IconCyberpunk v-else-if="config.name === 'cyberpunk'" width="16" height="16" />
             <svg
               v-else-if="config.name === 'sakura'"
               xmlns="http://www.w3.org/2000/svg"

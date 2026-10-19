@@ -4,6 +4,7 @@
  */
 
 export { default as AppAvatar } from './AppAvatar.vue'
+export { default as AppImage } from './AppImage.vue'
 export { default as AppEmpty } from './AppEmpty.vue'
 export { default as AppSkeleton } from './AppSkeleton.vue'
 export { default as AppStatusTag } from './AppStatusTag.vue'

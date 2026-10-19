@@ -14,7 +14,6 @@ import {
   NIcon,
   NGi,
   NFormItem,
-  NImage,
   NTag,
   useMessage,
   useDialog,
@@ -29,7 +28,7 @@ import {
   updateDefaultUserBannerList,
 } from '@/api/banner'
 import { getSiteConfig } from '@/api/site'
-import { normalizeResourceUrl } from '@/utils'
+import AppImage from '@/components/common/AppImage.vue'
 import { getCommonPartitions } from '@/api/video'
 import type {
   BannerItem,
@@ -271,19 +270,11 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     key: 'cover',
     width: 100,
     render: (row) =>
-      h(NImage, {
-        src: normalizeResourceUrl(row.cover as string),
-        objectFit: 'cover',
-        lazy: true,
-        previewDisabled: false,
-        imgProps: {
-          style: {
-            width: '64px',
-            height: '36px',
-            borderRadius: '4px',
-            objectFit: 'cover',
-          },
-        },
+      h(AppImage, {
+        src: row.cover as string,
+        alt: t('banner.list.cover'),
+        width: 64,
+        height: 36,
       }),
   },
   {
@@ -371,13 +362,15 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     title: t('common.table.operation'),
     key: 'actions',
-    width: 300,
+    width: 180,
     fixed: 'right',
     render: (row) => {
       const banner = row as unknown as BannerItem
       return h(TableActions, {
-        max: 3,
+        max: 2,
         actions: [
+          { key: 'edit', label: t('common.edit') },
+          { key: 'delete', label: t('common.delete'), type: 'error' },
           {
             key: 'setRegisterDefaultBanner',
             label: t('banner.actions.setRegisterDefaultBanner'),
@@ -385,8 +378,6 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
             show: banner.type === 3,
             disabled: !banner.show,
           },
-          { key: 'edit', label: t('common.edit') },
-          { key: 'delete', label: t('common.delete'), type: 'error' },
           {
             key: 'manageDefaultUserBanners',
             label: t('banner.actions.manageDefaultUserBanners'),

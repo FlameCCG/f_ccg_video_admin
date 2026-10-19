@@ -35,6 +35,8 @@ export function normalizeResourceUrl(url?: string | null): string {
   }
 
   // 其余视为后端返回的根相对路径：拼 VITE_MEDIA_BASE（默认空 = 同源）
+  // 对象 key 可能没有前导斜杠；否则列表页会请求 /content/user_files/...。
+  if (/^(?:user_files|uploads|images)\//.test(result)) result = `/${result}`
   const base = (import.meta.env.VITE_MEDIA_BASE as string | undefined)?.trim() ?? ''
   if (!base) return result
 

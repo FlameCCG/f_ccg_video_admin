@@ -15,6 +15,14 @@ vi.mock('@/api/rbac', () => ({
   getUserPermissions: vi.fn(),
 }))
 
+// 这里只验证菜单重定向；router.isReady 会解析懒加载组件，避免连带启动整套 UI。
+vi.mock('@/layouts/DefaultLayout.vue', () => ({
+  default: { name: 'LayoutStub', render: () => null },
+}))
+vi.mock('@/views/community/reports/index.vue', () => ({
+  default: { name: 'ReportViewStub', render: () => null },
+}))
+
 describe('permission store', () => {
   beforeEach(() => {
     // Create a fresh pinia instance for each test

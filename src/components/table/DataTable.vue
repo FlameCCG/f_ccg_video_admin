@@ -192,7 +192,7 @@ const resolvedScrollX = computed<string | number | undefined>(() => {
   if (props.scrollX !== undefined) return props.scrollX
   let total = 0
   for (const col of leafColumns.value) {
-    total += toPxWidth(col.width)
+    total += Math.max(toPxWidth(col.width), 'minWidth' in col ? toPxWidth(col.minWidth) : 0)
   }
   return total > 0 ? total : undefined
 })
@@ -525,11 +525,11 @@ function handleRetry(): void {
 
     // 选中行：类由 rowClassName 打上，见 script
     :deep(.n-data-table-tr.is-row-selected > .n-data-table-td) {
-      background-color: var(--color-primary-subtle);
+      background-color: var(--color-row-selected);
     }
 
     :deep(.n-data-table-tr.is-row-selected:hover > .n-data-table-td) {
-      background-color: var(--color-primary-subtle-hover);
+      background-color: var(--color-row-selected-hover);
     }
 
     // 固定列：原先有 4 组 !important 覆写背景与阴影，成因是赛博朋克主题的

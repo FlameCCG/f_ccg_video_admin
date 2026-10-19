@@ -53,6 +53,12 @@ export default defineConfig({
         target: 'http://127.0.0.1:9002/videos',
         changeOrigin: true,
       },
+      // 初始化横幅同样存储在 MinIO，后端返回 /images/banners/...。
+      // 缺少这条代理时 Vite 会返回 SPA HTML，HTTP 200 但图片无法解码。
+      '/images': {
+        target: 'http://127.0.0.1:9002/videos',
+        changeOrigin: true,
+      },
       '/uploads': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,

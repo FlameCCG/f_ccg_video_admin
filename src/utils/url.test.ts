@@ -1,7 +1,28 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { normalizeExternalHref, normalizeResourceUrl } from './url'
 
 describe('normalizeResourceUrl', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('anchors storage keys to the root instead of the current route', () => {
+    vi.stubEnv('VITE_MEDIA_BASE', '')
+    expect(normalizeResourceUrl('user_files/images/a.png')).toBe('/user_files/images/a.png')
+    expect(normalizeResourceUrl('images/banners/首页.png')).toBe('/images/banners/首页.png')
+    expect(normalizeResourceUrl('uploads/images/a.png')).toBe('/uploads/images/a.png')
+  })
+
+  it('joins root paths and storage keys to the configured media base', () => {
+    vi.stubEnv('VITE_MEDIA_BASE', 'https://media.example.com/videos/')
+    expect(normalizeResourceUrl('/images/banners/a.png')).toBe(
+      'https://media.example.com/videos/images/banners/a.png'
+    )
+    expect(normalizeResourceUrl('user_files/images/a.png')).toBe(
+      'https://media.example.com/videos/user_files/images/a.png'
+    )
+    expect(normalizeResourceUrl('https://external.example.com/a.png')).toBe(
+      'https://external.example.com/a.png'
+    )
+  })
   it('returns empty string for empty input', () => {
     expect(normalizeResourceUrl()).toBe('')
     expect(normalizeResourceUrl('')).toBe('')

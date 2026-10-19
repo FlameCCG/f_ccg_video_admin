@@ -201,7 +201,7 @@ function getActionLabel(action: ActionItem): string {
 // 还要用 :deep(.n-space) 反过来改它的 justify/wrap。直接 flex + gap token 更短。
 .table-actions {
   display: inline-flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: var(--spacing-2);
   align-items: center;
   justify-content: center;

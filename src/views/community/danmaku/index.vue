@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { formatDateTime, normalizeResourceUrl } from '@/utils'
+import { formatDateTime } from '@/utils'
+import AppImage from '@/components/common/AppImage.vue'
 /**
  * 弹幕列表页
  * Danmaku List Page
@@ -15,7 +16,6 @@ import {
   NGi,
   NFormItem,
   NInput,
-  NImage,
   NTag,
   NTooltip,
   useMessage,
@@ -173,14 +173,12 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     key: 'videoCover',
     width: 100,
     render: (row) => {
-      return h(NImage, {
-        src: normalizeResourceUrl(row.videoCover as string),
+      return h(AppImage, {
+        src: row.videoCover as string,
         width: 80,
         height: 48,
-        objectFit: 'cover',
         lazy: true,
         previewDisabled: false,
-        style: { borderRadius: '4px' },
       })
     },
   },

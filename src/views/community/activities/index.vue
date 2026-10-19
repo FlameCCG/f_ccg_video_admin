@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { formatDateTime, normalizeResourceUrl } from '@/utils'
+import { formatDateTime } from '@/utils'
+import AppImage from '@/components/common/AppImage.vue'
 /**
  * 动态管理页
  * Activity Management Page
@@ -15,7 +16,6 @@ import {
   NGi,
   NFormItem,
   NInput,
-  NImage,
   NTag,
   useMessage,
   useDialog,
@@ -118,14 +118,12 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     render: (row) => {
       const imageUrl = row.imageUrl as string
       if (!imageUrl) return h('span', { class: 'text-muted' }, '-')
-      return h(NImage, {
-        src: normalizeResourceUrl(imageUrl),
+      return h(AppImage, {
+        src: imageUrl,
         width: 80,
         height: 80,
-        objectFit: 'cover',
         lazy: true,
         previewDisabled: false,
-        style: { borderRadius: '4px' },
       })
     },
   },

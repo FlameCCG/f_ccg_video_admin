@@ -176,6 +176,7 @@ export default {
   },
 
   // 空の状態
+  image: { loadFailed: '画像を読み込めませんでした', empty: '画像がありません' },
   empty: {
     default: 'データがありません',
     search: '一致する結果がありません',

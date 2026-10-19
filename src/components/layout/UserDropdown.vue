@@ -7,7 +7,6 @@
 import { computed, ref, h } from 'vue'
 import {
   NDropdown,
-  NAvatar,
   NButton,
   NModal,
   NRadioGroup,
@@ -23,6 +22,7 @@ import { useUserStore } from '@/stores/user'
 import { usePermissionStore } from '@/stores/permission'
 import { resetRouter, addDynamicRoutes } from '@/router/guard'
 import router from '@/router'
+import AppAvatar from '@/components/common/AppAvatar.vue'
 
 const { t } = useI18n()
 const dialog = useDialog()
@@ -35,11 +35,6 @@ const permissionStore = usePermissionStore()
 const showRoleSwitchModal = ref(false)
 const selectedRoleId = ref<number>(0)
 const isSwitchingRole = ref(false)
-
-/** 用户头像显示 */
-const avatarText = computed(() => {
-  return userStore.username.charAt(0).toUpperCase() || 'U'
-})
 
 /** 当前角色名 */
 const currentRoleName = computed(() => {
@@ -195,16 +190,13 @@ function handleLogout(): void {
   >
     <NButton quaternary class="user-trigger">
       <div class="user-info">
-        <NAvatar
-          v-if="userStore.avatar"
+        <AppAvatar
           :src="userStore.avatar"
+          :text="userStore.username || 'U'"
           :size="32"
-          round
+          accent
           class="user-avatar"
         />
-        <NAvatar v-else :size="32" round class="user-avatar">
-          {{ avatarText }}
-        </NAvatar>
         <div class="user-detail">
           <span class="user-name">{{ userStore.username || 'User' }}</span>
           <span class="user-role">{{ currentRoleName }}</span>
@@ -252,7 +244,7 @@ function handleLogout(): void {
 
 <style scoped lang="scss">
 .user-trigger {
-  padding: 4px 8px;
+  padding: var(--spacing-1) var(--spacing-2);
   height: auto;
 
   &:hover {
@@ -263,39 +255,36 @@ function handleLogout(): void {
 .user-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .user-avatar {
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
-  color: white;
-  font-weight: 500;
 }
 
 .user-detail {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: calc(var(--spacing-1) / 2);
 }
 
 .user-name {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
   color: var(--color-text);
   line-height: 1.2;
 }
 
 .user-role {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
   line-height: 1.2;
 }
 
 .dropdown-arrow {
   color: var(--color-text-muted);
-  margin-left: 4px;
+  margin-left: var(--spacing-1);
 }
 
 .role-radio-group {

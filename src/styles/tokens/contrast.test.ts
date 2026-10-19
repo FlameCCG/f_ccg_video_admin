@@ -139,7 +139,15 @@ function ratioOf(theme: ThemeName, fgKey: string, bgKey: string): number {
   return contrast(fg, bg)
 }
 
-const SURFACES = ['bg', 'surface', 'surface-2', 'surface-3', 'surface-hover'] as const
+const SURFACES = [
+  'bg',
+  'surface',
+  'surface-2',
+  'surface-3',
+  'surface-hover',
+  'row-selected',
+  'row-selected-hover',
+] as const
 const SEMANTICS = ['primary', 'success', 'warning', 'danger', 'info'] as const
 const INK = ['text', 'text-secondary', 'text-muted'] as const
 
@@ -168,7 +176,7 @@ describe('theme token contrast (WCAG 2.1)', () => {
     })
 
     it.each(SEMANTICS)('%s-text is readable on surface and on its subtle tint', (sem) => {
-      for (const bg of ['surface', `${sem}-subtle`]) {
+      for (const bg of ['surface', `${sem}-subtle`, 'row-selected', 'row-selected-hover']) {
         const r = ratioOf(theme, `${sem}-text`, bg)
         const msg = `${theme}: --color-${sem}-text on --color-${bg} = ${r.toFixed(2)}`
         expect(r, msg).toBeGreaterThanOrEqual(AA_TEXT)
