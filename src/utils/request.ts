@@ -253,6 +253,9 @@ request.interceptors.response.use(
     return Promise.reject(new BusinessError(code, errorMsg))
   },
   async (error: unknown) => {
+    // 筛选变化/翻页会取消过期查询，这是正常控制流，不应弹出网络错误。
+    if (axios.isCancel(error)) return Promise.reject(error)
+
     // 网络错误或非 200 状态码
     if (axios.isAxiosError(error)) {
       const status = error.response?.status

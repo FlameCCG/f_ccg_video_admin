@@ -15,8 +15,11 @@ import type {
  * 获取评论列表
  * GET /admin/comment/list
  */
-export function getCommentList(params?: CommentListParams): Promise<PaginatedData<CommentItem>> {
-  return request.get('/admin/comment/list', { params })
+export function getCommentList(
+  params?: CommentListParams,
+  signal?: AbortSignal
+): Promise<PaginatedData<CommentItem>> {
+  return request.get('/admin/comment/list', { params, signal })
 }
 
 /**

@@ -54,11 +54,7 @@ const videoPlayerRef = ref<VideoPlayerInstance | null>(null)
 /** 播放器容器引用，用于滚动定位 */
 const playerContainerRef = ref<HTMLDivElement | null>(null)
 
-const {
-  data: videoDetail,
-  isLoading,
-  refetch,
-} = useQuery({
+const { data: videoDetail, isLoading } = useQuery({
   queryKey: ['videoDetail', () => props.videoId],
   queryFn: () => getVideoDetail({ videoId: props.videoId! }),
   enabled: computed(() => props.visible && props.videoId !== null),
@@ -78,7 +74,6 @@ watch(
   (newId) => {
     if (newId && props.visible) {
       currentPartIndex.value = 0
-      void refetch()
     }
   }
 )

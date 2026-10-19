@@ -57,15 +57,12 @@ const inheritedMenuIds = ref<Set<number>>(new Set())
 const { data: allMenus, isLoading: menusLoading } = useQuery({
   queryKey: ['allMenus'],
   queryFn: getMenus,
+  enabled: computed(() => props.visible),
   staleTime: 60 * 1000,
 })
 
 /** 获取角色已分配的菜单（区分直连和继承） */
-const {
-  data: roleMenusData,
-  isLoading: roleMenusLoading,
-  refetch: refetchRoleMenus,
-} = useQuery({
+const { data: roleMenusData, isLoading: roleMenusLoading } = useQuery({
   queryKey: ['roleMenus', () => props.role?.id],
   queryFn: () =>
     props.role
@@ -213,18 +210,14 @@ watch(
 )
 
 /** 监听 visible 变化 */
-watch(
-  () => props.visible,
-  (visible) => {
-    if (visible && props.role) {
-      void refetchRoleMenus()
-      // 默认展开全部
-      if (allMenus.value) {
-        expandedKeys.value = getAllMenuIds(allMenus.value)
-      }
+watch([() => props.visible, allMenus], ([visible, menus]) => {
+  if (visible && props.role) {
+    // 默认展开全部
+    if (menus) {
+      expandedKeys.value = getAllMenuIds(menus)
     }
   }
-)
+})
 
 /** 处理关闭 */
 function handleClose(): void {

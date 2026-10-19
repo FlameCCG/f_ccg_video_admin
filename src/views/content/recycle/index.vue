@@ -8,6 +8,7 @@ import AppImage from '@/components/common/AppImage.vue'
  */
 import { ref, computed, h } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useDebouncedQueryParams } from '@/composables/useDebouncedQueryParams'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import {
   NCard,
@@ -42,6 +43,7 @@ const searchParams = ref({
   page: 1,
   pageSize: 10,
 })
+const { queryParams, flushQueryParams } = useDebouncedQueryParams(searchParams, ['keyword'])
 
 /** 选中的行 */
 const checkedRowKeys = ref<DataTableRowKey[]>([])
@@ -53,7 +55,7 @@ const selectedVideoId = ref<number | null>(null)
 
 /**
  * 获取已删除的视频列表 (status=3)
- * searchParams 就在 queryKey 里，改动筛选/分页即触发请求；
+ * queryKey 使用输入防抖后的参数快照，分页和下拉筛选立即生效；
  * 因此各 handler 里不再额外调 refetch()（那会让同一次交互打两个请求，
  * 并且 refetch 无条件绕过 staleTime，等于让上面的 staleTime 彻底失效）。
  */
@@ -64,16 +66,19 @@ const {
   isError,
   refetch,
 } = useQuery({
-  queryKey: ['recycleVideoList', searchParams],
-  queryFn: () =>
-    getVideoList({
-      status: 3, // 已删除
-      keyword: searchParams.value.keyword || undefined,
-      partitionId: searchParams.value.partitionId ?? undefined,
-      page: searchParams.value.page,
-      pageSize: searchParams.value.pageSize,
-      sort: 'latest',
-    }),
+  queryKey: computed(() => ['recycleVideoList', queryParams.value] as const),
+  queryFn: ({ queryKey: [, params], signal }) =>
+    getVideoList(
+      {
+        status: 3, // 已删除
+        keyword: params.keyword || undefined,
+        partitionId: params.partitionId ?? undefined,
+        page: params.page,
+        pageSize: params.pageSize,
+        sort: 'latest',
+      },
+      signal
+    ),
   staleTime: 30 * 1000,
 })
 
@@ -251,6 +256,7 @@ const batchActions = computed(() => [
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
+  flushQueryParams()
 }
 
 /** 处理重置 */
@@ -261,6 +267,7 @@ function handleReset(): void {
     page: 1,
     pageSize: 10,
   }
+  flushQueryParams()
 }
 
 /** 处理页码变化 */

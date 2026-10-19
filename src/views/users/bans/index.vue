@@ -6,6 +6,7 @@
  */
 import { ref, computed, h } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useDebouncedQueryParams } from '@/composables/useDebouncedQueryParams'
 import { useQuery } from '@tanstack/vue-query'
 import { NCard, NButton, NIcon, NGi, NFormItem, NInput } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
@@ -27,6 +28,7 @@ const searchParams = ref({
   page: 1,
   pageSize: 10,
 })
+const { queryParams, flushQueryParams } = useDebouncedQueryParams(searchParams, ['keyword'])
 
 /** 封禁对话框状态 */
 const banDialogVisible = ref(false)
@@ -34,7 +36,7 @@ const banningUser = ref<AdminUserListItem | null>(null)
 
 /**
  * 获取用户列表
- * searchParams 就在 queryKey 里，改动筛选/分页即触发请求；
+ * queryKey 使用输入防抖后的参数快照，分页和下拉筛选立即生效；
  * 因此各 handler 里不再额外调 refetch()（那会让同一次交互打两个请求，
  * 并且 refetch 无条件绕过 staleTime，等于让上面的 staleTime 彻底失效）。
  */
@@ -45,14 +47,17 @@ const {
   isError,
   refetch,
 } = useQuery({
-  queryKey: ['userBanList', searchParams],
-  queryFn: () =>
-    getUserList({
-      keyword: searchParams.value.keyword || undefined,
-      status: searchParams.value.status ?? undefined,
-      page: searchParams.value.page,
-      pageSize: searchParams.value.pageSize,
-    }),
+  queryKey: computed(() => ['userBanList', queryParams.value] as const),
+  queryFn: ({ queryKey: [, params], signal }) =>
+    getUserList(
+      {
+        keyword: params.keyword || undefined,
+        status: params.status ?? undefined,
+        page: params.page,
+        pageSize: params.pageSize,
+      },
+      signal
+    ),
   staleTime: 30 * 1000,
 })
 
@@ -165,6 +170,7 @@ function onStatusChange(val: unknown): void {
 /** 处理搜索 */
 function handleSearch(): void {
   searchParams.value.page = 1
+  flushQueryParams()
 }
 
 /** 处理重置 */
@@ -175,6 +181,7 @@ function handleReset(): void {
     page: 1,
     pageSize: 10,
   }
+  flushQueryParams()
 }
 
 /** 处理页码变化 */

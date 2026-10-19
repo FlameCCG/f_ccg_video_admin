@@ -37,8 +37,11 @@ import type { PaginationParams } from './types/common'
  * 获取视频列表
  * GET /admin/video/list
  */
-export function getVideoList(params?: VideoListParams): Promise<PaginatedData<AdminVideoItem>> {
-  return request.get('/admin/video/list', { params })
+export function getVideoList(
+  params?: VideoListParams,
+  signal?: AbortSignal
+): Promise<PaginatedData<AdminVideoItem>> {
+  return request.get('/admin/video/list', { params, signal })
 }
 
 /**
@@ -100,8 +103,11 @@ export function reviewVideo(params: ReviewVideoParams): Promise<ReviewVideoResul
  * 获取弹幕列表
  * GET /admin/video/danmu/list
  */
-export function getDanmuList(params?: DanmuListParams): Promise<PaginatedData<AdminDanmuItem>> {
-  return request.get('/admin/video/danmu/list', { params })
+export function getDanmuList(
+  params?: DanmuListParams,
+  signal?: AbortSignal
+): Promise<PaginatedData<AdminDanmuItem>> {
+  return request.get('/admin/video/danmu/list', { params, signal })
 }
 
 /**

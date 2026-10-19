@@ -102,6 +102,7 @@ const uploadPreviewHeight = computed(() => currentSizeMeta.value.previewHeight)
 const { data: partitionData } = useQuery({
   queryKey: ['commonPartitionList'],
   queryFn: () => getCommonPartitions(),
+  enabled: computed(() => props.visible),
   staleTime: 5 * 60 * 1000,
 })
 

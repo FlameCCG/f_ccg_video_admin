@@ -15,8 +15,11 @@ import type {
  * 获取动态列表
  * GET /admin/dynamic/list
  */
-export function getDynamicList(params?: DynamicListParams): Promise<PaginatedData<DynamicItem>> {
-  return request.get('/admin/dynamic/list', { params })
+export function getDynamicList(
+  params?: DynamicListParams,
+  signal?: AbortSignal
+): Promise<PaginatedData<DynamicItem>> {
+  return request.get('/admin/dynamic/list', { params, signal })
 }
 
 /**

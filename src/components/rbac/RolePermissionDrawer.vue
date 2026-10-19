@@ -118,6 +118,7 @@ const emptyPermissionsDetail = (): RolePermissionsDetail => ({
 const { data: allResources, isLoading: resourcesLoading } = useQuery({
   queryKey: ['allResources'],
   queryFn: getResources,
+  enabled: computed(() => props.visible),
   staleTime: 60 * 1000,
 })
 
@@ -776,8 +777,6 @@ watch(
   () => props.visible,
   (visible) => {
     if (visible && props.role) {
-      void refetchPermissions()
-      void refetchRoleParents()
       searchKeyword.value = ''
       selectedTag.value = null
       newWildcard.value = { resource: '', action: '*' }

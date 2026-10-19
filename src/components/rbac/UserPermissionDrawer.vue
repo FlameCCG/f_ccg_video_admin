@@ -52,11 +52,7 @@ const searchKeyword = ref('')
 const selectedMethod = ref<string | null>(null)
 
 /** 获取用户权限 */
-const {
-  data: userPermissions,
-  isLoading: permissionsLoading,
-  refetch: refetchPermissions,
-} = useQuery({
+const { data: userPermissions, isLoading: permissionsLoading } = useQuery({
   queryKey: ['viewUserPermissions', computed(() => props.user?.id)],
   queryFn: () => (props.user ? getUserPermissions({ userId: props.user.id }) : Promise.resolve([])),
   enabled: computed(() => !!props.user && props.visible),
@@ -152,7 +148,6 @@ watch(
   () => props.visible,
   (visible) => {
     if (visible && props.user) {
-      void refetchPermissions()
       searchKeyword.value = ''
       selectedMethod.value = null
     }

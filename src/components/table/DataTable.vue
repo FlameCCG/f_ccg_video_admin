@@ -61,7 +61,7 @@ interface Props {
   striped?: boolean
   /** 表格大小 */
   size?: 'small' | 'medium' | 'large'
-  /** 是否虚拟滚动 */
+  /** 是否虚拟滚动；默认在大分页的平面列表中自动开启，树表/展开行保持完整渲染 */
   virtualScroll?: boolean
   /** 空状态描述 */
   emptyDescription?: string
@@ -101,7 +101,7 @@ const props = withDefaults(defineProps<Props>(), {
   singleLine: true,
   striped: false,
   size: 'medium',
-  virtualScroll: false,
+  virtualScroll: undefined,
   emptyDescription: undefined,
   childrenKey: 'children',
   defaultExpandedRowKeys: () => [],
@@ -148,6 +148,20 @@ const tableColumns = computed(() => {
     ...props.columns,
   ]
 })
+
+/** 小列表不付出虚拟列表的测量成本；大列表只挂载视口附近的行。 */
+const resolvedVirtualScroll = computed(
+  () =>
+    props.virtualScroll ??
+    (props.pagination &&
+      props.data.length >= 50 &&
+      !props.rowProps &&
+      !leafColumns.value.some(
+        (column) =>
+          ('type' in column && column.type === 'expand') || ('rowSpan' in column && column.rowSpan)
+      ) &&
+      !props.data.some((row: Record<string, unknown>) => Array.isArray(row[props.childrenKey])))
+)
 
 /** 展开分组列，取出真正占一列的叶子列 */
 function flattenColumns(cols: DataTableColumns<RowData>): TableColumnItem[] {
@@ -259,9 +273,10 @@ function handleCheckedRowKeysChange(keys: DataTableRowKey[]): void {
   internalCheckedKeys.value = keys
   emit('update:checkedRowKeys', keys)
 
+  const selectedKeys = new Set(keys)
   const selectedRows = props.data.filter((row) => {
     const key = rowKeyFn.value(row)
-    return keys.includes(key)
+    return selectedKeys.has(key)
   })
   emit('selectionChange', keys, selectedRows)
 }
@@ -312,7 +327,8 @@ function handleRetry(): void {
         :single-line="singleLine"
         :striped="striped"
         :size="size"
-        :virtual-scroll="virtualScroll"
+        :virtual-scroll="resolvedVirtualScroll"
+        :flex-height="resolvedVirtualScroll && maxHeight === undefined"
         :pagination="false"
         :scroll-x="resolvedScrollX"
         :scrollbar-props="bodyScrollbarProps"

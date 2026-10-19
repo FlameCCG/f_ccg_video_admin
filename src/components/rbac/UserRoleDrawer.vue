@@ -87,17 +87,14 @@ const loadingRoleTree = ref(false)
 
 /** 获取所有角色 */
 const { data: allRoles, isLoading: rolesLoading } = useQuery({
-  queryKey: ['allRoles'],
+  queryKey: ['roles'],
   queryFn: getRoles,
+  enabled: computed(() => props.visible),
   staleTime: 60 * 1000,
 })
 
 /** 获取用户已分配的角色 */
-const {
-  data: userRoles,
-  isLoading: userRolesLoading,
-  refetch: refetchUserRoles,
-} = useQuery({
+const { data: userRoles, isLoading: userRolesLoading } = useQuery({
   queryKey: ['userRoles', computed(() => props.user?.id)],
   queryFn: () => (props.user ? getUserRoles(props.user.id) : Promise.resolve([])),
   enabled: computed(() => !!props.user && props.visible),
@@ -149,7 +146,7 @@ watch(
   () => props.visible,
   (visible) => {
     if (visible && props.user) {
-      void refetchUserRoles()
+      selectedRoleIds.value = (userRoles.value ?? []).map((role) => role.id)
       // 重置继承树状态
       showInheritTree.value = false
       viewingTreeRoleId.value = null
