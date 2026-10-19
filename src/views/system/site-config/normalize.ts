@@ -64,6 +64,7 @@ export function normalizeAIConfig(raw: AIConfig): AIConfig {
 
 export function normalizeTranscodeConfig(raw: TranscodeConfig): TranscodeConfig {
   return {
+    localConsumerDisabled: raw.localConsumerDisabled ?? false,
     maxWorkers: raw.maxWorkers ?? 1,
     transcodeResolutions: Array.isArray(raw.transcodeResolutions) ? raw.transcodeResolutions : [],
     highBitrateThreshold: raw.highBitrateThreshold ?? 0,

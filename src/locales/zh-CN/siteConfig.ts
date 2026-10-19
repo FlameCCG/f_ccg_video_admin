@@ -142,6 +142,9 @@ export default {
   },
   // 转码配置
   transcode: {
+    localConsumerEnabled: '本机参与转码消费',
+    localConsumerTip:
+      '关闭后，当前后端实例不再消费转码任务，投稿仍正常投递任务，由其他已启用的节点处理；没有其他消费者时任务会排队。保存后需重启当前后端实例生效。',
     title: '转码配置',
     maxWorkers: '最大工作线程',
     transcodeResolutions: '转码分辨率',

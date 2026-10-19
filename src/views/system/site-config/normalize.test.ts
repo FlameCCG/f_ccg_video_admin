@@ -87,6 +87,15 @@ describe('site-config normalize', () => {
     expect(next.bitrate2160HighKbpsReduceRatio).toBe(0)
     expect(next.bitrate1080HighKbpsReduceRatio).toBe(0)
     expect(next.mp4Enable).toBe(true)
+    expect(next.localConsumerDisabled).toBe(false)
+  })
+
+  it('preserves the local consumer switch when loading and saving transcode config', () => {
+    const next = normalizeTranscodeConfig({ localConsumerDisabled: true } as TranscodeConfig)
+    expect(next.localConsumerDisabled).toBe(true)
+    expect(
+      normalizeTranscodeConfig({ ...next, localConsumerDisabled: false }).localConsumerDisabled
+    ).toBe(false)
   })
 
   it('fills empty third-login providers', () => {

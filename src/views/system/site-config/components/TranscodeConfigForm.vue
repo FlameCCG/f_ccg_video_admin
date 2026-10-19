@@ -56,10 +56,24 @@ function handleResolutionsChange(values: (string | number)[]): void {
     values.filter((v): v is number => typeof v === 'number')
   )
 }
+
+function handleLocalConsumerChange(enabled: boolean): void {
+  updateField('localConsumerDisabled', !enabled)
+}
 </script>
 
 <template>
   <n-form v-if="formData" label-placement="left" label-width="200" :disabled="loading">
+    <n-form-item :label="t('siteConfig.transcode.localConsumerEnabled')">
+      <n-space vertical>
+        <n-switch
+          :value="!formData.localConsumerDisabled"
+          :aria-label="t('siteConfig.transcode.localConsumerEnabled')"
+          @update:value="handleLocalConsumerChange"
+        />
+        <n-text depth="3">{{ t('siteConfig.transcode.localConsumerTip') }}</n-text>
+      </n-space>
+    </n-form-item>
     <!-- 基础设置 -->
     <n-grid :cols="2" :x-gap="24">
       <n-grid-item>

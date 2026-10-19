@@ -144,6 +144,9 @@ export default {
   },
   // トランスコード設定
   transcode: {
+    localConsumerEnabled: 'このノードで変換タスクを処理',
+    localConsumerTip:
+      '無効にすると、このバックエンドは変換タスクを処理しません。投稿のタスク送信は継続し、他の有効なノードが処理します。処理ノードがない場合は待機します。保存後、このバックエンドを再起動すると反映されます。',
     title: 'トランスコード設定',
     maxWorkers: '最大ワーカー数',
     transcodeResolutions: 'トランスコード解像度',

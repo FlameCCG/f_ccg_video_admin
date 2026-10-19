@@ -145,6 +145,9 @@ export default {
   },
   // Transcode Settings
   transcode: {
+    localConsumerEnabled: 'Local Transcode Consumer',
+    localConsumerTip:
+      'When disabled, this backend instance stops consuming transcode tasks. Uploads still enqueue tasks for other enabled nodes; tasks wait if no consumers are available. Restart this backend instance after saving to apply.',
     title: 'Transcode Settings',
     maxWorkers: 'Max Workers',
     transcodeResolutions: 'Transcode Resolutions',

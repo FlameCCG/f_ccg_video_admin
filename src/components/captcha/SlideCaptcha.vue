@@ -127,10 +127,13 @@ function handleSettled(): void {
   if (!settleArmed || verifyStatus.value !== 'success' || !props.visible) return
   clearSettleTimer()
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  settleTimer = setTimeout(() => {
-    settleTimer = undefined
-    if (props.visible && verifyStatus.value === 'success') emit('settled')
-  }, reducedMotion ? 0 : 100)
+  settleTimer = setTimeout(
+    () => {
+      settleTimer = undefined
+      if (props.visible && verifyStatus.value === 'success') emit('settled')
+    },
+    reducedMotion ? 0 : 100
+  )
 }
 
 function flushPosition(): void {
@@ -749,7 +752,7 @@ defineExpose({
     border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-elev-1);
-    transform: translate3d(var(--captcha-x, 0px), 0, 0);
+    transform: translate3d(var(--captcha-x, 0), 0, 0);
     transition:
       color var(--duration-fast) var(--easing-out-quart),
       background-color var(--duration-fast) var(--easing-out-quart),

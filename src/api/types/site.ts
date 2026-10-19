@@ -209,6 +209,8 @@ export interface AIConfig {
 
 /** 转码配置（与后端 conf.Transcode 对齐） */
 export interface TranscodeConfig {
+  /** 本机不参与转码消费，保存后重启当前后端实例生效 */
+  localConsumerDisabled: boolean
   maxWorkers: number
   transcodeResolutions: number[]
   highBitrateThreshold: number
