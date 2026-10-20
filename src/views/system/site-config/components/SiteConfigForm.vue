@@ -209,6 +209,34 @@ function handleSubmissionPolicyChange(value: boolean): void {
         </n-form-item>
       </n-grid-item>
       <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.slideCaptcha')">
+          <n-switch
+            :value="formData.login.slideCaptcha"
+            @update:value="(v: boolean) => updateField('login', 'slideCaptcha', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.slideCaptchaTTL')">
+          <n-input-number
+            :value="formData.login.slideCaptchaTTL"
+            :min="60"
+            :max="3600"
+            @update:value="(v) => updateField('login', 'slideCaptchaTTL', v ?? 300)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.login.slideCaptchaPadding')">
+          <n-input-number
+            :value="formData.login.slideCaptchaPadding"
+            :min="0"
+            :max="100"
+            @update:value="(v) => updateField('login', 'slideCaptchaPadding', v ?? 10)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
         <n-form-item :label="t('siteConfig.site.login.textClickCaptchaTTL')">
           <n-input-number
             :value="formData.login.textClickCaptchaTTL"
@@ -229,6 +257,8 @@ function handleSubmissionPolicyChange(value: boolean): void {
         </n-form-item>
       </n-grid-item>
     </n-grid>
+
+    <n-text depth="3">{{ t('siteConfig.site.interactiveCaptchaTip') }}</n-text>
 
     <!-- 用户横幅 -->
     <n-divider title-placement="left">
@@ -285,6 +315,34 @@ function handleSubmissionPolicyChange(value: boolean): void {
         </n-form-item>
       </n-grid-item>
       <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.register.textClickCaptcha')">
+          <n-switch
+            :value="formData.register.textClickCaptcha"
+            @update:value="(v: boolean) => updateField('register', 'textClickCaptcha', v)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.register.textClickCaptchaTTL')">
+          <n-input-number
+            :value="formData.register.textClickCaptchaTTL"
+            :min="60"
+            :max="3600"
+            @update:value="(v) => updateField('register', 'textClickCaptchaTTL', v ?? 300)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
+        <n-form-item :label="t('siteConfig.site.register.textClickCaptchaPadding')">
+          <n-input-number
+            :value="formData.register.textClickCaptchaPadding"
+            :min="0"
+            :max="100"
+            @update:value="(v) => updateField('register', 'textClickCaptchaPadding', v ?? 20)"
+          />
+        </n-form-item>
+      </n-grid-item>
+      <n-grid-item>
         <n-form-item :label="t('siteConfig.site.register.slideCaptchaTTL')">
           <n-input-number
             :value="formData.register.slideCaptchaTTL"
@@ -305,6 +363,8 @@ function handleSubmissionPolicyChange(value: boolean): void {
         </n-form-item>
       </n-grid-item>
     </n-grid>
+
+    <n-text depth="3">{{ t('siteConfig.site.interactiveCaptchaTip') }}</n-text>
 
     <!-- 存储设置 -->
     <n-divider title-placement="left">

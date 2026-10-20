@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-
 import {
   NButton,
   NForm,
@@ -14,159 +13,124 @@ import {
   type FormRules,
   type InputInst,
 } from 'naive-ui'
-
-import { getPublicSiteConfig } from '@/api/site'
 import SlideCaptcha from '@/components/captcha/SlideCaptcha.vue'
+import ClickCaptcha from '@/components/captcha/ClickCaptcha.vue'
 import LanguageDropdown from '@/components/common/LanguageDropdown.vue'
 import ThemeDropdown from '@/components/common/ThemeDropdown.vue'
+import { useCaptchaTypeQueue } from '@/composables/useCaptchaTypeQueue'
+import type { ClickCaptchaResult } from '@/api/captcha'
+import type { LoginCredentials } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const { t } = useI18n()
 const message = useMessage()
 const authStore = useAuthStore()
-
 const formRef = ref<FormInst | null>(null)
 const usernameInputRef = ref<InputInst | null>(null)
-
 interface CaptchaExposed {
   reset: () => void
   refresh: () => void
-  fail: () => void
+  fail: (message?: string) => void
   success: () => void
 }
-
 const captchaRef = ref<CaptchaExposed | null>(null)
-
-const formData = reactive({
-  username: '',
-  password: '',
-})
-
-const captchaData = reactive({
-  token: '',
-  x: 0,
-  y: 0,
-  verified: false,
-})
-
+const formData = reactive({ username: '', password: '' })
 const showCaptchaModal = ref(false)
 const shouldNavigateAfterCaptcha = ref(false)
-
-/** 滑块验证码是否启用（默认 true，安全优先） */
-const slideCaptchaEnabled = ref(true)
-
-const isLoading = computed(() => authStore.isLoggingIn)
-
+const captchaKind = ref<'click' | 'slide'>('slide')
+const captchaRevision = ref(0)
+const preparingCaptcha = ref(false)
+const typeQueue = useCaptchaTypeQueue(() => 'login')
+const isLoading = computed(() => authStore.isLoggingIn || preparingCaptcha.value)
+let selectionId = 0
 const rules: FormRules = {
-  username: [
-    {
-      required: true,
-      message: () => t('auth.tips.usernameRequired'),
-      trigger: 'blur',
-    },
-  ],
-  password: [
-    {
-      required: true,
-      message: () => t('auth.tips.passwordRequired'),
-      trigger: 'blur',
-    },
-  ],
+  username: [{ required: true, message: () => t('auth.tips.usernameRequired'), trigger: 'blur' }],
+  password: [{ required: true, message: () => t('auth.tips.passwordRequired'), trigger: 'blur' }],
 }
-
 onMounted(() => {
-  void fetchPublicSiteConfig()
-  void focusUsernameInput()
+  typeQueue.warmup()
+  void nextTick(() => usernameInputRef.value?.focus())
 })
-
-async function focusUsernameInput(): Promise<void> {
-  await nextTick()
-  usernameInputRef.value?.focus()
-}
-
-/** 获取公开站点配置（无需认证） */
-async function fetchPublicSiteConfig(): Promise<void> {
-  try {
-    const config = await getPublicSiteConfig()
-    slideCaptchaEnabled.value = config.site.register.slideCaptcha ?? true
-  } catch {
-    // 获取配置失败时默认启用滑块验证码（安全优先）
-    slideCaptchaEnabled.value = true
-  }
-}
-
-/** 仅滑块验证码校验失败（不含账号密码等业务错误） */
-function isCaptchaBusinessError(messageText: string): boolean {
-  const lower = messageText.toLowerCase()
-  return (
-    lower.includes('验证码错误') ||
-    lower.includes('验证码验证失败') ||
-    lower.includes('验证码已过期') ||
-    lower.includes('captcha verification') ||
-    lower.includes('captcha expired') ||
-    lower.includes('slide captcha') ||
-    lower.includes('invalid slide captcha')
-  )
-}
-
-function handleCaptchaConfirm(result: { token: string; x: number; y: number }): void {
-  captchaData.token = result.token
-  captchaData.x = result.x
-  captchaData.y = result.y
-  captchaData.verified = true
-  void doLogin()
-}
-
-function handleCaptchaFail(): void {
-  // 失败反馈只在滑块内部展示，不弹 toast
-  captchaData.verified = false
-}
-
-function handleCaptchaRefresh(): void {
-  captchaData.verified = false
-  captchaData.token = ''
-  captchaData.x = 0
-  captchaData.y = 0
-}
+watch(
+  showCaptchaModal,
+  (open) => {
+    if (open) typeQueue.warmup()
+    else selectionId += 1
+  },
+  { flush: 'post' }
+)
 
 async function handleLoginClick(): Promise<void> {
+  if (isLoading.value) return
+  preparingCaptcha.value = true
   try {
-    await formRef.value?.validate()
-
-    if (slideCaptchaEnabled.value) {
-      shouldNavigateAfterCaptcha.value = false
-      showCaptchaModal.value = true
-    } else {
-      captchaData.verified = true
-      await doLogin()
+    try {
+      await formRef.value?.validate()
+    } catch {
+      return
     }
-  } catch {
-    // 表单校验已在字段下方给出明确反馈
+    const type = await typeQueue.take()
+    shouldNavigateAfterCaptcha.value = false
+    if (type === 'none') {
+      typeQueue.warmup()
+      await doLogin({})
+      return
+    }
+    captchaKind.value = type
+    captchaRevision.value += 1
+    showCaptchaModal.value = true
+  } catch (error: unknown) {
+    message.error(error instanceof Error ? error.message : '验证码准备失败，请重试')
+    typeQueue.warmup()
+  } finally {
+    preparingCaptcha.value = false
   }
 }
-
-async function doLogin(): Promise<void> {
-  if (!captchaData.verified) return
-
+function handleSlideConfirm(result: { token: string; x: number; y: number }): void {
+  void doLogin({
+    slideCaptchaToken: result.token,
+    slideCaptchaX: result.x,
+    slideCaptchaY: result.y,
+  })
+}
+function handleClickConfirm(result: ClickCaptchaResult): void {
+  void doLogin({ captchaToken: result.token, captchaDots: result.dots })
+}
+async function handleCaptchaRetry(): Promise<void> {
+  if (!showCaptchaModal.value || shouldNavigateAfterCaptcha.value || isLoading.value) return
+  const id = ++selectionId
+  preparingCaptcha.value = true
   try {
-    const loginParams = slideCaptchaEnabled.value
-      ? {
-          username: formData.username,
-          password: formData.password,
-          slideCaptchaToken: captchaData.token,
-          slideCaptchaX: captchaData.x,
-          slideCaptchaY: captchaData.y,
-        }
-      : {
-          username: formData.username,
-          password: formData.password,
-        }
-
-    // 开启滑块时静默请求：验证码失败只在滑块内反馈，避免与拦截器双重 toast
-    await authStore.login(loginParams, { silent: slideCaptchaEnabled.value })
-
-    if (slideCaptchaEnabled.value) {
+    const type = await typeQueue.take()
+    if (id !== selectionId || !showCaptchaModal.value) return
+    if (type === 'none') {
+      showCaptchaModal.value = false
+    } else {
+      captchaKind.value = type
+      captchaRevision.value += 1
+    }
+    await nextTick()
+    typeQueue.warmup()
+  } catch (error: unknown) {
+    if (id !== selectionId) return
+    message.error(error instanceof Error ? error.message : '验证码准备失败，请重试')
+    typeQueue.warmup()
+  } finally {
+    preparingCaptcha.value = false
+  }
+}
+async function doLogin(captcha: Partial<LoginCredentials>): Promise<void> {
+  if (authStore.isLoggingIn) return
+  const withCaptcha = showCaptchaModal.value
+  const id = selectionId
+  try {
+    await authStore.login(
+      { username: formData.username.trim(), password: formData.password, ...captcha },
+      { silent: withCaptcha }
+    )
+    if (withCaptcha) {
+      if (id !== selectionId || !showCaptchaModal.value) return
       shouldNavigateAfterCaptcha.value = true
       captchaRef.value?.success()
     } else {
@@ -174,37 +138,22 @@ async function doLogin(): Promise<void> {
       void router.push({ path: '/' })
     }
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : ''
-    captchaData.verified = false
-
-    if (slideCaptchaEnabled.value) {
+    if (withCaptcha && id === selectionId && showCaptchaModal.value) {
       shouldNavigateAfterCaptcha.value = false
-      captchaRef.value?.fail()
-      // 滑块验证码错误：仅滑块内部提示；其它业务错误（如密码错误）保留一次 toast
-      if (errorMessage && !isCaptchaBusinessError(errorMessage)) {
-        message.error(errorMessage)
-      }
-      return
-    }
-
-    if (errorMessage) {
-      message.error(errorMessage)
+      captchaRef.value?.fail(error instanceof Error ? error.message : '')
+      typeQueue.warmup()
     }
   }
 }
-
 function handleCaptchaSettled(): void {
   if (shouldNavigateAfterCaptcha.value) showCaptchaModal.value = false
 }
-
 function handleCaptchaAfterLeave(): void {
   if (!shouldNavigateAfterCaptcha.value) return
-
   shouldNavigateAfterCaptcha.value = false
   message.success(t('auth.tips.loginSuccess'))
   void router.push({ path: '/' })
 }
-
 function handleEnterSubmit(): void {
   void handleLoginClick()
 }
@@ -354,24 +303,57 @@ function handleEnterSubmit(): void {
       preset="card"
       transform-origin="center"
       class="captcha-modal"
+      :class="{ 'captcha-modal--success': shouldNavigateAfterCaptcha }"
+      :aria-label="t('auth.captcha.title')"
       header-class="captcha-modal__header"
       content-class="captcha-modal__content"
-      :title="t('auth.captcha.title')"
-      :style="{ width: 'min(22.5rem, calc(100vw - var(--spacing-8)))' }"
+      :style="{ width: 'min(24rem, calc(100vw - var(--spacing-8)))' }"
       :bordered="false"
       :mask-closable="false"
       :closable="!isLoading && !shouldNavigateAfterCaptcha"
       :close-on-esc="!isLoading && !shouldNavigateAfterCaptcha"
       @after-leave="handleCaptchaAfterLeave"
     >
-      <SlideCaptcha
-        ref="captchaRef"
-        :visible="showCaptchaModal"
-        @confirm="handleCaptchaConfirm"
-        @fail="handleCaptchaFail"
-        @refresh="handleCaptchaRefresh"
-        @settled="handleCaptchaSettled"
-      />
+      <template #header>
+        <div class="captcha-modal__heading">
+          <span class="captcha-modal__emblem" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 3 5.5 6v5.5c0 4.2 2.5 7.7 6.5 9.5 4-1.8 6.5-5.3 6.5-9.5V6L12 3Z" />
+              <path d="m9.3 12.2 1.8 1.8 3.7-4" />
+            </svg>
+          </span>
+          <div class="captcha-modal__heading-copy">
+            <span>{{ t('auth.captcha.title') }}</span>
+            <p class="captcha-modal__subtitle">
+              {{ captchaKind === 'click' ? '按提示顺序点击文字' : t('auth.captcha.subtitle') }}
+            </p>
+          </div>
+        </div>
+      </template>
+      <div class="captcha-switch-stage" :aria-busy="preparingCaptcha">
+        <Transition name="captcha-switch" mode="out-in">
+          <SlideCaptcha
+            v-if="captchaKind === 'slide'"
+            :key="`slide-${captchaRevision}`"
+            ref="captchaRef"
+            :visible="showCaptchaModal"
+            :auto-retry="false"
+            @confirm="handleSlideConfirm"
+            @retry="handleCaptchaRetry"
+            @settled="handleCaptchaSettled"
+          />
+          <ClickCaptcha
+            v-else
+            :key="`click-${captchaRevision}`"
+            ref="captchaRef"
+            :visible="showCaptchaModal"
+            :auto-retry="false"
+            @confirm="handleClickConfirm"
+            @retry="handleCaptchaRetry"
+            @settled="handleCaptchaSettled"
+          />
+        </Transition>
+      </div>
     </n-modal>
   </div>
 </template>

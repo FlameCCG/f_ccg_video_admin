@@ -5,7 +5,7 @@
  */
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NCard, NTabs, NTabPane, NButton, NSpace, NSpin, useMessage } from 'naive-ui'
+import { NCard, NTabs, NTab, NButton, NSpace, NSpin, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { getSiteConfig, updateSiteConfig } from '@/api/site'
@@ -100,6 +100,20 @@ const transcodeFormData = ref<TranscodeConfig | null>(null)
 const thirdLoginFormData = ref<ThirdLoginConfig | null>(null)
 const jwtFormData = ref<JwtConfig | null>(null)
 const serverFormData = ref<ServerCorsConfig | null>(null)
+
+const activeFormData = computed(
+  () =>
+    ({
+      site: siteFormData.value,
+      logger: loggerFormData.value,
+      email: emailFormData.value,
+      ai: aiFormData.value,
+      transcode: transcodeFormData.value,
+      thirdLogin: thirdLoginFormData.value,
+      jwt: jwtFormData.value,
+      server: serverFormData.value,
+    })[currentTab.value]
+)
 
 /**
  * 把查询结果复制到可编辑表单。
@@ -215,6 +229,7 @@ const updateMutation = useMutation({
 // 切换 tab - 跳转到对应的路由路径
 function handleTabChange(name: string): void {
   const tabName = name as SiteConfigName
+  if (tabName === currentTab.value) return
 
   // 后端已经注册的配置子路由优先走真实路径，让侧边菜单、页面标题和顶部标签
   // 保持同一个导航身份；AI / Server 等未注册项再安全回退到 query 驱动。
@@ -256,7 +271,7 @@ async function handleReset(): Promise<void> {
 
 <template>
   <div class="site-config-page">
-    <n-card :bordered="false">
+    <n-card :bordered="false" class="config-card">
       <template #header>
         <n-space justify="space-between" align="center">
           <span class="page-title">{{ t('siteConfig.title') }}</span>
@@ -273,7 +288,7 @@ async function handleReset(): Promise<void> {
               type="primary"
               size="small"
               :loading="updateMutation.isPending.value"
-              :disabled="isFetching"
+              :disabled="isFetching || !activeFormData"
               @click="handleSave"
             >
               {{ t('siteConfig.actions.save') }}
@@ -282,62 +297,67 @@ async function handleReset(): Promise<void> {
         </n-space>
       </template>
 
-      <n-tabs :value="currentTab" type="line" animated @update:value="handleTabChange">
-        <n-tab-pane v-for="tab in configTabs" :key="tab.key" :name="tab.key" :tab="tab.label">
-          <n-spin :show="isFetching" class="config-spin">
-            <div class="config-content">
+      <n-tabs :value="currentTab" type="line" class="config-tabs" @update:value="handleTabChange">
+        <n-tab v-for="tab in configTabs" :key="tab.key" :name="tab.key">
+          {{ tab.label }}
+        </n-tab>
+      </n-tabs>
+      <n-spin :show="isFetching" class="config-spin">
+        <div class="config-scroll">
+          <Transition name="config-fade" mode="out-in">
+            <div v-if="activeFormData" :key="currentTab" class="config-content">
               <!-- 基础配置 -->
               <site-config-form
-                v-if="tab.key === 'site' && siteFormData"
+                v-if="currentTab === 'site' && siteFormData"
                 v-model="siteFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 日志配置 -->
               <logger-config-form
-                v-else-if="tab.key === 'logger' && loggerFormData"
+                v-else-if="currentTab === 'logger' && loggerFormData"
                 v-model="loggerFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 邮件配置 -->
               <email-config-form
-                v-else-if="tab.key === 'email' && emailFormData"
+                v-else-if="currentTab === 'email' && emailFormData"
                 v-model="emailFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- AI配置 -->
               <AIConfigForm
-                v-else-if="tab.key === 'ai' && aiFormData"
+                v-else-if="currentTab === 'ai' && aiFormData"
                 v-model="aiFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 转码配置 -->
               <transcode-config-form
-                v-else-if="tab.key === 'transcode' && transcodeFormData"
+                v-else-if="currentTab === 'transcode' && transcodeFormData"
                 v-model="transcodeFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- 第三方登录 -->
               <third-login-config-form
-                v-else-if="tab.key === 'thirdLogin' && thirdLoginFormData"
+                v-else-if="currentTab === 'thirdLogin' && thirdLoginFormData"
                 v-model="thirdLoginFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- JWT配置 -->
               <jwt-config-form
-                v-else-if="tab.key === 'jwt' && jwtFormData"
+                v-else-if="currentTab === 'jwt' && jwtFormData"
                 v-model="jwtFormData"
                 :loading="updateMutation.isPending.value"
               />
               <!-- CORS 白名单 -->
               <server-cors-config-form
-                v-else-if="tab.key === 'server' && serverFormData"
+                v-else-if="currentTab === 'server' && serverFormData"
                 v-model="serverFormData"
                 :loading="updateMutation.isPending.value"
               />
             </div>
-          </n-spin>
-        </n-tab-pane>
-      </n-tabs>
+          </Transition>
+        </div>
+      </n-spin>
     </n-card>
   </div>
 </template>
@@ -345,18 +365,69 @@ async function handleReset(): Promise<void> {
 <style scoped lang="scss">
 .site-config-page {
   height: 100%;
+  min-height: 0;
+}
+
+.config-card {
+  height: 100%;
+  min-height: 0;
+
+  :deep(> .n-card-content) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
 }
 
 .page-title {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--text-lg);
+  font-weight: var(--font-medium);
+}
+
+.config-tabs {
+  flex-shrink: 0;
+
+  :deep(.n-tabs-bar) {
+    transition-duration: var(--motion-indicator-duration);
+    transition-timing-function: var(--motion-indicator-easing);
+  }
 }
 
 .config-spin {
-  min-height: 300px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+
+  :deep(.n-spin-content) {
+    height: 100%;
+    transition: opacity var(--motion-enter-duration) var(--motion-enter-easing);
+  }
+}
+
+.config-scroll {
+  height: 100%;
+  overflow: hidden auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scrollbar-thumb) transparent;
 }
 
 .config-content {
-  padding: 16px 0;
+  padding: var(--spacing-4) 0;
+}
+
+.config-fade-enter-active {
+  transition: opacity var(--motion-enter-duration) var(--motion-enter-easing);
+}
+
+.config-fade-leave-active {
+  pointer-events: none;
+  transition: opacity var(--motion-leave-duration) var(--motion-leave-easing);
+}
+
+.config-fade-enter-from,
+.config-fade-leave-to {
+  opacity: 0;
 }
 </style>

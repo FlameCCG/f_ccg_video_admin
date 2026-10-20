@@ -15,6 +15,8 @@ export default {
   },
   // 基本設定
   site: {
+    interactiveCaptchaTip:
+      'クリック認証とスライド認証を両方有効にすると、毎回いずれかがランダムに表示されます。',
     title: '基本設定',
     submission: {
       title: '動画投稿',
@@ -36,6 +38,9 @@ export default {
       usernamePwdLogin: 'ユーザー名/パスワードログイン',
       textGraphicCaptcha: '画像認証',
       textClickCaptcha: 'クリック認証',
+      slideCaptcha: 'スライド認証',
+      slideCaptchaTTL: 'スライド認証有効期限',
+      slideCaptchaPadding: 'スライド認証パディング',
       textClickCaptchaTTL: 'クリック認証有効期限',
       textClickCaptchaPadding: 'クリック認証パディング',
     },
@@ -50,7 +55,10 @@ export default {
       emailCaptcha: 'メール認証',
       textGraphicCaptcha: '画像認証',
       slideCaptcha: 'スライド認証',
+      textClickCaptcha: 'クリック認証',
       slideCaptchaTTL: 'スライド認証有効期限',
+      textClickCaptchaTTL: 'クリック認証有効期限',
+      textClickCaptchaPadding: 'クリック認証パディング',
       slideCaptchaPadding: 'スライド認証パディング',
     },
     storage: {

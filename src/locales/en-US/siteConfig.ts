@@ -15,6 +15,8 @@ export default {
   },
   // Basic Settings
   site: {
+    interactiveCaptchaTip:
+      'When click and slide captchas are both enabled, one is chosen at random each time.',
     title: 'Basic Settings',
     submission: {
       title: 'Video submissions',
@@ -36,6 +38,9 @@ export default {
       usernamePwdLogin: 'Username/Password Login',
       textGraphicCaptcha: 'Graphic Captcha',
       textClickCaptcha: 'Click Captcha',
+      slideCaptcha: 'Slide Captcha',
+      slideCaptchaTTL: 'Slide Captcha TTL',
+      slideCaptchaPadding: 'Slide Captcha Padding',
       textClickCaptchaTTL: 'Click Captcha TTL',
       textClickCaptchaPadding: 'Click Captcha Padding',
     },
@@ -50,7 +55,10 @@ export default {
       emailCaptcha: 'Email Captcha',
       textGraphicCaptcha: 'Graphic Captcha',
       slideCaptcha: 'Slide Captcha',
+      textClickCaptcha: 'Click Captcha',
       slideCaptchaTTL: 'Slide Captcha TTL',
+      textClickCaptchaTTL: 'Click Captcha TTL',
+      textClickCaptchaPadding: 'Click Captcha Padding',
       slideCaptchaPadding: 'Slide Captcha Padding',
     },
     storage: {

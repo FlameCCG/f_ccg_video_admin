@@ -16,6 +16,7 @@ export default {
   // 基础配置
   site: {
     title: '基础配置',
+    interactiveCaptchaTip: '点选和滑块验证码同时开启时，每次随机弹出一种。',
     submission: {
       title: '视频投稿',
       disableUserSubmission: '禁止普通用户投稿',
@@ -36,6 +37,9 @@ export default {
       usernamePwdLogin: '账号密码登录',
       textGraphicCaptcha: '图形验证码',
       textClickCaptcha: '点击验证码',
+      slideCaptcha: '滑块验证码',
+      slideCaptchaTTL: '滑块验证码有效期',
+      slideCaptchaPadding: '滑块验证码边距',
       textClickCaptchaTTL: '点击验证码有效期',
       textClickCaptchaPadding: '点击验证码边距',
     },
@@ -50,7 +54,10 @@ export default {
       emailCaptcha: '邮箱验证码',
       textGraphicCaptcha: '图形验证码',
       slideCaptcha: '滑块验证码',
+      textClickCaptcha: '点击验证码',
       slideCaptchaTTL: '滑块验证码有效期',
+      textClickCaptchaTTL: '点击验证码有效期',
+      textClickCaptchaPadding: '点击验证码边距',
       slideCaptchaPadding: '滑块验证码边距',
     },
     storage: {

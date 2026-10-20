@@ -11,7 +11,7 @@ import type { SlideCaptcha, LoginCredentials, JwtToken, RefreshTokenParams } fro
  * GET /common/captcha/slide
  */
 export function getSlideCaptcha(): Promise<SlideCaptcha> {
-  return request.get('/common/captcha/slide')
+  return request.get('/common/captcha/slide', { params: { scene: 'login' } })
 }
 
 /**

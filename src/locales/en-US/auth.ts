@@ -19,6 +19,8 @@ export default {
   },
   captcha: {
     title: 'Security Verification',
+    subtitle: 'Slide the puzzle piece into the gap',
+    successHint: 'All set. Taking you in…',
     tip: 'Drag the slider to complete verification',
     verifying: 'Verifying security credentials',
     loading: 'Loading...',

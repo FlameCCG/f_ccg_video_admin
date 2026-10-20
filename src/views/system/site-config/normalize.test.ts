@@ -118,11 +118,32 @@ describe('site-config normalize', () => {
     expect(next.disableUserSubmission).toBe(false)
     expect(next.contentReview.enable).toBe(false)
     expect(next.login.gitHubLogin).toBe(false)
+    expect(next.login.slideCaptcha).toBe(false)
+    expect(next.register.textClickCaptcha).toBe(false)
     expect(next.register.slideCaptchaTTL).toBe(300)
     expect(next.defaultUserBannerIDs).toEqual([])
     expect(next.storage.dailyUploadLimit).toBe(10)
     expect(next.storage.unmergedChunkRetentionHours).toBe(2)
     expect(next.storage.unpublishedSourceRetentionHours).toBe(1)
+  })
+
+  it('preserves both interactive captcha switches for login and email sending', () => {
+    const raw = {
+      login: { textClickCaptcha: true, slideCaptcha: true },
+      register: { textClickCaptcha: true, slideCaptcha: true },
+    } as SiteConfig
+    const next = normalizeSiteConfig(raw)
+    expect(next.login.textClickCaptcha).toBe(true)
+    expect(next.login.slideCaptcha).toBe(true)
+    expect(next.register.textClickCaptcha).toBe(true)
+    expect(next.register.slideCaptcha).toBe(true)
+    const saved = normalizeSiteConfig({
+      ...next,
+      login: { ...next.login, slideCaptcha: false },
+      register: { ...next.register, textClickCaptcha: false },
+    })
+    expect(saved.login.slideCaptcha).toBe(false)
+    expect(saved.register.textClickCaptcha).toBe(false)
   })
 
   it('keeps the daily limit separate from the per-work part limit', () => {
