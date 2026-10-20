@@ -32,7 +32,7 @@
  */
 import { defineStore } from 'pinia'
 import { computed, defineComponent, h, ref } from 'vue'
-import type { RouteRecordRaw, RouteComponent } from 'vue-router'
+import { useRoute, type RouteRecordRaw, type RouteComponent } from 'vue-router'
 import { getCurrentUserMenus, getUserPermissions } from '@/api/rbac'
 import type { Menu, Permission } from '@/api/types'
 import type { LocaleType } from '@/locales'
@@ -68,6 +68,20 @@ import MenuComponentBoundary from '@/components/rbac/MenuComponentBoundary.vue'
  * 【注意】登录页 / 403 / 404 不在菜单里，它们在 src/router/routes.ts 中显式懒加载。
  */
 const viewModules = import.meta.glob<{ default: RouteComponent }>('@/views/**/index.vue')
+
+// 配置子路由共用一个边界组件，使 Tab 导航只更新表单，不重建整张卡片。
+const SiteConfigRouteComponent = defineComponent({
+  name: 'SiteConfigRouteBoundary',
+  setup() {
+    const route = useRoute()
+    return () =>
+      h(MenuComponentBoundary, {
+        menuTitle: route.meta.title ?? '',
+        componentPath: 'views/system/site-config/index.vue',
+        loader: viewModules['/src/views/system/site-config/index.vue'],
+      })
+  },
+})
 
 /**
  * 布局组件映射
@@ -168,6 +182,10 @@ function createMenuRouteComponent(
   }
 
   const loader = resolveComponent(componentPath)
+  if (loader && loader === viewModules['/src/views/system/site-config/index.vue']) {
+    return SiteConfigRouteComponent
+  }
+
   return defineComponent({
     name: `MenuRouteBoundary${String(menu.id)}`,
     setup() {
@@ -295,7 +313,10 @@ function menuToRoute(menu: Menu, locale: LocaleType, isTopLevel = false): RouteR
   const baseRoute = {
     path: menu.path,
     name: menu.name || `menu-${menu.id}`,
-    meta: baseMeta,
+    meta: {
+      ...baseMeta,
+      ...(component === SiteConfigRouteComponent ? { viewKey: 'site-config' } : {}),
+    },
     component,
     children,
   }

@@ -35,6 +35,8 @@
 :root {
   $pearl-colors: map.get($themes, 'pearl');
 
+  color-scheme: light;
+
   @each $color-name, $color-value in $pearl-colors {
     --color-#{$color-name}: #{$color-value};
   }
@@ -55,8 +57,12 @@
     $is-dark: map.get($meta, 'is-dark');
 
     @if $is-dark {
+      color-scheme: dark;
+
       @include emit-shadows($shadows-dark);
     } @else {
+      color-scheme: light;
+
       @include emit-shadows($shadows-light);
     }
   }

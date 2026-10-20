@@ -84,3 +84,25 @@ textarea,
 select {
   font-family: inherit;
 }
+
+// 自动填充使用当前组件的主题色；内阴影覆盖 Chromium 的浏览器默认底色。
+// 同时覆盖预览、填入、悬停和聚焦状态，不延迟背景颜色变化。
+.n-input {
+  --input-autofill-bg: var(--n-color, var(--color-surface));
+  --input-autofill-text: var(--n-text-color, var(--color-text));
+
+  &.n-input--focus {
+    --input-autofill-bg: var(--n-color-focus, var(--n-color, var(--color-surface)));
+  }
+
+  &.n-input--disabled {
+    --input-autofill-bg: var(--n-color-disabled, var(--color-surface));
+    --input-autofill-text: var(--n-text-color-disabled, var(--color-text-disabled));
+  }
+}
+
+input:is(:autofill, :-webkit-autofill) {
+  caret-color: var(--input-autofill-text, var(--color-text));
+  -webkit-text-fill-color: var(--input-autofill-text, var(--color-text));
+  box-shadow: inset 0 0 0 1000px var(--input-autofill-bg, var(--color-surface));
+}

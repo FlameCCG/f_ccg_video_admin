@@ -29,3 +29,4 @@ dist-ssr
 .mcp.json
 .claude
 .playwright-mcp
+.serena

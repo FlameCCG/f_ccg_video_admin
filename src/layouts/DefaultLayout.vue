@@ -46,7 +46,7 @@ const SIDEBAR_COLLAPSED_WIDTH = readLayoutPx('--layout-sider-collapsed-width', 7
  * 哪个路由该缓存（include/exclude 也不能做成动态的：它一变，KeepAlive 的
  * pruneCache 会把已有缓存整批清掉）。因此给需要缓存的页面套一层具名壳：
  *   - meta.keepAlive 为真：渲染 KeepAliveView 壳，名字命中 include，
- *     缓存条目按 vnode key（路由 path）区分；
+ *     缓存条目按 vnode key（viewKey 或路由 path）区分；
  *   - 否则：直接渲染页面组件，名字不在 include 里，照常挂载/卸载。
  * :max 给缓存条数封顶，长时间使用也不会让内存无上限增长。
  */
@@ -64,6 +64,7 @@ const KeepAliveView = defineComponent({
 
 /** 当前路由是否参与缓存 */
 const keepCurrentView = computed(() => route.meta.keepAlive === true)
+const currentViewKey = computed(() => route.meta.viewKey ?? route.path)
 
 /** 监听路由变化，自动添加标签 */
 watch(
@@ -110,10 +111,10 @@ watch(
                  不再用 mode="out-in"：那会把 200ms 离场 + 200ms 入场串成 400ms 的空档 -->
             <transition name="fade-slide">
               <keep-alive :include="CACHED_VIEW_NAME" :max="MAX_CACHED_VIEWS">
-                <KeepAliveView v-if="keepCurrentView" :key="route.path">
-                  <component :is="Component" :key="route.path" />
+                <KeepAliveView v-if="keepCurrentView" :key="currentViewKey">
+                  <component :is="Component" :key="currentViewKey" />
                 </KeepAliveView>
-                <component :is="Component" v-else :key="route.path" />
+                <component :is="Component" v-else :key="currentViewKey" />
               </keep-alive>
             </transition>
           </router-view>

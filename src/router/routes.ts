@@ -67,6 +67,8 @@ declare module 'vue-router' {
      * 配合 <keep-alive> 使用，缓存页面状态
      */
     keepAlive?: boolean
+    /** 同一页面内的子路由共用实例，避免重复播放整页过渡 */
+    viewKey?: string
     /** 菜单图标（SVG 字符串） */
     icon?: string
     /** 排序顺序 */
