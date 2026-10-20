@@ -338,16 +338,17 @@ export const setDashQuality = (dash: MediaPlayerClass, dashIndex: number): void 
         buffer: { fastSwitchEnabled: false, flushBufferAtTrackSwitch: false },
       },
     })
+    // 保留正在播放的分片，在后续分片边界切换。强制替换会清缓冲并触发 seek，造成卡顿。
     // 兼容 dash.js v4/v5 API
     const dashAny = dash as unknown as Record<string, unknown>
     if (typeof dashAny.setQualityFor === 'function') {
       ;(dashAny.setQualityFor as (type: string, index: number, replace: boolean) => void)(
         'video',
         dashIndex,
-        true
+        false
       )
     } else {
-      dash.setRepresentationForTypeByIndex('video', dashIndex, true)
+      dash.setRepresentationForTypeByIndex('video', dashIndex, false)
     }
   }
 }
