@@ -5,9 +5,9 @@ import type { PaginationParams } from './common'
 
 /**
  * 视频状态
- * 1=已发布 2=私密 3=已删除 4=审核中
+ * 1=已发布 2=私密 3=已删除 4=审核中 5=定时待发布
  */
-export type VideoStatus = 1 | 2 | 3 | 4
+export type VideoStatus = 1 | 2 | 3 | 4 | 5
 
 /**
  * 视频排序方式
@@ -102,7 +102,16 @@ export interface TranscodeProgress {
 /**
  * 视频列表项
  */
-export interface AdminVideoItem {
+export interface VideoPublicationInfo {
+  /** 是否定时作品，发布后保留 */
+  isScheduled: boolean
+  /** 计划发布时间；即时作品为空 */
+  publishAt: string | null
+  /** 管理员审核通过时间；免审或尚未通过时为空 */
+  approvedAt: string | null
+}
+
+export interface AdminVideoItem extends VideoPublicationInfo {
   /** 视频 ID */
   id: number
   /** 标题 */
@@ -238,7 +247,7 @@ export interface VideoPart {
 /**
  * 视频详情
  */
-export interface VideoDetail {
+export interface VideoDetail extends VideoPublicationInfo {
   /** 视频 ID */
   id: number
   /** 标题 */
@@ -291,6 +300,8 @@ export interface VideoDetail {
  * 视频列表查询参数
  */
 export interface VideoListParams extends PaginationParams {
+  /** 发布方式筛选，false 表示即时作品 */
+  isScheduled?: boolean
   /** 作者用户 ID（可选） */
   userId?: number
   /** 标题/描述关键词（可选） */

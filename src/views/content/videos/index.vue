@@ -35,6 +35,7 @@ import {
   transcodeProgressKey,
 } from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
+import { useVideoPublicationColumns } from '@/composables/useVideoPublicationColumns'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -46,6 +47,7 @@ const searchParams = ref({
   userId: null as number | null,
   keyword: '',
   status: null as VideoStatus | null,
+  isScheduled: null as number | null,
   partitionId: null as number | null,
   sort: 'latest' as VideoSortType,
   page: 1,
@@ -85,6 +87,7 @@ const {
         userId: params.userId ?? undefined,
         keyword: params.keyword || undefined,
         status: params.status ?? undefined,
+        isScheduled: params.isScheduled == null ? undefined : params.isScheduled === 1,
         partitionId: params.partitionId ?? undefined,
         sort: params.sort,
         page: params.page,
@@ -168,7 +171,14 @@ const statusOptions = computed(() => [
   { value: 1, label: t('video.status.published') },
   { value: 2, label: t('video.status.private') },
   { value: 4, label: t('video.status.reviewing') },
+  { value: 5, label: t('video.status.scheduled') },
 ])
+
+const publicationOptions = computed(() => [
+  { value: 1, label: t('video.publication.scheduled') },
+  { value: 0, label: t('video.publication.immediate') },
+])
+const publicationColumns = useVideoPublicationColumns()
 
 /** 排序选项 */
 const sortOptions = computed(() => [
@@ -185,6 +195,7 @@ function getStatusType(status: VideoStatus): 'success' | 'warning' | 'error' | '
     2: 'warning',
     3: 'error',
     4: 'processing',
+    5: 'processing',
   }
   return typeMap[status]
 }
@@ -196,6 +207,7 @@ function getStatusText(status: VideoStatus): string {
     2: t('video.status.private'),
     3: t('video.status.deleted'),
     4: t('video.status.reviewing'),
+    5: t('video.status.scheduled'),
   }
   return textMap[status]
 }
@@ -294,6 +306,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
         dot: true,
       }),
   },
+  ...publicationColumns.value,
   {
     title: t('video.list.transcode'),
     key: 'transcode',
@@ -385,6 +398,7 @@ function handleReset(): void {
     userId: null,
     keyword: '',
     status: null,
+    isScheduled: null,
     partitionId: null,
     sort: 'latest',
     page: 1,
@@ -407,6 +421,12 @@ function handlePageSizeChange(pageSize: number): void {
 /** 状态筛选变化 */
 function handleStatusChange(value: string | number | null): void {
   searchParams.value.status = typeof value === 'number' ? (value as VideoStatus) : null
+}
+
+/** 发布方式筛选变化 */
+function handlePublicationChange(value: string | number | null): void {
+  searchParams.value.isScheduled = typeof value === 'number' ? value : null
+  searchParams.value.page = 1
 }
 
 /** 分区筛选变化 */
@@ -553,6 +573,17 @@ function handleReconnectStream(): void {
               :placeholder="t('video.filter.partitionPlaceholder')"
               :width="'100%'"
               @change="handlePartitionChange"
+            />
+          </n-form-item>
+        </n-gi>
+        <n-gi span="6 m:3 l:2">
+          <n-form-item :label="t('video.filter.publicationType')" path="isScheduled">
+            <filter-select
+              :value="searchParams.isScheduled"
+              :options="publicationOptions"
+              :placeholder="t('video.filter.publicationPlaceholder')"
+              :width="'100%'"
+              @change="handlePublicationChange"
             />
           </n-form-item>
         </n-gi>

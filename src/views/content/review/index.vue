@@ -31,6 +31,7 @@ import { AppAvatar } from '@/components/common'
 import AppPageHeader from '@/components/layout/AppPageHeader.vue'
 import { useTableSelectionAction } from '@/composables'
 import VideoDetailDrawer from '../components/VideoDetailDrawer.vue'
+import { useVideoPublicationColumns } from '@/composables/useVideoPublicationColumns'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -108,6 +109,7 @@ const reviewMutation = useMutation({
     checkedRowKeys.value = []
     void queryClient.invalidateQueries({ queryKey: ['reviewVideoList'] })
     void queryClient.invalidateQueries({ queryKey: ['videoList'] })
+    void queryClient.invalidateQueries({ queryKey: ['videoDetail'] })
     void queryClient.invalidateQueries({ queryKey: ['recycleVideoList'] })
   },
   onError: (error: Error) => {
@@ -152,6 +154,7 @@ function formatDuration(seconds: number): string {
 }
 
 /** 表格列配置 */
+const publicationColumns = useVideoPublicationColumns()
 const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
   {
     type: 'selection',
@@ -217,6 +220,7 @@ const columns = computed<DataTableColumns<Record<string, unknown>>>(() => [
     width: 160,
     render: (row) => formatDateTime(row.createdAt as string),
   },
+  ...publicationColumns.value,
   {
     title: t('common.table.operation'),
     key: 'actions',

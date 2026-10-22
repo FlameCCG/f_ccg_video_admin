@@ -26,8 +26,15 @@ export default {
     danmu: '弾幕数',
     isOriginal: 'オリジナル',
     createdAt: '投稿日時',
+    publicationType: '公開方式',
+    publishAt: '公開予定日時',
+    approvedAt: '審査承認日時',
     transcode: 'トランスコード',
     loadFailedHint: '動画一覧を取得できませんでした。しばらくしてから再試行してください。',
+  },
+  publication: {
+    scheduled: '予約公開',
+    immediate: '即時公開',
   },
   transcode: {
     streamOffline: 'トランスコード進捗の配信が切断されました。クリックして再接続',
@@ -67,8 +74,11 @@ export default {
     private: '非公開',
     deleted: '削除済み',
     reviewing: '審査中',
+    scheduled: '予約公開待ち',
   },
   filter: {
+    publicationType: '公開方式',
+    publicationPlaceholder: '公開方式を選択',
     userId: 'ユーザーID',
     userIdPlaceholder: 'ユーザーIDを入力',
     keyword: '動画タイトル',
