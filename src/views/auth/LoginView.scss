@@ -913,32 +913,39 @@
     backdrop-filter: none;
   }
 }
+
 .captcha-switch-stage {
   min-height: 17rem;
 }
+
 .captcha-switch-enter-active {
   transition:
     opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+
 .captcha-switch-leave-active {
   transition:
     opacity 140ms ease,
     transform 140ms ease;
 }
+
 .captcha-switch-enter-from {
   opacity: 0;
   transform: translateY(6px) scale(0.99);
 }
+
 .captcha-switch-leave-to {
   opacity: 0;
   transform: translateY(-4px) scale(0.99);
 }
+
 @media (prefers-reduced-motion: reduce) {
   .captcha-switch-enter-active,
   .captcha-switch-leave-active {
     transition: opacity 1ms linear;
   }
+
   .captcha-switch-enter-from,
   .captcha-switch-leave-to {
     transform: none;

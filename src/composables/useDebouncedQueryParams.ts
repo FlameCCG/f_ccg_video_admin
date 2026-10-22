@@ -22,8 +22,9 @@ export function useDebouncedQueryParams<T extends Pagination>(
   function flushQueryParams(): void {
     cancelPending()
     const next = { ...source.value }
+    const current = queryParams.value as T
     const keys = Object.keys(next) as (keyof T)[]
-    if (keys.some((key) => !Object.is(next[key], queryParams.value[key]))) {
+    if (keys.some((key) => !Object.is(next[key], current[key]))) {
       queryParams.value = next
     }
   }

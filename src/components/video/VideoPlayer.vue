@@ -144,10 +144,13 @@ function showQualityFeedback(
 ): void {
   if (qualityFeedbackTimer) clearTimeout(qualityFeedbackTimer)
   qualityFeedback.value = { state, label }
-  qualityFeedbackTimer = setTimeout(() => {
-    qualityFeedback.value = null
-    qualityFeedbackTimer = null
-  }, state === 'error' ? 4000 : 2000)
+  qualityFeedbackTimer = setTimeout(
+    () => {
+      qualityFeedback.value = null
+      qualityFeedbackTimer = null
+    },
+    state === 'error' ? 4000 : 2000
+  )
 }
 
 function completeQualitySwitch(label: string): void {

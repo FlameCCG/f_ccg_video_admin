@@ -191,6 +191,7 @@ defineExpose({ reset, refresh, success, fail })
 <style scoped lang="scss">
 .click-captcha {
   width: 100%;
+
   &__canvas {
     position: relative;
     min-height: 160px;
@@ -199,16 +200,19 @@ defineExpose({ reset, refresh, success, fail })
     border-radius: var(--radius-xl);
     cursor: crosshair;
   }
+
   &__canvas > img {
     display: block;
     width: 100%;
     user-select: none;
   }
+
   &__empty {
     display: grid;
     min-height: 160px;
     place-items: center;
   }
+
   &__point {
     position: absolute;
     display: grid;
@@ -227,18 +231,22 @@ defineExpose({ reset, refresh, success, fail })
       background-color 200ms,
       transform 200ms;
   }
+
   &--success &__point {
     background: var(--color-success);
   }
+
   &--fail &__point {
     background: var(--color-danger);
   }
+
   &__toolbar {
     display: flex;
     gap: 8px;
     align-items: center;
     margin-top: 12px;
   }
+
   &__hint {
     display: flex;
     flex: 1;
@@ -246,11 +254,13 @@ defineExpose({ reset, refresh, success, fail })
     align-items: center;
     font-size: 12px;
   }
+
   &__hint img {
     max-width: 120px;
     max-height: 40px;
     object-fit: contain;
   }
+
   &__footer {
     display: flex;
     gap: 8px;
@@ -260,9 +270,11 @@ defineExpose({ reset, refresh, success, fail })
     color: var(--color-text-muted);
     font-size: 12px;
   }
+
   &--fail &__footer {
     color: var(--color-danger);
   }
+
   &__success {
     position: absolute;
     inset: 0;
@@ -274,6 +286,7 @@ defineExpose({ reset, refresh, success, fail })
     background: color-mix(in srgb, var(--color-surface) 92%, transparent);
     animation: click-success 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
+
   &__scan {
     position: absolute;
     inset: 0;
@@ -282,28 +295,34 @@ defineExpose({ reset, refresh, success, fail })
     pointer-events: none;
   }
 }
+
 @keyframes click-scan {
   from {
     transform: translateX(-100%);
   }
+
   to {
     transform: translateX(100%);
   }
 }
+
 @keyframes click-success {
   from {
     opacity: 0;
     transform: scale(0.96);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   .click-captcha__scan {
     animation: none;
   }
+
   .click-captcha__success {
     animation: none;
   }

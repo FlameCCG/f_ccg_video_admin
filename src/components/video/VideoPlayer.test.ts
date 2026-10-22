@@ -80,7 +80,10 @@ function resource(format = 'mp4'): VideoResource {
 
 type PlayerWrapper = VueWrapper<InstanceType<typeof VideoPlayer>>
 const wrappers: PlayerWrapper[] = []
-const playMock = vi.fn(() => Promise.resolve())
+const playMock = vi.fn(function (this: HTMLMediaElement) {
+  Object.defineProperty(this, 'paused', { configurable: true, value: false })
+  return Promise.resolve()
+})
 
 async function createPlayer(resources = [resource()]): Promise<PlayerWrapper> {
   const wrapper = mount(VideoPlayer, {
@@ -102,8 +105,13 @@ async function createPlayer(resources = [resource()]): Promise<PlayerWrapper> {
   return wrapper
 }
 
-function setMedia(wrapper: PlayerWrapper, ranges: [number, number][], duration = 100) {
-  const video = wrapper.get('video').element
+function setMedia(
+  wrapper: PlayerWrapper,
+  ranges: [number, number][],
+  duration = 100,
+  target?: HTMLVideoElement
+) {
+  const video = target ?? wrapper.get('video').element
   Object.defineProperties(video, {
     duration: { configurable: true, value: duration },
     buffered: {
@@ -129,7 +137,15 @@ beforeEach(() => {
   dash.handlers.clear()
   dash.currentIndex = 0
   vi.clearAllMocks()
-  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    Object.defineProperty(this, 'buffered', {
+      configurable: true,
+      value: { length: 0, start: () => 0, end: () => 0 },
+    })
+    this.dispatchEvent(new Event('emptied'))
+  })
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(playMock)
 })
 
@@ -280,49 +296,59 @@ describe('VideoPlayer quality changes', () => {
   it('confirms MP4 only after loading the new source and restoring the playback position', async () => {
     const wrapper = await createPlayer(mp4Qualities())
     const video = wrapper.get('video')
+    Object.defineProperty(video.element, 'paused', { configurable: true, value: false })
     video.element.currentTime = 42
     await video.trigger('timeupdate')
     await video.trigger('play')
+    playMock.mockClear() // 初始自动播放不属于本次清晰度切换。
     qualityMenu(wrapper).vm.$emit('select', 1)
     await flushPromises()
     expect(wrapper.get('[role="status"]').text()).toBe('Switching to 720p…')
-    expect(video.attributes('src')).toBe('/720.mp4')
+    const candidate = wrapper.get<HTMLVideoElement>('video.video-player__video--standby')
+    expect(video.attributes('src')).toBe('/video.mp4')
+    expect(candidate.attributes('src')).toBe('/720.mp4')
     expect(playMock).not.toHaveBeenCalled()
 
     await video.trigger('loadstart')
-    setMedia(wrapper, [[40, 60]])
-    Object.defineProperty(video.element, 'readyState', { configurable: true, value: 1 })
-    await video.trigger('loadedmetadata')
-    expect(video.element.currentTime).toBe(42)
-    await video.trigger('canplay')
+    setMedia(wrapper, [[40, 60]], 100, candidate.element)
+    Object.defineProperty(candidate.element, 'readyState', { configurable: true, value: 1 })
+    await candidate.trigger('loadedmetadata')
+    expect(candidate.element.currentTime).toBe(42)
+    await candidate.trigger('canplay')
     expect(wrapper.get('[role="status"]').text()).toBe('Switching to 720p…')
-    Object.defineProperties(video.element, {
+    Object.defineProperties(candidate.element, {
       readyState: { configurable: true, value: 3 },
       seeking: { configurable: true, value: true },
     })
-    await video.trigger('canplay')
+    await candidate.trigger('canplay')
     expect(wrapper.get('[role="status"]').text()).toBe('Switching to 720p…')
-    Object.defineProperty(video.element, 'seeking', { configurable: true, value: false })
-    await video.trigger('seeked')
-    expect(wrapper.get('[role="status"]').text()).toBe('Switched to 720p')
+    Object.defineProperty(candidate.element, 'seeking', { configurable: true, value: false })
+    await candidate.trigger('seeked')
+    await vi.waitFor(() => expect(wrapper.get('[role="status"]').text()).toBe('Switched to 720p'))
     expect(playMock).toHaveBeenCalledTimes(1)
   })
 
   it('cancels superseded MP4 callbacks and keeps paused playback paused', async () => {
     const wrapper = await createPlayer(mp4Qualities())
+    Object.defineProperty(wrapper.get('video').element, 'paused', {
+      configurable: true,
+      value: true,
+    })
+    playMock.mockClear()
     qualityMenu(wrapper).vm.$emit('select', 1)
     await flushPromises()
     qualityMenu(wrapper).vm.$emit('select', 2)
     await flushPromises()
     expect(wrapper.get('[role="status"]').text()).toBe('Switching to 360p…')
-    setMedia(wrapper, [[0, 20]])
-    Object.defineProperty(wrapper.get('video').element, 'readyState', {
+    const candidate = wrapper.get<HTMLVideoElement>('video.video-player__video--standby')
+    setMedia(wrapper, [[0, 20]], 100, candidate.element)
+    Object.defineProperty(candidate.element, 'readyState', {
       configurable: true,
       value: 3,
     })
-    await wrapper.get('video').trigger('loadedmetadata')
-    await wrapper.get('video').trigger('canplay')
-    expect(wrapper.get('[role="status"]').text()).toBe('Switched to 360p')
+    await candidate.trigger('loadedmetadata')
+    await candidate.trigger('canplay')
+    await vi.waitFor(() => expect(wrapper.get('[role="status"]').text()).toBe('Switched to 360p'))
     expect(playMock).not.toHaveBeenCalled()
   })
 
@@ -350,7 +376,8 @@ describe('VideoPlayer quality changes', () => {
     await nextTick()
     expect(setDashQuality).toHaveBeenCalledWith(expect.anything(), 1)
     expect(wrapper.get('[role="status"]').text()).toBe('Switching to 720p…')
-    expect(qualityMenu(wrapper).text()).toBe('1080p')
+    // 菜单先显示请求的档位，成功反馈仍必须等待真实渲染事件。
+    expect(qualityMenu(wrapper).text()).toBe('720p')
     await wrapper.get('video').trigger('canplay')
     const rendered = dash.handlers.get('qualityChangeRendered')!
     rendered({ mediaType: 'audio', newRepresentation: { index: 1, height: 720 } })

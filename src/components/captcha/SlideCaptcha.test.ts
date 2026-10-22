@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { createI18n } from 'vue-i18n'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,6 +40,17 @@ const i18n = createI18n({
 interface CaptchaExposed {
   success: () => void
   fail: () => void
+}
+
+async function loadCaptchaImages(wrapper: Pick<VueWrapper, 'get'>): Promise<void> {
+  const master = wrapper.get<HTMLImageElement>('.slide-captcha__master-image')
+  Object.defineProperties(master.element, {
+    naturalWidth: { configurable: true, value: 320 },
+    naturalHeight: { configurable: true, value: 160 },
+    clientWidth: { configurable: true, value: 320 },
+  })
+  await master.trigger('load')
+  await wrapper.get('.slide-captcha__tile-image').trigger('load')
 }
 
 const componentStubs = {
@@ -100,6 +111,7 @@ describe('SlideCaptcha', () => {
 
     await flushPromises()
 
+    await loadCaptchaImages(wrapper)
     const slider = wrapper.get('[role="slider"]')
     await slider.trigger('pointerdown', { clientX: 0, pointerId: 1, button: 0, isPrimary: true })
     await slider.trigger('pointermove', { clientX: 156, pointerId: 1 })
@@ -127,6 +139,7 @@ describe('SlideCaptcha', () => {
 
     await flushPromises()
 
+    await loadCaptchaImages(wrapper)
     const slider = wrapper.get('[role="slider"]')
     await slider.trigger('pointerdown', { clientX: 0, pointerId: 2, button: 0, isPrimary: true })
     await slider.trigger('pointermove', { clientX: 120, pointerId: 2 })
@@ -156,6 +169,7 @@ describe('SlideCaptcha', () => {
 
     await flushPromises()
 
+    await loadCaptchaImages(wrapper)
     const slider = wrapper.get('[role="slider"]')
     await slider.trigger('pointerdown', { clientX: 0, pointerId: 3, button: 0, isPrimary: true })
     await slider.trigger('pointermove', { clientX: 132, pointerId: 3 })

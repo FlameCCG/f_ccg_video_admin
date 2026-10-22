@@ -70,6 +70,7 @@ import MenuComponentBoundary from '@/components/rbac/MenuComponentBoundary.vue'
 const viewModules = import.meta.glob<{ default: RouteComponent }>('@/views/**/index.vue')
 
 // 配置子路由共用一个边界组件，使 Tab 导航只更新表单，不重建整张卡片。
+// eslint-disable-next-line vue/one-component-per-file -- 路由工厂在此共享配置页边界，而非定义多个页面。
 const SiteConfigRouteComponent = defineComponent({
   name: 'SiteConfigRouteBoundary',
   setup() {
@@ -186,6 +187,7 @@ function createMenuRouteComponent(
     return SiteConfigRouteComponent
   }
 
+  // eslint-disable-next-line vue/one-component-per-file -- 按菜单生成独立路由边界，保持页面异步加载和错误隔离。
   return defineComponent({
     name: `MenuRouteBoundary${String(menu.id)}`,
     setup() {
