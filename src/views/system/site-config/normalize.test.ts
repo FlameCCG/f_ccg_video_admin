@@ -98,6 +98,22 @@ describe('site-config normalize', () => {
     ).toBe(false)
   })
 
+  it('preserves transcode checkpoint settings and fills their defaults', () => {
+    const next = normalizeTranscodeConfig({
+      checkpointDir: '/data/checkpoints',
+      checkpointDisable: true,
+      chunkDurationSec: -1,
+    } as TranscodeConfig)
+    expect(next.checkpointDir).toBe('/data/checkpoints')
+    expect(next.checkpointDisable).toBe(true)
+    expect(next.chunkDurationSec).toBe(-1)
+
+    const defaults = normalizeTranscodeConfig({} as TranscodeConfig)
+    expect(defaults.checkpointDir).toBe('')
+    expect(defaults.checkpointDisable).toBe(false)
+    expect(defaults.chunkDurationSec).toBe(0)
+  })
+
   it('fills empty third-login providers', () => {
     const next = normalizeThirdLoginConfig({} as ThirdLoginConfig)
     expect(next.qq).toEqual({ appID: '', appKey: '', redirect: '' })

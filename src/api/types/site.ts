@@ -251,6 +251,12 @@ export interface TranscodeConfig {
   mp4Enable: boolean
   dashEnable: boolean
   dashSegDuration: number
+  /** 断点目录。空字符串表示使用系统临时目录 */
+  checkpointDir: string
+  /** 为 true 时关闭断点续传，重试整段重编码 */
+  checkpointDisable: boolean
+  /** 分段转码块长（秒）。0 表示默认 180；小于 0 表示关闭分段 */
+  chunkDurationSec: number
 }
 
 /** QQ 登录配置 */

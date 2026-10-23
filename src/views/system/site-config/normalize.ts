@@ -91,6 +91,9 @@ export function normalizeTranscodeConfig(raw: TranscodeConfig): TranscodeConfig 
     mp4Enable: raw.mp4Enable ?? false,
     dashEnable: raw.dashEnable ?? false,
     dashSegDuration: raw.dashSegDuration ?? 4,
+    checkpointDir: raw.checkpointDir ?? '',
+    checkpointDisable: raw.checkpointDisable ?? false,
+    chunkDurationSec: raw.chunkDurationSec ?? 0,
   }
 }
 

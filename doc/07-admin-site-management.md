@@ -277,11 +277,16 @@ name=transcode
     "hardwareScale": false,
     "mp4Enable": true,
     "dashEnable": true,
-    "dashSegDuration": 4
+    "dashSegDuration": 4,
+    "checkpointDir": "",
+    "checkpointDisable": false,
+    "chunkDurationSec": 0
   },
   "msg": "ok"
 }
 ```
+
+> `checkpointDir` 为空时使用系统临时目录。`checkpointDisable` 为 true 时关闭断点续传。`chunkDurationSec` 为 0 时默认 180 秒，小于 0 时关闭分段转码。保存时必须带回这三个字段，否则会被写成零值。
 
 name=thirdLogin
 
@@ -490,7 +495,10 @@ name=transcode
   "hardwareScale": false,
   "mp4Enable": true,
   "dashEnable": true,
-  "dashSegDuration": 4
+  "dashSegDuration": 4,
+  "checkpointDir": "",
+  "checkpointDisable": false,
+  "chunkDurationSec": 0
 }
 ```
 
