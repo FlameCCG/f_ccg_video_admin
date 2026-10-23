@@ -407,6 +407,9 @@ function handleSubmissionPolicyChange(value: boolean): void {
           </n-input-number>
         </n-form-item>
       </n-grid-item>
+      <n-grid-item :span="2">
+        <n-text depth="3">{{ t('siteConfig.site.storage.sizeTip') }}</n-text>
+      </n-grid-item>
       <n-grid-item>
         <n-form-item :label="t('siteConfig.site.storage.maxUploadNum')">
           <n-input-number

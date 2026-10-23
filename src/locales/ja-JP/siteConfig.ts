@@ -66,6 +66,8 @@ export default {
       maxChunkSize: '最大チャンクサイズ',
       chunkSize: 'チャンクサイズ',
       maxFileSize: '最大ファイルサイズ',
+      sizeTip:
+        'フロントはチャンクサイズで分割します。1チャンクの上限は最大チャンクサイズで、未設定のときだけチャンクサイズを使います。チャンクサイズの方が大きい場合、公開設定では最大チャンクサイズまで下げます。最大ファイルサイズはアップロードと結合時に、保存済みチャンクの合計で検証します。',
       maxUploadNum: '作品ごとの分P上限',
       dailyUploadLimit: '一般ユーザーの1日あたりのファイル上限',
       unmergedChunkRetentionHours: '未結合チャンクの保持期間',

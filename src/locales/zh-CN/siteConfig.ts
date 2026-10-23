@@ -65,6 +65,8 @@ export default {
       maxChunkSize: '最大分片大小',
       chunkSize: '分片大小',
       maxFileSize: '最大文件大小',
+      sizeTip:
+        '前台按分片大小切分。单片上限优先用最大分片大小；未配置时才用分片大小。分片大小更大时，公开配置会把它压到最大分片大小。最大文件大小在上传和合并时按已落盘分片合计校验。',
       maxUploadNum: '单个作品分P上限',
       dailyUploadLimit: '普通用户每日上传文件上限',
       unmergedChunkRetentionHours: '未合并分片保留时间',

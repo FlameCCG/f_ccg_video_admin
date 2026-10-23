@@ -66,6 +66,8 @@ export default {
       maxChunkSize: 'Max Chunk Size',
       chunkSize: 'Chunk Size',
       maxFileSize: 'Max File Size',
+      sizeTip:
+        'Clients slice uploads by chunk size. The per-chunk cap is max chunk size, or chunk size when max chunk size is unset. The public config lowers chunk size so it does not exceed max chunk size. Max file size is checked against the sum of stored chunks on upload and merge.',
       maxUploadNum: 'Parts per Work Limit',
       dailyUploadLimit: 'Daily File Limit for Users',
       unmergedChunkRetentionHours: 'Unmerged Chunk Retention',
